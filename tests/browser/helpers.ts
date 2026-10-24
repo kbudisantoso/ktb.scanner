@@ -14,7 +14,7 @@ export async function diagnostics(page: Page) {
 export async function closeTool(page: Page) {
   const apply = page
     .locator('.scanner-detail-footer')
-    .getByRole('button', { name: 'Übernehmen', exact: true });
+    .getByRole('button', { name: /^(Übernehmen|OK)$/ });
   if (await apply.isVisible()) await apply.click();
 }
 export async function tool(page: Page, name: 'Filter' | 'Anpassen' | 'Format') {

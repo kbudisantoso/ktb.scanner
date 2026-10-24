@@ -77,6 +77,7 @@ export function ScannerView({
   const [activePageId, setActivePageId] = useState<string>();
   const [pageActions, setPageActions] = useState(false);
   const [reviewPanel, setReviewPanel] = useState<ReviewPanel | null>(null);
+  const readOnlyPanel = reviewPanel === 'quality' || reviewPanel === 'original';
   const [pageGrid, setPageGrid] = useState(false);
   const [history, setHistory] = useState<Edit[]>([]);
   const panelSnapshot = useRef<Edit | null>(null);
@@ -860,9 +861,11 @@ export function ScannerView({
         !pageGrid &&
         (reviewPanel ? (
           <footer className="scanner-footer scanner-detail-footer">
-            <button disabled={busy} onClick={cancelPanel}>
-              {t('Abbrechen')}
-            </button>
+            {!readOnlyPanel && (
+              <button disabled={busy} onClick={cancelPanel}>
+                {t('Abbrechen')}
+              </button>
+            )}
             <button
               disabled={busy}
               className="scanner-primary"
@@ -871,7 +874,7 @@ export function ScannerView({
                 panelSnapshot.current = null;
               }}
             >
-              {t('Übernehmen')}
+              {t(readOnlyPanel ? 'OK' : 'Übernehmen')}
             </button>
           </footer>
         ) : (

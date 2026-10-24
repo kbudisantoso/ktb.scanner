@@ -1205,6 +1205,9 @@
 .scanner.scanner-workspace > .scanner-detail-footer {
   grid-template-columns: 1fr 1fr;
 }
+.scanner-detail-footer > button:only-child {
+  grid-column: 1 / -1;
+}
 .scanner-workspace > .scanner-footer button {
   min-width: 44px;
   min-height: 44px;
