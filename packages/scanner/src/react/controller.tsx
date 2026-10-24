@@ -1,0 +1,100 @@
+import { initialProfile } from '../profiles.ts';
+import { diagnose } from '../diagnostics.ts';
+import { createRoot } from 'react-dom/client';
+import type { ScannerController, ScannerOptions, ScanResult } from '../types.ts';
+import { ScannerError } from '../errors.ts';
+import { resolveLimits } from '../session.ts';
+import { assetUrl } from '../worker-client.ts';
+import { ScannerView } from './ScannerView.tsx';
+import { SHUTTER_SOUNDS } from '../sounds.ts';
+import { resolvePaperPreference } from '../paper-region.ts';
+export type { ScannerOptions, ScannerController } from '../types.ts';
+export function createScanner(options: ScannerOptions): ScannerController {
+  resolveLimits(options.limits);
+  initialProfile(options.defaultProfile);
+  if (
+    !options.mount ||
+    !options.assetBaseUrl ||
+    (options.imageType && !['image/jpeg', 'image/png'].includes(options.imageType)) ||
+    (options.initialMode && !['auto', 'manual'].includes(options.initialMode)) ||
+    (options.paperRegion !== undefined && !/^[a-z]{2}$/i.test(options.paperRegion)) ||
+    (options.shutterSound && !SHUTTER_SOUNDS.some((sound) => sound.id === options.shutterSound))
+  )
+    throw new ScannerError(
+      'CONFIG_INVALID',
+      'Bitte Mount, Assetpfad, Bildformat, Aufnahmemodus und Papierregion prüfen.',
+    );
+  assetUrl(options.assetBaseUrl, 'processing.worker.js');
+  let disposed = false;
+  let active: { finish: (result: ScanResult) => void } | undefined;
+  return {
+    open(initial = {}) {
+      if (disposed)
+        return Promise.reject(new ScannerError('SCANNER_DISPOSED', 'Scanner wurde geschlossen.'));
+      if (active)
+        return Promise.reject(
+          new ScannerError('SCANNER_BUSY', 'Eine Sitzung ist bereits geöffnet.'),
+        );
+      try {
+        initialProfile(options.defaultProfile, initial.defaultProfile);
+      } catch (error) {
+        return Promise.reject(error);
+      }
+      if (initial.signal?.aborted) return Promise.resolve({ status: 'cancelled' });
+      const paperPreference = resolvePaperPreference(
+        options.paperRegion,
+        navigator.languages?.length ? navigator.languages : [navigator.language],
+      );
+      diagnose(options.diagnostics, 'session-open', {
+        paperPreference,
+        context: options.context,
+        defaultProfile: initialProfile(options.defaultProfile, initial.defaultProfile),
+        mode: options.initialMode ?? 'auto',
+        imageType: options.imageType ?? 'image/jpeg',
+        engineBuffers: options.diagnostics?.engineBuffers === true,
+        shutterSound: options.shutterSound ?? 'camera',
+      });
+      const restoreFocus = document.activeElement as HTMLElement | null;
+      const host = document.createElement('div');
+      host.className = 'scanner-backdrop';
+      options.mount.append(host);
+      const root = createRoot(host),
+        abort = new AbortController();
+      return new Promise<ScanResult>((resolve) => {
+        let done = false;
+        const cancel = () => finish({ status: 'cancelled' });
+        const finish = (result: ScanResult) => {
+          if (done) return;
+          done = true;
+          diagnose(options.diagnostics, 'session-close', { status: result.status });
+          abort.abort();
+          initial.signal?.removeEventListener('abort', cancel);
+          // Unmount after React's current event/effect finishes, then release all owned resources.
+          queueMicrotask(() => {
+            root.unmount();
+            host.remove();
+            active = undefined;
+            if (restoreFocus?.isConnected) restoreFocus.focus();
+            resolve(result);
+          });
+        };
+        active = { finish };
+        initial.signal?.addEventListener('abort', cancel, { once: true });
+        root.render(
+          <ScannerView
+            options={options}
+            paperPreference={paperPreference.preferredPaper}
+            initial={initial}
+            signal={abort.signal}
+            finish={finish}
+          />,
+        );
+      });
+    },
+    async destroy() {
+      disposed = true;
+      active?.finish({ status: 'cancelled' });
+      await Promise.resolve();
+    },
+  };
+}

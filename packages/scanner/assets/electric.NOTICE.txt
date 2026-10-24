@@ -1,0 +1,11 @@
+Electric Boom 1
+Artist: AleXZavesa
+Source: https://pixabay.com/de/sound-effects/electric-boom-1-463651/
+Download: https://cdn.pixabay.com/audio/2026/01/09/audio_02cd4658f9.mp3
+Retrieved: 2026-10-18
+License: Pixabay Content License
+License summary: https://pixabay.com/service/license-summary/
+Binding terms: https://pixabay.com/service/terms/
+
+Used as an integrated capture cue. Do not redistribute as a standalone sound
+collection. The upstream sound file is unchanged.

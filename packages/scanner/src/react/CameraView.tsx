@@ -1,0 +1,556 @@
+import { useEffect, useId, useRef, useState } from 'react';
+import { diagnose } from '../diagnostics.ts';
+import type { DiagnosticOptions } from '../diagnostics.ts';
+import type { CaptureDetails } from '../camera.ts';
+import { Camera } from '../camera.ts';
+import { AutoCapture } from '../capture.ts';
+import { LiveTracker } from '../tracking.ts';
+import { CaptureOutline } from './CaptureOutline.tsx';
+import { CameraIcon } from './CameraIcon.tsx';
+import { createScanicAdapter } from '../scanic.ts';
+import { errorMessage } from '../errors.ts';
+import type { CaptureMode, Limits, Quad, CaptureHint, LiveDetection, Size } from '../types.ts';
+import type { Translate } from './hooks.ts';
+export function CameraView({
+  assetBaseUrl,
+  diagnostics,
+  limits,
+  mode,
+  setMode,
+  onShutter,
+  onPrepareSound,
+  onCapture,
+  onCancel,
+  onClose,
+  onImport,
+  pageCount,
+  t,
+}: {
+  assetBaseUrl: string;
+  diagnostics?: DiagnosticOptions;
+  limits: Limits;
+  mode: CaptureMode;
+  setMode: (mode: CaptureMode) => void;
+  onShutter: () => boolean;
+  onPrepareSound: () => void;
+  onCapture: (blob: Blob, hint?: CaptureHint) => void;
+  onCancel: () => void;
+  onClose: () => void;
+  onImport: () => void;
+  pageCount: number;
+  t: Translate;
+}) {
+  const video = useRef<HTMLVideoElement>(null),
+    snapshot = useRef<HTMLCanvasElement>(null),
+    camera = useRef(new Camera()),
+    gate = useRef(new AutoCapture(mode));
+  const [quad, setQuad] = useState<Quad | null>(null),
+    [opacity, setOpacity] = useState(1),
+    [waiting, setWaiting] = useState(false),
+    [progress, setProgress] = useState(0),
+    [error, setError] = useState('');
+  const [running, setRunning] = useState(false),
+    [devices, setDevices] = useState<MediaDeviceInfo[]>([]),
+    [device, setDevice] = useState(''),
+    [restart, setRestart] = useState(0);
+  const [taking, setTaking] = useState(false);
+  const [phase, setPhase] = useState<'live' | 'encoding' | 'processing'>('live');
+  const [autoBlock, setAutoBlock] = useState('');
+  const [previewSize, setPreviewSize] = useState<Size>({ width: 4, height: 3 });
+  const shot = useRef<() => void>(() => {});
+  const optionsId = useId();
+  const lighting = useRef(false),
+    lightRevision = useRef(0);
+  const [showOptions, setShowOptions] = useState(false);
+  const [hasTorch, setHasTorch] = useState(false),
+    [torch, setTorch] = useState(false),
+    [torchPending, setTorchPending] = useState(false);
+  useEffect(() => {
+    const abort = new AbortController(),
+      engine = createScanicAdapter(assetBaseUrl, diagnostics);
+    let timer: ReturnType<typeof setTimeout>,
+      active = true,
+      pendingShot = false;
+    let detectionAbort = new AbortController(),
+      detectionEpoch = 0;
+    let latest: { detection: LiveDetection; frameSize: Size } | undefined;
+    let tracker = new LiveTracker(),
+      lastEvidence = performance.now(),
+      frameAspect = 0,
+      watchdogState = '';
+    const showTracking = (now: number) => {
+      const view = tracker.view(now);
+      setQuad(view.corners);
+      setOpacity(view.opacity);
+      return view;
+    };
+    gate.current.rearm();
+    setTaking(false);
+    setPhase('live');
+    setRunning(false);
+    setProgress(0);
+    setWaiting(false);
+    setAutoBlock('');
+    setQuad(null);
+    setError('');
+    setHasTorch(false);
+    setTorch(false);
+    setTorchPending(false);
+    lighting.current = false;
+    lightRevision.current++;
+    const watchdog = setInterval(() => {
+      if (active && !pendingShot) {
+        const now = performance.now();
+        const view = showTracking(now);
+        const status = gate.current.poll(now);
+        const state =
+          now - lastEvidence > 1200 ? 'expired' : now - lastEvidence > 400 ? 'waiting' : 'fresh';
+        if (state !== watchdogState && state !== 'fresh')
+          diagnose(diagnostics, 'live-watchdog', {
+            state,
+            now,
+            lastEvidence,
+            ...view,
+            ...status,
+            generation: gate.current.generation,
+          });
+        watchdogState = state;
+        setProgress(status.progress);
+        if (state === 'expired') setAutoBlock('');
+        if (now - lastEvidence > 400) setWaiting(status.progress > 0);
+      }
+    }, 100);
+    const capture = async (automatic = false) => {
+      if (pendingShot || !active || !video.current) return;
+      pendingShot = true;
+      detectionEpoch++;
+      clearTimeout(timer);
+      detectionAbort.abort();
+      const evidence = latest;
+      setProgress((value) => (value > 0 ? 1 : 0));
+      setTaking(true);
+      let handedOff = false;
+      try {
+        diagnose(diagnostics, 'capture-start', { generation: gate.current.generation });
+        let details: CaptureDetails | undefined;
+        const blob = await camera.current.capture(
+          video.current,
+          limits,
+          abort.signal,
+          (value) => {
+            details = value;
+          },
+          (value, image) => {
+            const canvas = snapshot.current!;
+            const scale = Math.min(1, 1000 / Math.max(image.width, image.height));
+            canvas.width = Math.round(image.width * scale);
+            canvas.height = Math.round(image.height * scale);
+            canvas.getContext('2d')!.drawImage(image, 0, 0, canvas.width, canvas.height);
+            setPreviewSize({ width: image.width, height: image.height });
+            video.current?.pause();
+            setPhase('encoding');
+            const soundPlayed = onShutter();
+            diagnose(diagnostics, 'capture-shutter', { ...value, soundPlayed });
+          },
+        );
+        if (!active) return;
+        camera.current.stop();
+        engine.destroy();
+        const hint: CaptureHint | undefined =
+          evidence?.detection.corners && details
+            ? {
+                corners: structuredClone(evidence.detection.corners),
+                stable: automatic,
+                frameSize: evidence.frameSize,
+                ageMs: details.capturedAtMs - evidence.detection.timestamp,
+                mapping:
+                  details.method === 'video-frame' ? 'same-frame-area' : 'unverified-photo-area',
+              }
+            : undefined;
+        diagnose(diagnostics, 'capture-complete', {
+          bytes: blob.size,
+          mime: blob.type,
+          details,
+          hint,
+          encodingMs: details ? performance.now() - details.capturedAtMs : undefined,
+        });
+        handedOff = true;
+        setPhase('processing');
+        onCapture(blob, hint);
+      } catch (err) {
+        if (active) {
+          diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
+          setError(errorMessage(err));
+          gate.current.rearm();
+          detectionAbort = new AbortController();
+          latest = undefined;
+          tracker = new LiveTracker();
+          setPhase('live');
+          await video.current?.play().catch(() => {});
+          timer = setTimeout(() => void tick(), 125);
+        }
+      } finally {
+        if (!handedOff) {
+          pendingShot = false;
+          if (active) setTaking(false);
+        }
+      }
+    };
+    shot.current = () => {
+      diagnose(diagnostics, 'manual-trigger', { generation: gate.current.generation });
+      if (gate.current.claimManual()) void capture();
+    };
+    const tick = async () => {
+      const started = performance.now(),
+        epoch = detectionEpoch;
+      if (!active || pendingShot || !video.current) return;
+      if (video.current.readyState < 2) {
+        timer = setTimeout(() => void tick(), 125);
+        return;
+      }
+      try {
+        const frameSize = { width: video.current.videoWidth, height: video.current.videoHeight };
+        const aspect = frameSize.width / frameSize.height;
+        if (frameAspect && Math.abs(Math.log(aspect / frameAspect)) > 0.01) {
+          tracker = new LiveTracker();
+          gate.current.reset();
+        }
+        frameAspect = aspect;
+        const generation = gate.current.generation;
+        const image = await createImageBitmap(video.current, {
+          resizeWidth: Math.max(
+            1,
+            Math.round(
+              (800 * video.current.videoWidth) /
+                Math.max(video.current.videoWidth, video.current.videoHeight),
+            ),
+          ),
+          resizeHeight: Math.max(
+            1,
+            Math.round(
+              (800 * video.current.videoHeight) /
+                Math.max(video.current.videoWidth, video.current.videoHeight),
+            ),
+          ),
+        });
+        if (!active || pendingShot || epoch !== detectionEpoch) {
+          image.close();
+          return;
+        }
+        const detection = await engine.detect(image, started, detectionAbort.signal);
+        if (!active || pendingShot || epoch !== detectionEpoch) return;
+        latest = {
+          detection,
+          frameSize,
+        };
+        const now = performance.now();
+        lastEvidence = detection.timestamp;
+        const evidence = tracker.update(detection, now);
+        const view = showTracking(now);
+        const status = gate.current.update(
+          lighting.current ? { ...evidence, sharpness: 'unknown' } : evidence,
+          now,
+          generation,
+        );
+        diagnose(diagnostics, 'live-decision', {
+          ...detection,
+          receivedAtMs: now,
+          latencyMs: now - started,
+          displayedCorners: view.corners,
+          displayOpacity: view.opacity,
+          trackingReason: tracker.reason,
+          captureEvidence: evidence,
+          generation,
+          currentGeneration: gate.current.generation,
+          ...status,
+          reason: gate.current.decisionReason,
+        });
+        setProgress(status.progress);
+        setAutoBlock(evidence.corners ? gate.current.decisionReason : '');
+        setWaiting(status.progress > 0 && (!evidence.corners || evidence.sharpness !== 'sharp'));
+        if (status.capture) {
+          await capture(true);
+          return;
+        }
+      } catch (err) {
+        if (active && !pendingShot && epoch === detectionEpoch) {
+          gate.current.reset();
+          tracker = new LiveTracker();
+          setQuad(null);
+          setProgress(0);
+          diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
+          setError(errorMessage(err));
+        }
+      }
+      if (active && !pendingShot && epoch === detectionEpoch)
+        timer = setTimeout(() => void tick(), Math.max(0, 125 - (performance.now() - started)));
+    };
+    const start = async () => {
+      try {
+        await camera.current.start(video.current!, abort.signal, device || undefined);
+        if (!active) return;
+        const stream = video.current!.srcObject as MediaStream;
+        const settings = stream.getVideoTracks()[0]?.getSettings() as
+          | (MediaTrackSettings & { focusMode?: string; exposureTime?: number; iso?: number })
+          | undefined;
+        diagnose(diagnostics, 'camera-start', {
+          width: settings?.width,
+          height: settings?.height,
+          frameRate: settings?.frameRate,
+          facingMode: settings?.facingMode,
+          focusMode: settings?.focusMode,
+          exposureTime: settings?.exposureTime,
+          iso: settings?.iso,
+          videoWidth: video.current!.videoWidth,
+          videoHeight: video.current!.videoHeight,
+        });
+        setPreviewSize({ width: video.current!.videoWidth, height: video.current!.videoHeight });
+        setRunning(true);
+        setHasTorch(camera.current.supportsTorch);
+        setDevices(
+          (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'),
+        );
+        if (active) void tick();
+      } catch (err) {
+        if (active) setError(errorMessage(err));
+      }
+    };
+    const pause = () => {
+      if (document.hidden) {
+        active = false;
+        abort.abort();
+        detectionAbort.abort();
+        camera.current.stop();
+        engine.destroy();
+        clearTimeout(timer);
+        setRunning(false);
+        setQuad(null);
+        setProgress(0);
+        setError(t('Kamera pausiert. Bitte erneut starten.'));
+      }
+    };
+    document.addEventListener('visibilitychange', pause);
+    void start();
+    return () => {
+      diagnose(diagnostics, 'camera-stop', {});
+      active = false;
+      abort.abort();
+      detectionAbort.abort();
+      clearTimeout(timer);
+      clearInterval(watchdog);
+      camera.current.stop();
+      engine.destroy();
+      document.removeEventListener('visibilitychange', pause);
+    };
+  }, [device, restart]);
+  const changeMode = (next: CaptureMode) => {
+    diagnose(diagnostics, 'capture-mode', { mode: next });
+    gate.current.setMode(next);
+    setProgress(0);
+    setWaiting(false);
+    setMode(next);
+  };
+  return (
+    <section className="scanner-capture" data-phase={phase}>
+      <div className="scanner-camera-topbar">
+        <button
+          className="scanner-camera-icon scanner-camera-close"
+          aria-label={t('Schließen')}
+          onClick={onClose}
+        >
+          <CameraIcon name="close" />
+        </button>
+        <span className="scanner-camera-title">{t('Dokument scannen')}</span>
+        {hasTorch && (
+          <button
+            className="scanner-camera-icon"
+            aria-label={t(torch ? 'Licht ausschalten' : 'Licht einschalten')}
+            aria-pressed={torch}
+            disabled={!running || taking || torchPending}
+            onClick={async () => {
+              const revision = ++lightRevision.current;
+              lighting.current = true;
+              setTorchPending(true);
+              gate.current.reset();
+              setProgress(0);
+              try {
+                if ((await camera.current.setTorch(!torch)) && revision === lightRevision.current)
+                  setTorch(!torch);
+              } catch {
+                if (revision === lightRevision.current)
+                  setError(t('Kameralicht konnte nicht umgeschaltet werden.'));
+              } finally {
+                if (revision === lightRevision.current) {
+                  lighting.current = false;
+                  gate.current.reset();
+                  setProgress(0);
+                  setTorchPending(false);
+                }
+              }
+            }}
+          >
+            <CameraIcon name="light" />
+          </button>
+        )}
+        <button
+          className="scanner-camera-icon"
+          aria-label={t('Kameraoptionen')}
+          aria-expanded={showOptions}
+          aria-controls={optionsId}
+          disabled={taking}
+          onClick={() => setShowOptions((value) => !value)}
+        >
+          <CameraIcon name="more" />
+        </button>
+      </div>
+      <div
+        className={`scanner-camera ${phase !== 'live' ? 'scanner-camera-captured' : ''}`}
+        style={{
+          aspectRatio: `${previewSize.width}/${previewSize.height}`,
+          width: `min(100%, calc(var(--scanner-camera-height, 52dvh) * ${previewSize.width / previewSize.height}))`,
+        }}
+      >
+        <video ref={video} muted playsInline aria-label={t('Kameravorschau')} />
+        <canvas
+          ref={snapshot}
+          className="scanner-captured-photo"
+          role="img"
+          aria-label={t('Aufgenommenes Foto')}
+          hidden={phase === 'live'}
+        />
+        {quad && phase === 'live' && (
+          <CaptureOutline corners={quad} size={previewSize} progress={progress} opacity={opacity} />
+        )}
+        {phase !== 'live' && (
+          <>
+            <div className="scanner-shutter-flash" aria-hidden="true" />
+            <div className="scanner-photo-processing" role="status">
+              <span className="scanner-processing-mark" aria-hidden="true">
+                <span />
+              </span>
+              <div>
+                <strong>{t('Foto aufgenommen')}</strong>
+                <p>
+                  {phase === 'encoding'
+                    ? t('Bild wird gesichert...')
+                    : t('Zuschnitt und Bildoptimierung laufen...')}
+                </p>
+                <div className="scanner-processing-track" aria-hidden="true">
+                  <span />
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      {phase === 'live' && (
+        <p role="status" className="scanner-camera-hint">
+          {!running
+            ? t(error ? 'Kamera nicht bereit' : 'Kamera wird gestartet...')
+            : mode === 'auto' && autoBlock === 'sharpness-unknown'
+              ? t('Schärfe nicht beurteilbar - bitte manuell auslösen.')
+              : mode === 'auto' && autoBlock === 'sharpness-blur'
+                ? t('Bild wirkt unscharf - ruhig halten oder manuell auslösen.')
+                : waiting
+                  ? t('Erkennung kurz unsicher - ruhig halten')
+                  : progress > 0
+                    ? t('Ruhig halten - automatische Aufnahme')
+                    : mode === 'manual'
+                      ? t('Dokument ausrichten und auslösen')
+                      : t('Dokument vollständig ins Bild halten')}
+        </p>
+      )}
+      <div className="scanner-camera-options" id={optionsId} hidden={!showOptions}>
+        <h3>{t('Kameraoptionen')}</h3>
+        {devices.length > 1 && (
+          <label>
+            {t('Kamera')}
+            <select
+              disabled={taking}
+              value={device}
+              onChange={(event) => setDevice(event.target.value)}
+            >
+              <option value="">{t('Rückkamera bevorzugen')}</option>
+              {devices.map((item, index) => (
+                <option key={item.deviceId} value={item.deviceId}>
+                  {item.label || `${t('Kamera')} ${index + 1}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <button
+          onClick={() => {
+            onPrepareSound();
+            setRestart((value) => value + 1);
+            setShowOptions(false);
+          }}
+          disabled={taking}
+        >
+          {t('Kamera neu starten')}
+        </button>
+        <button disabled={taking} onClick={() => setShowOptions(false)}>
+          {t('Optionen schließen')}
+        </button>
+      </div>
+      <div className="scanner-camera-dock">
+        <label className="scanner-camera-mode-select">
+          <span className="scanner-camera-mode-label">{t('Aufnahmemodus')}</span>
+          <select
+            disabled={taking}
+            value={mode}
+            onChange={(e) => changeMode(e.target.value as CaptureMode)}
+          >
+            <option value="auto">{t('Auto')}</option>
+            <option value="manual">{t('Manuell')}</option>
+          </select>
+        </label>
+        <div className="scanner-camera-controls">
+          <button
+            className="scanner-camera-icon scanner-camera-back"
+            disabled={taking}
+            onClick={onCancel}
+            aria-label={t('Zurück zum Import')}
+          >
+            <CameraIcon name="back" />
+            {pageCount > 0 && <span className="scanner-camera-page-count">{pageCount}</span>}
+          </button>
+          <button
+            disabled={!running || taking || torchPending}
+            className="scanner-shutter-button"
+            aria-label={taking ? t('Aufnahme läuft...') : t('Jetzt aufnehmen')}
+            onClick={() => {
+              onPrepareSound();
+              shot.current();
+            }}
+          >
+            <span>{taking ? t('Aufnahme läuft...') : t('Jetzt aufnehmen')}</span>
+          </button>
+          <button
+            className="scanner-camera-icon"
+            aria-label={t('Bilder importieren')}
+            disabled={taking}
+            onClick={onImport}
+          >
+            <CameraIcon name="gallery" />
+          </button>
+        </div>
+        <span className="scanner-camera-caption">
+          {pageCount
+            ? `${pageCount} ${t(pageCount === 1 ? 'Seite aufgenommen' : 'Seiten aufgenommen')}`
+            : t('Dokument')}
+        </span>
+      </div>
+      {error && (
+        <div className="scanner-camera-error" role="alert">
+          <p>{t(error)}</p>
+          {!running && (
+            <button disabled={taking} onClick={() => setRestart((value) => value + 1)}>
+              {t('Kamera fortsetzen')}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

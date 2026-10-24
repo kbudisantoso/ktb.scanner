@@ -1,0 +1,11 @@
+* text=auto
+*.mp3 binary
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
+**/AGENTS.md export-ignore
+**/CLAUDE.md export-ignore
+.agents/** export-ignore
+.codex/** export-ignore
+.claude/** export-ignore
+artifacts/local/** export-ignore
+.certificates/** export-ignore

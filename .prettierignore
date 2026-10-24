@@ -1,0 +1,7 @@
+node_modules
+dist
+.next
+.astro
+public/scanner-assets
+public/pdf.worker.min.mjs
+pnpm-lock.yaml

@@ -1,0 +1,299 @@
+'use client';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import type { ScanPage, ScanResult } from '@ktb/scanner';
+import { useUrl } from './blob-url';
+const PdfPreview = lazy(() => import('./PdfPreview'));
+const ImageViewer = lazy(() =>
+  import('@ktb/scanner/react').then((module) => ({ default: module.ImageViewer })),
+);
+type Result = Extract<ScanResult, { status: 'confirmed' }>;
+function ResultViewer({
+  page,
+  index,
+  count,
+  close,
+  move,
+  restoreFocus,
+}: {
+  page: ScanPage;
+  index: number;
+  count: number;
+  close: () => void;
+  move: (index: number) => void;
+  restoreFocus: () => void;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null),
+    url = useUrl(page.image);
+  useEffect(() => {
+    const node = dialog.current!;
+    const previous = document.activeElement;
+    node.showModal();
+    return () => {
+      node.close();
+      if (
+        previous instanceof HTMLElement &&
+        previous.isConnected &&
+        previous.getClientRects().length
+      )
+        previous.focus();
+      else restoreFocus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={dialog}
+      className="result-viewer"
+      aria-labelledby="result-viewer-title"
+      onCancel={(e) => {
+        e.preventDefault();
+        close();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) close();
+      }}
+    >
+      <header>
+        <h2 id="result-viewer-title">
+          Seite {index + 1} <span>von {count}</span>
+        </h2>
+        <button onClick={close}>Schließen</button>
+      </header>
+      <Suspense fallback={<p role="status">Bild wird geladen...</p>}>
+        <ImageViewer image={page.image} resetKey={page.id} alt={`Vergrößerte Seite ${index + 1}`} />
+      </Suspense>
+      <div className="viewer-actions">
+        <button disabled={index === 0} onClick={() => move(index - 1)} aria-label="Vorherige Seite">
+          Zurück
+        </button>
+        <button
+          disabled={index === count - 1}
+          onClick={() => move(index + 1)}
+          aria-label="Nächste Seite"
+        >
+          Weiter
+        </button>
+        <a
+          className="primary"
+          href={url}
+          download={`scan-${index + 1}.${page.image.type === 'image/png' ? 'png' : 'jpg'}`}
+        >
+          Herunterladen
+        </a>
+      </div>
+    </dialog>
+  );
+}
+
+function ImageResult({
+  page,
+  index,
+  active,
+  inspect,
+}: {
+  page: ScanPage;
+  index: number;
+  active: boolean;
+  inspect: () => void;
+}) {
+  const url = useUrl(page.image);
+  return (
+    <article className="result-page" hidden={!active}>
+      <button
+        className="result-image-button"
+        aria-label={`Seite ${index + 1} vergrößern`}
+        onClick={(event) => {
+          event.currentTarget.focus();
+          inspect();
+        }}
+      >
+        {url ? (
+          <img src={url} alt={`Exportierte Seite ${index + 1}`} />
+        ) : (
+          <span className="image-placeholder">Bild wird geladen...</span>
+        )}
+        <span className="image-inspect">100 %</span>
+      </button>
+      <p className="result-dimensions">
+        {page.metadata.outputSizePx.width} × {page.metadata.outputSizePx.height} px ·{' '}
+        {(page.image.size / 1024).toFixed(0)} KiB
+      </p>
+    </article>
+  );
+}
+export default function Results({
+  result,
+  reset,
+  scan,
+  hidden,
+  back,
+}: {
+  result: Result;
+  reset: () => void;
+  scan: () => void;
+  hidden: boolean;
+  back: () => void;
+}) {
+  const [index, setIndex] = useState(0),
+    [view, setView] = useState<'image' | 'pdf'>('image'),
+    [inspecting, setInspecting] = useState(false),
+    [details, setDetails] = useState(false),
+    [discard, setDiscard] = useState(false);
+  const container = useRef<HTMLElement>(null);
+  const infoTrigger = useRef<HTMLButtonElement>(null);
+  const closeDetails = () => {
+    setDetails(false);
+    infoTrigger.current?.focus();
+  };
+  const pdfUrl = useUrl(result.pdf),
+    imageUrl = useUrl(result.pages[index].image);
+  return (
+    <section
+      ref={container}
+      className="results"
+      hidden={hidden}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && details) {
+          event.preventDefault();
+          closeDetails();
+        }
+      }}
+    >
+      <div className="result-heading">
+        <h2>
+          {result.pages.length} {result.pages.length === 1 ? 'Seite' : 'Seiten'} fertig
+        </h2>
+        <div className="actions">
+          <button
+            ref={infoTrigger}
+            onClick={() => setDetails((v) => !v)}
+            aria-label="Integrationsdetails"
+            aria-expanded={details}
+          >
+            Info
+          </button>
+          <button onClick={scan} aria-label="Neues Dokument">
+            Neu
+          </button>
+          <button onClick={back}>Zurück</button>
+        </div>
+      </div>
+      {discard && (
+        <div
+          className="result-discard"
+          role="alertdialog"
+          aria-label="Ergebnisse verwerfen?"
+          aria-modal="false"
+        >
+          <p>Ergebnisse aus diesem Browser entfernen?</p>
+          <button autoFocus onClick={() => setDiscard(false)}>
+            Behalten
+          </button>
+          <button onClick={reset}>Jetzt verwerfen</button>
+        </div>
+      )}
+      <div className="result-switch" role="group" aria-label="Ergebnisansicht">
+        <button aria-pressed={view === 'image'} onClick={() => setView('image')}>
+          Bilder
+        </button>
+        <button disabled={!result.pdf} aria-pressed={view === 'pdf'} onClick={() => setView('pdf')}>
+          PDF
+        </button>
+      </div>
+      <div className="result-pager">
+        <button
+          aria-label="Vorherige Seite"
+          disabled={index === 0}
+          onClick={() => setIndex((i) => i - 1)}
+        >
+          ‹
+        </button>
+        <span>
+          Seite {index + 1} / {result.pages.length}
+        </span>
+        <button
+          aria-label="Nächste Seite"
+          disabled={index === result.pages.length - 1}
+          onClick={() => setIndex((i) => i + 1)}
+        >
+          ›
+        </button>
+      </div>
+      <div className="result-grid" hidden={view !== 'image' || details}>
+        {result.pages.map((page, i) => (
+          <ImageResult
+            key={page.id}
+            page={page}
+            index={i}
+            active={i === index}
+            inspect={() => setInspecting(true)}
+          />
+        ))}
+      </div>
+      {result.pdf && view === 'pdf' && !details && !hidden && (
+        <section
+          className="pdf-result"
+          hidden={view !== 'pdf' || details}
+          aria-label="PDF-Vorschau"
+        >
+          <Suspense fallback={<p role="status">PDF wird geladen...</p>}>
+            <PdfPreview blob={result.pdf} activeIndex={index} />
+          </Suspense>
+        </section>
+      )}
+      <div className="result-downloads">
+        <a
+          className="primary"
+          aria-label="Bild herunterladen"
+          href={imageUrl}
+          download={`scan-${index + 1}.${result.pages[index].image.type === 'image/png' ? 'png' : 'jpg'}`}
+        >
+          Bild laden
+        </a>
+        {result.pdf && (
+          <a className="primary" aria-label="PDF herunterladen" href={pdfUrl} download="scan.pdf">
+            PDF laden
+          </a>
+        )}
+      </div>
+      <aside className="integration-details" hidden={!details} aria-label="Integrationsdetails">
+        <header>
+          <h3>Integrationsdetails</h3>
+          <button onClick={closeDetails} aria-label="Integrationsdetails schließen">
+            Schließen
+          </button>
+        </header>
+        <button onClick={() => setDiscard(true)} aria-label="Ergebnisse verwerfen">
+          Ergebnisse verwerfen
+        </button>
+        <p>
+          Schema {result.schemaVersion} · PDF{' '}
+          {result.pdf ? `${(result.pdf.size / 1024).toFixed(0)} KiB` : 'deaktiviert'}
+        </p>
+        <pre>
+          {JSON.stringify(
+            {
+              sessionId: result.sessionId,
+              pages: result.pages.map(({ image, original, ...page }) => page),
+            },
+            null,
+            2,
+          )}
+        </pre>
+      </aside>
+      {inspecting && (
+        <ResultViewer
+          page={result.pages[index]}
+          index={index}
+          count={result.pages.length}
+          close={() => setInspecting(false)}
+          move={setIndex}
+          restoreFocus={() =>
+            container.current
+              ?.querySelector<HTMLButtonElement>('.result-page:not([hidden]) button')
+              ?.focus()
+          }
+        />
+      )}
+    </section>
+  );
+}

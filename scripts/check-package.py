@@ -1,0 +1,49 @@
+"""Inspect the actual release archive without extracting any paths."""
+import json
+import sys
+import tarfile
+from pathlib import PurePosixPath
+
+with tarfile.open(sys.argv[1], "r:gz") as archive:
+    names = set(archive.getnames())
+    for member in archive.getmembers():
+        path = PurePosixPath(member.name)
+        assert not path.is_absolute() and ".." not in path.parts, member.name
+        assert not member.issym() and not member.islnk(), member.name
+        assert not any(part in {"AGENTS.md", "CLAUDE.md", ".agents", ".codex", ".claude", ".certificates", "artifacts"} or part.startswith(".env") for part in path.parts), member.name
+    required = {
+        "package/LICENSE", "package/NOTICE", "package/README.md",
+        "package/dist/index.js", "package/dist/index.d.ts",
+        "package/dist/react/index.js", "package/dist/react/ImageViewer.d.ts",
+        "package/dist/scanic.js", "package/dist/export.js", "package/dist/styles.css",
+        "package/dist/assets/processing.worker.js", "package/dist/assets/pdf.worker.js",
+        "package/dist/assets/scanic.js", "package/dist/assets/scanic.LICENSE",
+        "package/dist/assets/licenses/inventory.json", "package/src/types.ts",
+        "package/src/react/ImageViewer.tsx", "package/scripts/build.mjs",
+        "package/scripts/clean.mjs", "package/scripts/instrument-scanic.mjs",
+    }
+    assert required <= names, sorted(required - names)
+    manifest = json.load(archive.extractfile("package/package.json"))
+    assert manifest["name"] == "@ktb/scanner"
+    assert manifest["license"] == "AGPL-3.0-only" and manifest["private"] is False
+    assert manifest["publishConfig"]["access"] == "public"
+    for entry in [".", "./react", "./scanic", "./export"]:
+        for target in manifest["exports"][entry].values():
+            assert "package/" + target.removeprefix("./") in names, target
+    license_text = archive.extractfile("package/LICENSE").read().decode()
+    assert "GNU AFFERO GENERAL PUBLIC LICENSE" in license_text and "Version 3" in license_text
+    clips = [name for name in names if name.endswith(".mp3")]
+    assert len(clips) == 12, clips
+    for clip in clips:
+        notice = clip.removesuffix(".mp3") + ".NOTICE.txt"
+        assert notice in names, notice
+        assert b"Pixabay Content License" in archive.extractfile(notice).read(), notice
+    inventory = json.load(archive.extractfile("package/dist/assets/licenses/inventory.json"))
+    assert any(item["name"] == "scanic" for item in inventory)
+    assert any(item["name"] == "jspdf" for item in inventory)
+    for item in inventory:
+        assert item["notices"], item["name"]
+        for notice in item["notices"]:
+            directory = (item["name"] + "@" + item["version"]).replace("/", "__")
+            assert f"package/dist/assets/licenses/{directory}/{notice}" in names
+    print(f"Package verified: {len(names)} files, all entry points/sources/notices, 12 integrated cues, no local configuration.")

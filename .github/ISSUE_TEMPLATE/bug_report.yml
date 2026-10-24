@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible scanner or integration issue.
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please reproduce with a synthetic document where possible. Diagnostic archives can contain original photos and intermediate images; do not attach private archives or receipts to public issues.
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Device, OS and browser version
+    validations:
+      required: true
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration
+      options:
+        - Next.js reference application
+        - Astro example
+        - React component
+        - Imperative API
+        - Custom engine or export integration
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal synthetic example and whether the source is a camera or imported image.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Browser console messages, synthetic screenshots or a minimal reproduction. Do not include original private documents.

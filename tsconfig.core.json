@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": [
+    "packages/scanner/src/index.ts",
+    "packages/scanner/src/camera.ts",
+    "packages/scanner/src/export.ts",
+    "packages/scanner/src/image-header.ts",
+    "packages/scanner/src/quality.ts",
+    "packages/scanner/src/refine.ts",
+    "tests/unit/*.test.ts"
+  ]
+}

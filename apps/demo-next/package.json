@@ -1,0 +1,21 @@
+{
+  "name": "@ktb/demo-next",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "dev:https": "next dev --experimental-https --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ktb/scanner": "workspace:*",
+    "next": "16.4.1",
+    "pdfjs-dist": "6.4.299",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}
