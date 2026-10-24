@@ -162,6 +162,18 @@ for (const theme of ['forest', 'ink'])
       }
       await pageActions(page, 2);
       await page.getByRole('button', { name: 'Seite 2: Nach oben', exact: true }).click();
+      await pageActions(page, 2);
+      await page
+        .locator('.scanner-footer')
+        .getByRole('button', { name: 'Zurück', exact: true })
+        .click();
+      await expect(
+        page.locator('.scanner-review-footer').getByRole('button', { name: 'Zurück', exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page.locator('.scanner-review-footer').getByRole('button', { name: 'Weiter', exact: true }),
+      ).toBeEnabled();
+      await page.getByRole('button', { name: /^Seitenübersicht/ }).click();
       await page.getByRole('button', { name: 'Seite 1: Bearbeiten', exact: true }).click();
       await finish.click();
       await expect(

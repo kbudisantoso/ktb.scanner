@@ -928,7 +928,7 @@ export function ScannerView({
             </select>
           </label>
           {draft && (
-            <button disabled={busy} onClick={() => setPageGrid(false)}>
+            <button disabled={busy} onClick={() => editPage(draft)}>
               {t('Zurück')}
             </button>
           )}
