@@ -92,8 +92,10 @@ export default function Page() {
     const preview = soundPreview.current;
     return () => {
       preview?.pause();
+      preview?.removeAttribute('src');
+      preview?.load();
     };
-  }, []);
+  }, [shutterSound]);
   const open = (files?: File[]) => {
     if (active.current || archiving) return;
     active.current = true;
@@ -317,18 +319,16 @@ export default function Page() {
           disabled={busy || !soundFile}
           onClick={() => {
             const audio = soundPreview.current;
-            if (!audio) return;
+            if (!audio || !soundFile) return;
+            const source = `/scanner-assets/${soundFile}`;
+            if (audio.getAttribute('src') !== source) audio.src = source;
             audio.currentTime = 0;
             void audio.play().catch(() => setError('Der Ton konnte nicht abgespielt werden.'));
           }}
         >
           Ton anhören
         </button>
-        <audio
-          ref={soundPreview}
-          preload="none"
-          src={soundFile ? `/scanner-assets/${soundFile}` : undefined}
-        />
+        <audio ref={soundPreview} preload="none" />
       </aside>
       <section
         className="diagnostics app-panel"
