@@ -49,8 +49,8 @@
     "jspdf": "4.2.1"
   },
   "devDependencies": {
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "description": "Embeddable browser document scanner with React, local image processing and PDF export",
   "repository": {

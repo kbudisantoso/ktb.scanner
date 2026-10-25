@@ -25,15 +25,15 @@
     "check:package": "node scripts/check-package.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.58.2",
-    "@types/node": "22.19.21",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "esbuild": "0.27.3",
-    "prettier": "3.8.1",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "typescript": "5.9.3",
-    "vitest": "4.1.9"
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "prettier": "3.9.10",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
   }
 }
