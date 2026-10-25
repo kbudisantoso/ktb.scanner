@@ -7,14 +7,14 @@ Project source is AGPL-3.0-only; dependencies retain their own licenses. Direct 
 | Scanic | 1.7.1 | Classic detection, perspective, corner editor | MIT; [Manifest](https://github.com/marquaye/scanic/blob/main/package.json), [API](https://github.com/marquaye/scanic/blob/main/src/scanic.d.ts) |
 | jsPDF | 4.2.1 | PDF worker | MIT; [Release](https://github.com/parallax/jsPDF/releases/tag/v4.2.1), [Manifest](https://github.com/parallax/jsPDF/blob/master/package.json) |
 | PDF.js / pdfjs-dist | 6.4.299 | Next.js PDF preview only | Apache-2.0; [Release](https://github.com/mozilla/pdf.js/releases/tag/v6.4.299), [License](https://github.com/mozilla/pdf.js/blob/master/LICENSE) |
-| React / React DOM | 19.2.4 | Peer / demo runtime | MIT; [React](https://github.com/facebook/react) |
-| Next.js | 16.4.1 | Full reference application | MIT; [Next.js](https://github.com/vercel/next.js) |
-| Astro | 7.3.5 | Small host example | MIT; [Astro](https://github.com/withastro/astro) |
+| React / React DOM | 19.3.1 | Peer / demo runtime | MIT; [React](https://github.com/facebook/react) |
+| Next.js | 16.4.2 | Full reference application | MIT; [Next.js](https://github.com/vercel/next.js) |
+| Astro | 7.4.1 | Small host example | MIT; [Astro](https://github.com/withastro/astro) |
 | TypeScript | 5.9.3 | Types / declarations | Apache-2.0; [TypeScript](https://github.com/microsoft/TypeScript) |
-| esbuild | 0.27.3 | Library/worker build | MIT; [esbuild](https://github.com/evanw/esbuild) |
-| Vitest | 4.1.9 | Tests / built import | MIT; [Vitest](https://github.com/vitest-dev/vitest) |
-| Playwright | 1.58.2 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
-| Prettier | 3.8.1 | Formatting | MIT; [Prettier](https://github.com/prettier/prettier) |
+| esbuild | 0.28.2 | Library/worker build | MIT; [esbuild](https://github.com/evanw/esbuild) |
+| Vitest | 5.0.5 | Tests / built import | MIT; [Vitest](https://github.com/vitest-dev/vitest) |
+| Playwright | 1.64.1 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
+| Prettier | 3.9.10 | Formatting | MIT; [Prettier](https://github.com/prettier/prettier) |
 
 Scanic 1.7.1 provides scanDocument, extractDocument and createCornerEditor with keyboard/loupe support. The earlier 1.7.0 branch version was unavailable in the registry. Build-time instrumentation verifies exact source anchors, exposes existing buffers when enabled and adds an optional candidate selector. Installed vendor files remain unchanged. Preserve MIT and modification notices. Classic WASM bytes are embedded; no ML models, OCR data or commercial SDKs are distributed.
 
