@@ -64,6 +64,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      - name: Provide virtual audio output for Firefox
+        if: matrix.engine == 'firefox'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=scanner_tests
+          pactl set-default-sink scanner_tests
       - run: pnpm build
       - run: pnpm exec playwright test --project=${{ matrix.project }}
       - name: Retain synthetic failure reports
