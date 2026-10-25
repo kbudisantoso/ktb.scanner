@@ -1,8 +1,16 @@
 # Implementation and verification status
 
-Updated 24 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 25 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
-## Latest verified implementation
+## Configurable capture stability, 25 October 2026
+
+[ADR 0021](../adr/0021-configurable-capture-stability.md) adds library/per-open stability duration and reference Scan options. Default remains 1,000 ms. All ten presets and a non-preset 875 ms value pass exact-boundary native checks; invalid values, precedence, stale/duplicate/unknown observations, Manual and once-only claims are covered. Diagnostic session-open and camera-start record the effective value.
+
+Verification: 156 native tests and three Vitest tests passed. Library/assets, Next.js and Astro builds, typecheck, formatting, documentation links and diff checks passed. A targeted 48-case browser run passed 40 cases and skipped eight synthetic camera/audio cases under the existing WebKit canvas-stream limitation. It covered Chromium/Firefox capture at 100/1,000/2,000 ms, configuration validation/overrides in all four profiles, Auto shutter timing and focused review in both themes at three viewport sizes. The 100 ms sequence claims on its second valid observation. A separate mobile WebKit check selected all ten choices and verified a reachable >=44 px control at 320 x 568. The local phone HTTPS application was checked to serve the new setting. No physical phone timing or full new browser-matrix result is claimed; the earlier complete matrix is recorded below.
+
+Reproduce the targeted run with `pnpm exec playwright test tests/browser/camera.spec.ts tests/browser/react-api.spec.ts tests/browser/review-ui.spec.ts tests/browser/shutter.spec.ts --grep 'stability|recurring live|focused|auto/deepscan|invalid configuration' --workers=2` after building.
+
+## Focused review verification, 24 October 2026
 
 Focused mobile review is recorded in [ADR 0020](../adr/0020-focused-review-and-shared-viewer.md). The final UI checkpoint includes direct Finish, explicit handling of pending imports, scrollable page tiles, focused Cancel/Apply tools, bounded recipe Undo, shared fit/100%/zoom/pinch/pan viewer, held Before, detached original-pixel corner loupe and actual inline lens status. Results survive returning to start. PDF preview loads on demand, renders the selected page first and caches at most three canvases. Landscape result actions use a side dock; development chrome cannot cover the footer.
 

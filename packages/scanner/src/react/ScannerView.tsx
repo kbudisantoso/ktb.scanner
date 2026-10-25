@@ -4,6 +4,7 @@ import { ReviewTools, REVIEW_TITLES, type ReviewPanel } from './ReviewTools.tsx'
 import { ImageViewer } from './ImageViewer.tsx';
 import { ToolIcon } from './ToolIcon.tsx';
 import { initialProfile, profileRecipe } from '../profiles.ts';
+import { resolveAutoCaptureStabilityMs } from '../capture.ts';
 import type {
   CaptureMode,
   CaptureHint,
@@ -608,6 +609,10 @@ export function ScannerView({
                 diagnostics={options.diagnostics}
                 limits={session.limits}
                 mode={mode}
+                stabilityMs={resolveAutoCaptureStabilityMs(
+                  options.autoCaptureStabilityMs,
+                  initial.autoCaptureStabilityMs,
+                )}
                 setMode={setMode}
                 onShutter={() => shutter.current?.play() ?? false}
                 onPrepareSound={prepareSound}

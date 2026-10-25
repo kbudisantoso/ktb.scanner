@@ -16,6 +16,7 @@ export function CameraView({
   diagnostics,
   limits,
   mode,
+  stabilityMs,
   setMode,
   onShutter,
   onPrepareSound,
@@ -30,6 +31,7 @@ export function CameraView({
   diagnostics?: DiagnosticOptions;
   limits: Limits;
   mode: CaptureMode;
+  stabilityMs: number;
   setMode: (mode: CaptureMode) => void;
   onShutter: () => boolean;
   onPrepareSound: () => void;
@@ -43,7 +45,7 @@ export function CameraView({
   const video = useRef<HTMLVideoElement>(null),
     snapshot = useRef<HTMLCanvasElement>(null),
     camera = useRef(new Camera()),
-    gate = useRef(new AutoCapture(mode));
+    gate = useRef(new AutoCapture(mode, stabilityMs));
   const [quad, setQuad] = useState<Quad | null>(null),
     [opacity, setOpacity] = useState(1),
     [waiting, setWaiting] = useState(false),
@@ -294,6 +296,7 @@ export function CameraView({
           | (MediaTrackSettings & { focusMode?: string; exposureTime?: number; iso?: number })
           | undefined;
         diagnose(diagnostics, 'camera-start', {
+          autoCaptureStabilityMs: gate.current.stabilityMs,
           width: settings?.width,
           height: settings?.height,
           frameRate: settings?.frameRate,

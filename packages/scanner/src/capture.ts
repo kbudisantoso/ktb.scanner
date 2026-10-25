@@ -1,8 +1,25 @@
 import type { CaptureMode, LiveDetection, Quad } from './types.ts';
 import { area, quadDrift, validQuad } from './geometry.ts';
-const STABLE_CAPTURE_MS = 1000;
+import { ScannerError } from './errors.ts';
+
+export const DEFAULT_AUTO_CAPTURE_STABILITY_MS = 1000;
+export const AUTO_CAPTURE_STABILITY_PRESETS_MS = [
+  100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000,
+] as const;
+
+export function resolveAutoCaptureStabilityMs(configured?: number, requested?: number): number {
+  for (const value of [configured, requested])
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 100))
+      throw new ScannerError(
+        'CONFIG_INVALID',
+        'Die Stabilisierungsdauer muss eine ganze Zahl ab 100 ms sein.',
+      );
+  return requested ?? configured ?? DEFAULT_AUTO_CAPTURE_STABILITY_MS;
+}
+
 /** Measurement time, never UI interpolation, determines capture eligibility. */
 export class AutoCapture {
+  readonly stabilityMs: number;
   private anchor: Quad | null = null;
   private previous: Quad | null = null;
   private stableMs = 0;
@@ -13,8 +30,9 @@ export class AutoCapture {
   private mode: CaptureMode;
   private epoch = 0;
   decisionReason = 'reset';
-  constructor(mode: CaptureMode = 'auto') {
+  constructor(mode: CaptureMode = 'auto', stabilityMs?: number) {
     this.mode = mode;
+    this.stabilityMs = resolveAutoCaptureStabilityMs(stabilityMs);
   }
   get generation(): number {
     return this.epoch;
@@ -37,7 +55,7 @@ export class AutoCapture {
     // A pending job can still return a fresh sample. Polling must not invalidate that interval.
     if (now - this.last > 400) this.decisionReason = 'waiting-for-evidence';
     return {
-      progress: this.armed && this.mode === 'auto' ? this.stableMs / STABLE_CAPTURE_MS : 0,
+      progress: this.armed && this.mode === 'auto' ? this.stableMs / this.stabilityMs : 0,
       capture: false,
     };
   }
@@ -46,7 +64,7 @@ export class AutoCapture {
     if (now - this.last > 1200) this.clearWindow();
     this.decisionReason = reason;
     return {
-      progress: this.armed && this.mode === 'auto' ? this.stableMs / STABLE_CAPTURE_MS : 0,
+      progress: this.armed && this.mode === 'auto' ? this.stableMs / this.stabilityMs : 0,
       capture: false,
     };
   }
@@ -125,7 +143,7 @@ export class AutoCapture {
     this.previous = structuredClone(q);
     this.last = detection.timestamp;
     this.interrupted = false;
-    const progress = Math.min(1, this.stableMs / STABLE_CAPTURE_MS);
+    const progress = Math.min(1, this.stableMs / this.stabilityMs);
     if (progress >= 1) {
       this.armed = false;
       this.decisionReason = 'captured';

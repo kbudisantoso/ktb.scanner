@@ -4,7 +4,11 @@ export { SHUTTER_SOUNDS } from './sounds.ts';
 export type { ShutterSoundId } from './sounds.ts';
 export { ScannerError } from './errors.ts';
 export { ScanSession, DEFAULT_LIMITS, resolveLimits, metadataFor } from './session.ts';
-export { AutoCapture } from './capture.ts';
+export {
+  AutoCapture,
+  DEFAULT_AUTO_CAPTURE_STABILITY_MS,
+  AUTO_CAPTURE_STABILITY_PRESETS_MS,
+} from './capture.ts';
 export {
   validQuad,
   suggestFormat,

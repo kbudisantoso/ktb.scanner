@@ -27,7 +27,7 @@ The Next.js reference application runs at `http://localhost:3000`. `pnpm dev:ast
 
 React 19 and React DOM are peers. UI, camera, engine and PDF resources load when needed. All worker/media assets are served locally, with no CDN fallback. The host owns returned blobs and any later upload. The reference app demonstrates two themes, document contexts, real PDF.js previews, downloads and explicitly opt-in local diagnostics. Astro uses the same built package.
 
-Without a host profile override, Auto immediately chooses Photo or Color and applies appropriate adjustments. Manual profiles, tones, lens settings, format and orientation remain editable. Standard paper formats correct the whole crop to the chosen aspect ratio; they do not measure physical paper size. The current automatic-capture trial requires one second of measured stable evidence, with bounded pauses for uncertainty.
+Without a host profile override, Auto immediately chooses Photo or Color and applies appropriate adjustments. Manual profiles, tones, lens settings, format and orientation remain editable. Standard paper formats correct the whole crop to the chosen aspect ratio; they do not measure physical paper size. Automatic capture defaults to one second of measured stable evidence, configurable through `autoCaptureStabilityMs` in configuration or per open, with bounded pauses for uncertainty. The reference Scan options expose experimental durations from 100 to 5,000 ms.
 
 This repository contains the workspace package; a registry release of `@ktb/scanner` has not been published. See [package API](packages/scanner/README.md), [integration](docs/INTEGRATION.md) and [distribution](docs/PUBLISHING.md).
 

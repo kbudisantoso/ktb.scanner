@@ -1,4 +1,4 @@
-import { closeAppPanel } from './helpers';
+import { closeAppPanel, openOptions } from './helpers';
 import { diagnostics } from './helpers';
 import { test, expect } from './fixtures';
 import { execFileSync } from 'node:child_process';
@@ -135,122 +135,128 @@ test('denied camera leaves import accessible', async ({ page }) => {
   ).toBeEnabled();
 });
 
-test('recurring live outliers and short losses retain the outline and complete auto capture', async ({
-  page,
-  browserName,
-}) => {
-  test.skip(
-    browserName === 'webkit',
-    'Physical Safari camera required; Canvas streams are unavailable in this profile.',
-  );
-  await page.addInitScript(() => {
-    const state = {
-      detections: 0,
-      stops: 0,
-      first: 0,
-      last: 0,
-      missingOutlines: 0,
-      wrongOutlines: 0,
-    };
-    Object.assign(window, { liveStability: state });
-    const NativeWorker = window.Worker;
-    class SequenceWorker extends NativeWorker {
-      postMessage(message: any, transfer?: any) {
-        if (message.kind !== 'detect') return super.postMessage(message, transfer ?? []);
-        message.image.close();
-        const n = ++state.detections;
-        if (n === 1) state.first = message.timestamp;
-        state.last = message.timestamp;
-        if (n > 1) {
-          const outline = document.querySelector('.scanner-camera polygon');
-          if (!outline) state.missingOutlines++;
-          else if (Number(outline.getAttribute('points')!.split(',')[0]) < 150)
-            state.wrongOutlines++;
-        }
-        const corners =
-          n % 10 === 4
-            ? null
-            : n % 10 === 7
-              ? [
-                  { x: 0.03, y: 0.02 },
-                  { x: 0.95, y: 0.25 },
-                  { x: 0.9, y: 0.95 },
-                  { x: 0.1, y: 0.9 },
-                ]
-              : [
-                  { x: 0.2, y: 0.1 },
-                  { x: 0.8, y: 0.1 },
-                  { x: 0.8, y: 0.9 },
-                  { x: 0.2, y: 0.9 },
-                ];
-        setTimeout(
-          () =>
-            this.dispatchEvent(
-              new MessageEvent('message', {
-                data: {
-                  id: message.id,
-                  result: {
-                    timestamp: message.timestamp,
-                    corners,
-                    sharpness: corners ? 'sharp' : 'unknown',
+for (const stabilityMs of [100, 1000, 2000])
+  test(`${stabilityMs} ms: recurring live outliers and short losses retain the outline and complete auto capture`, async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName === 'webkit',
+      'Physical Safari camera required; Canvas streams are unavailable in this profile.',
+    );
+    await page.addInitScript(() => {
+      const state = {
+        detections: 0,
+        stops: 0,
+        first: 0,
+        last: 0,
+        missingOutlines: 0,
+        wrongOutlines: 0,
+      };
+      Object.assign(window, { liveStability: state });
+      const NativeWorker = window.Worker;
+      class SequenceWorker extends NativeWorker {
+        postMessage(message: any, transfer?: any) {
+          if (message.kind !== 'detect') return super.postMessage(message, transfer ?? []);
+          message.image.close();
+          const n = ++state.detections;
+          if (n === 1) state.first = message.timestamp;
+          state.last = message.timestamp;
+          if (n > 1) {
+            const outline = document.querySelector('.scanner-camera polygon');
+            if (!outline) state.missingOutlines++;
+            else if (Number(outline.getAttribute('points')!.split(',')[0]) < 150)
+              state.wrongOutlines++;
+          }
+          const corners =
+            n % 10 === 4
+              ? null
+              : n % 10 === 7
+                ? [
+                    { x: 0.03, y: 0.02 },
+                    { x: 0.95, y: 0.25 },
+                    { x: 0.9, y: 0.95 },
+                    { x: 0.1, y: 0.9 },
+                  ]
+                : [
+                    { x: 0.2, y: 0.1 },
+                    { x: 0.8, y: 0.1 },
+                    { x: 0.8, y: 0.9 },
+                    { x: 0.2, y: 0.9 },
+                  ];
+          setTimeout(
+            () =>
+              this.dispatchEvent(
+                new MessageEvent('message', {
+                  data: {
+                    id: message.id,
+                    result: {
+                      timestamp: message.timestamp,
+                      corners,
+                      sharpness: corners ? 'sharp' : 'unknown',
+                    },
                   },
-                },
-              }),
-            ),
-          60,
-        );
-      }
-    }
-    Object.defineProperty(window, 'Worker', { configurable: true, value: SequenceWorker });
-    Object.defineProperty(window, 'ImageCapture', { configurable: true, value: undefined });
-    Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
-      configurable: true,
-      value: async () => [],
-    });
-    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
-      configurable: true,
-      value: async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1280;
-        canvas.height = 960;
-        const ctx = canvas.getContext('2d')!;
-        const draw = () => {
-          ctx.fillStyle = '#435444';
-          ctx.fillRect(0, 0, 1280, 960);
-          ctx.fillStyle = '#fffdf6';
-          ctx.fillRect(290, 60, 700, 840);
-          ctx.fillStyle = '#30372f';
-          ctx.font = '23px monospace';
-          for (let y = 130; y < 860; y += 36) ctx.fillText('TEST 0123456789 12,34', 330, y);
-        };
-        draw();
-        const timer = setInterval(draw, 50),
-          stream = canvas.captureStream(20);
-        for (const track of stream.getTracks()) {
-          const stop = track.stop.bind(track);
-          track.stop = () => {
-            state.stops++;
-            clearInterval(timer);
-            stop();
-          };
+                }),
+              ),
+            60,
+          );
         }
-        return stream;
-      },
+      }
+      Object.defineProperty(window, 'Worker', { configurable: true, value: SequenceWorker });
+      Object.defineProperty(window, 'ImageCapture', { configurable: true, value: undefined });
+      Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
+        configurable: true,
+        value: async () => [],
+      });
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        configurable: true,
+        value: async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 1280;
+          canvas.height = 960;
+          const ctx = canvas.getContext('2d')!;
+          const draw = () => {
+            ctx.fillStyle = '#435444';
+            ctx.fillRect(0, 0, 1280, 960);
+            ctx.fillStyle = '#fffdf6';
+            ctx.fillRect(290, 60, 700, 840);
+            ctx.fillStyle = '#30372f';
+            ctx.font = '23px monospace';
+            for (let y = 130; y < 860; y += 36) ctx.fillText('TEST 0123456789 12,34', 330, y);
+          };
+          draw();
+          const timer = setInterval(draw, 50),
+            stream = canvas.captureStream(20);
+          for (const track of stream.getTracks()) {
+            const stop = track.stop.bind(track);
+            track.stop = () => {
+              state.stops++;
+              clearInterval(timer);
+              stop();
+            };
+          }
+          return stream;
+        },
+      });
     });
+    await page.goto('/');
+    await openOptions(page);
+    await page
+      .getByLabel('Stabilisierungsdauer', { exact: true })
+      .selectOption(String(stabilityMs));
+    await closeAppPanel(page);
+    await page.getByRole('button', { name: /Dokument scannen/ }).click();
+    await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+    await expect(page.getByRole('img', { name: 'Bearbeitete Seite' })).toBeVisible();
+    const state = await page.evaluate(() => (window as any).liveStability);
+    if (stabilityMs === 100) expect(state.detections).toBe(2);
+    else expect(state.detections).toBeGreaterThan(8);
+    expect(state.last - state.first).toBeGreaterThanOrEqual(stabilityMs);
+    expect(state.missingOutlines).toBe(0);
+    expect(state.wrongOutlines).toBe(0);
+    expect(state.stops).toBe(1);
+    await page.waitForTimeout(500);
+    expect(await page.evaluate(() => (window as any).liveStability.detections)).toBe(
+      state.detections,
+    );
   });
-  await page.goto('/');
-  await closeAppPanel(page);
-  await page.getByRole('button', { name: /Dokument scannen/ }).click();
-  await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
-  await expect(page.getByRole('img', { name: 'Bearbeitete Seite' })).toBeVisible();
-  const state = await page.evaluate(() => (window as any).liveStability);
-  expect(state.detections).toBeGreaterThan(8);
-  expect(state.last - state.first).toBeGreaterThanOrEqual(1000);
-  expect(state.missingOutlines).toBe(0);
-  expect(state.wrongOutlines).toBe(0);
-  expect(state.stops).toBe(1);
-  await page.waitForTimeout(500);
-  expect(await page.evaluate(() => (window as any).liveStability.detections)).toBe(
-    state.detections,
-  );
-});

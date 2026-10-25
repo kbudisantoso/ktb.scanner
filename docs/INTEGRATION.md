@@ -33,6 +33,7 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
     mount,
     assetBaseUrl: '/scanner-assets/',
     initialMode: 'auto',
+    autoCaptureStabilityMs: 1000,
     imageType: 'image/jpeg',
     createPdf: true,
     includeOriginals: false,
@@ -52,6 +53,14 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
 Call `destroy()` on host unmount too. `open({ signal })` and destruction cancel active resources and resolve `cancelled`. A controller can reopen after a session if it has not been destroyed; concurrent opens are rejected. The mount is an exclusive scanner container; unrelated host nodes are not overwritten. `initialFiles` enters import/review without a camera prompt.
 
 The adapter returns `Processed | CropRequired`. A `crop-required` state has source size, proposed corners and `not-detected`/`capture-conflict`, with no image/format. Custom hosts must obtain explicit corner confirmation before issuing a processing request with those corners. Never convert it into a full-original page. The packaged UI handles this; cancelled replacement preserves the existing page. Unexpected missing export geometry fails with `CROP_REQUIRED`, not partial success.
+
+## Capture stability
+
+`autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 500 })`; open call > configuration > default. Both supplied values must be safe integers >=100, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.
+
+Core integrations can use `new AutoCapture('auto', 500)`. `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` are exported from `@ktb/scanner`. The presets are 100/200/300/500/750/1,000/1,500/2,000/3,000/5,000 ms; other integer values >=100 also work. In the reference application choose **Optionen > Stabilisierungsdauer** before starting a session.
+
+This is a minimum measured-evidence window, not a timer or a delay after the green contour closes. At least two fresh valid observations are needed. Detection is capped at about eight jobs per second, so especially 100-300 ms values depend on sampling and processing cadence. Unknown sharpness, movement and missing evidence still pause/reset capture. Diagnostics record the resolved value in `session-open` and `camera-start`.
 
 ## Geometry, format and region
 

@@ -21,6 +21,7 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
     mount,
     assetBaseUrl: '/scanner-assets/',
     initialMode: 'auto',
+    autoCaptureStabilityMs: 1000,
     imageType: 'image/jpeg',
     shutterSound: 'camera', // Use 'off' to avoid audio loading and playback.
     createPdf: true,
@@ -37,6 +38,8 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
 `initialFiles` opens review without requesting a camera. `open({ signal })` supports host cancellation and returns `{ status: 'cancelled' }`. Recoverable processing/export errors keep the session open. `destroy()` stops owned tracks and workers and releases preview resources. One session per controller; a destroyed controller cannot reopen. The host owns confirmed image/PDF blobs and serializable metadata.
 
 `defaultProfile` accepts `auto`, `photo`, `color`, `grayscale` or `bw`. An `open()` override takes precedence over controller configuration; without either, Auto chooses and applies Photo or Color immediately. Grayscale and soft monochrome remain manual choices. All edits are recalculated from the original. `paperRegion` is a weak regional A4/Letter preference, not a GPS request or a size measurement. Manual paper formats and orientation take precedence; paper axes are separate from 90-degree image rotation.
+
+`autoCaptureStabilityMs` configures the minimum measured stability window, default 1,000 ms. A per-open override takes precedence. Both supplied values must be safe integers >=100. Core users can pass a second argument to `new AutoCapture('auto', 500)`; exported `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` describe the default and reference choices. Fresh distinct observations, geometry and sharpness still govern capture, so sampling/processing can exceed the selected minimum. See [integration](../../docs/INTEGRATION.md#capture-stability).
 
 `SHUTTER_SOUNDS` and `ShutterSoundId` describe twelve local cues plus silence. `ImageViewer` accepts an image blob, optional matching unoptimized crop, accessible alternative text and a reset key. It supports fit/100 percent, zoom steps, pinch, pan and held comparison. Use the same CSS and bounded container height. The parent owns blobs; the component owns its object URLs.
 

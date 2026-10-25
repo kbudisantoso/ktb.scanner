@@ -1,7 +1,12 @@
 'use client';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { DiagnosticRecording } from './diagnostics/recorder';
-import { SCAN_PROFILES, SHUTTER_SOUNDS } from '@ktb/scanner';
+import {
+  SCAN_PROFILES,
+  SHUTTER_SOUNDS,
+  AUTO_CAPTURE_STABILITY_PRESETS_MS,
+  DEFAULT_AUTO_CAPTURE_STABILITY_MS,
+} from '@ktb/scanner';
 import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb/scanner';
 import { useUrl } from './blob-url';
 import Results from './Results';
@@ -30,7 +35,8 @@ export default function Page() {
     [archiving, setArchiving] = useState(false);
   const [request, setRequest] = useState<Request | null>(null),
     [panel, setPanel] = useState<'options' | 'diagnostics' | null>(null),
-    [profile, setProfile] = useState<ScanProfile>('auto');
+    [profile, setProfile] = useState<ScanProfile>('auto'),
+    [stabilityMs, setStabilityMs] = useState(DEFAULT_AUTO_CAPTURE_STABILITY_MS);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const closePanel = () => {
     setPanel(null);
@@ -137,6 +143,7 @@ export default function Page() {
         context,
         imageType: mime,
         shutterSound,
+        autoCaptureStabilityMs: stabilityMs,
         createPdf: true,
         diagnostics: diagnosticOptions,
         ...(profile === 'auto' ? {} : { defaultProfile: profile }),
@@ -253,6 +260,21 @@ export default function Page() {
           </button>
         </header>
         <div className="setup-fields">
+          <label>
+            Stabilisierungsdauer
+            <select
+              aria-label="Stabilisierungsdauer"
+              value={stabilityMs}
+              disabled={busy}
+              onChange={(e) => setStabilityMs(Number(e.target.value))}
+            >
+              {AUTO_CAPTURE_STABILITY_PRESETS_MS.map((duration) => (
+                <option key={duration} value={duration}>
+                  {duration} ms{duration === DEFAULT_AUTO_CAPTURE_STABILITY_MS ? ' (Standard)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Startprofil
             <select

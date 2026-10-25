@@ -1,6 +1,6 @@
 # Product requirements
 
-Version 0.7, 24 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
+Version 0.8, 25 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
 
 ## Purpose and boundary
 
@@ -32,7 +32,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-16 | MUST | Edit, reorder, delete and atomically replace pages; keep the previous page until replacement acceptance. |
 | F-17 | MUST | Hand off a non-empty, fully confirmed ordered collection of image blobs and serializable metadata. |
 | F-18 | MUST | Show evidence-based blur, lighting or edge hints; represent unknown causes honestly. |
-| F-19 | MUST | Auto-capture once after one second of measured stable geometry in the current D-034 trial, using fresh sharp evidence. Unknown sharpness blocks Auto and explicitly suggests manual capture. The manual shutter remains available. |
+| F-19 | MUST | Auto-capture once after a configurable measured stability duration, default 1,000 ms, using fresh sharp evidence. Configure through the library or override per open; the reference app exposes experimental duration choices. Unknown sharpness blocks Auto and explicitly suggests manual capture. The manual shutter remains available. |
 | F-20 | OPTIONAL | Add local sample OCR or SDK readability analysis only under a separate decision and comparison test. |
 | F-21 | CONDITIONAL | If F-20 is introduced, run asynchronously, mark uncertainty, invalidate stale results and allow manual acceptance. |
 | F-22 | OPTIONAL | Add reliable geometric paper flattening under a separate decision; visible folds alone are not a rejection. |

@@ -99,6 +99,55 @@ test('invalid configuration and per-open profile fail before creating a dialog',
     children: 0,
   });
 });
+test('stability configuration and per-open overrides are validated before opening and recorded', async ({
+  page,
+}) => {
+  const result = await page.evaluate(async () => {
+    const h = (window as any).reactHarness;
+    const mount = document.body.appendChild(document.createElement('div'));
+    const invalid: string[] = [];
+    for (const value of [0, 99, 100.5, NaN, Infinity, null, '100']) {
+      try {
+        h.createScanner({ mount, assetBaseUrl: '/scanner-assets/', autoCaptureStabilityMs: value });
+        invalid.push('accepted');
+      } catch (error: any) {
+        invalid.push(error.code);
+      }
+      const controller = h.createScanner({ mount, assetBaseUrl: '/scanner-assets/' });
+      invalid.push(
+        await controller.open({ autoCaptureStabilityMs: value }).catch((error: any) => error.code),
+      );
+      await controller.destroy();
+    }
+    const childrenAfterInvalid = mount.childElementCount;
+    const durations: number[] = [];
+    for (const [configured, requested] of [
+      [undefined, undefined],
+      [2000, undefined],
+      [2000, 100],
+      [1000, 875],
+    ]) {
+      const controller = h.createScanner({
+        mount,
+        assetBaseUrl: '/scanner-assets/',
+        autoCaptureStabilityMs: configured,
+        diagnostics: {
+          onEvent: (event: any) => {
+            if (event.type === 'session-open') durations.push(event.data.autoCaptureStabilityMs);
+          },
+        },
+      });
+      const pending = controller.open({ autoCaptureStabilityMs: requested });
+      await controller.destroy();
+      await pending;
+    }
+    mount.remove();
+    return { invalid, childrenAfterInvalid, durations };
+  });
+  expect(result.invalid).toEqual(Array(14).fill('CONFIG_INVALID'));
+  expect(result.childrenAfterInvalid).toBe(0);
+  expect(result.durations).toEqual([1000, 2000, 100, 875]);
+});
 test('declarative component survives StrictMode and callback updates, snapshots options, cleans up and reopens', async ({
   page,
 }) => {

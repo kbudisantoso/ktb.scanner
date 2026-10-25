@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AutoCapture } from '../../packages/scanner/src/capture.ts';
+import {
+  AutoCapture,
+  AUTO_CAPTURE_STABILITY_PRESETS_MS,
+  resolveAutoCaptureStabilityMs,
+} from '../../packages/scanner/src/capture.ts';
 import { LiveTracker } from '../../packages/scanner/src/tracking.ts';
 import type { Quad, LiveDetection } from '../../packages/scanner/src/types.ts';
 
@@ -16,6 +20,70 @@ const frame = (
   corners: Quad | null = quad,
   sharpness: LiveDetection['sharpness'] = 'sharp',
 ): LiveDetection => ({ timestamp, corners, sharpness });
+
+for (const duration of [...AUTO_CAPTURE_STABILITY_PRESETS_MS, 875]) {
+  test(`${duration} ms stability uses measured time, never triggers early and claims once`, () => {
+    const gate = new AutoCapture('auto', duration);
+    assert.equal(gate.update(frame(0), 0).capture, false);
+    for (let time = 100; time < duration - 1; time += 100)
+      assert.equal(gate.update(frame(time), time).capture, false);
+    const before = gate.update(frame(duration - 1), duration - 1);
+    assert.equal(before.capture, false);
+    assert.equal(before.progress, (duration - 1) / duration);
+    assert.equal(gate.poll(duration + 50).capture, false);
+    assert.equal(gate.poll(duration + 50).progress, before.progress);
+    assert.deepEqual(gate.update(frame(duration), duration + 60), {
+      progress: 1,
+      capture: true,
+    });
+    assert.equal(gate.update(frame(duration + 100), duration + 100).capture, false);
+    gate.rearm();
+    assert.equal(gate.update(frame(duration + 200), duration + 200).progress, 0);
+  });
+}
+
+test('stability defaults, per-open precedence and invalid values are explicit', () => {
+  assert.equal(new AutoCapture().stabilityMs, 1000);
+  assert.equal(resolveAutoCaptureStabilityMs(), 1000);
+  assert.equal(resolveAutoCaptureStabilityMs(2000), 2000);
+  assert.equal(resolveAutoCaptureStabilityMs(2000, 300), 300);
+  assert.equal(resolveAutoCaptureStabilityMs(undefined, 875), 875);
+  for (const invalid of [
+    0,
+    -100,
+    99,
+    100.5,
+    NaN,
+    Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+    null,
+    '100',
+  ]) {
+    assert.throws(() => new AutoCapture('auto', invalid as number), { code: 'CONFIG_INVALID' });
+    assert.throws(() => resolveAutoCaptureStabilityMs(1000, invalid as number), {
+      code: 'CONFIG_INVALID',
+    });
+    assert.throws(() => resolveAutoCaptureStabilityMs(invalid as number, 1000), {
+      code: 'CONFIG_INVALID',
+    });
+  }
+});
+
+test('short windows still reject unknown, stale and duplicate evidence and honor Manual', () => {
+  const gate = new AutoCapture('auto', 100);
+  gate.update(frame(0), 0);
+  assert.equal(gate.update(frame(100, quad, 'unknown'), 100).capture, false);
+  assert.equal(gate.update(frame(200), 700).capture, false);
+  assert.equal(gate.update(frame(800), 800).progress, 0);
+  assert.equal(gate.update(frame(800), 900).capture, false);
+  assert.equal(gate.update(frame(1000), 1000).progress, 0);
+  const generation = gate.generation;
+  gate.setMode('manual');
+  assert.equal(gate.update(frame(1100), 1100, generation).capture, false);
+  assert.equal(gate.update(frame(1200), 1200).capture, false);
+  assert.equal(gate.claimManual(), true);
+  assert.equal(gate.claimManual(), false);
+});
 
 test('a single jumping contour is not displayed or passed off as fresh evidence', () => {
   const tracker = new LiveTracker();

@@ -1,13 +1,13 @@
 # Initial-version decisions
 
-Updated 24 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
+Updated 25 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
 
 | ID | Decision | Consequences and limits |
 | --- | --- | --- |
 | D-001 | Classic Scanic behind an adapter | Exact installed version 1.7.1; 1.7.0 was unavailable. No silent engine replacement; physical suitability remains to be verified. |
 | D-002 | Independent library, complete Next.js reference and small Astro example | Local images and browser raster PDF, without changes to other products or a production backend. |
 | D-003 | AGPL version 3 only, explicitly selected | Replaces the private/UNLICENSED development decision. Workspace/examples remain non-publishable packages; source is open. Preserve separate third-party notices. |
-| D-004 | Reversible conservative processing, own sharpness/exposure metrics and Auto/Manual | Auto defaults per D-029. No local OCR/full flattening. The current capture window is 1,000 ms per D-034; smoothing is display-only. |
+| D-004 | Reversible conservative processing, own sharpness/exposure metrics and Auto/Manual | Auto defaults per D-029. No local OCR/full flattening. Capture stability defaults to 1,000 ms and is configurable per D-037; smoothing is display-only. |
 | D-005 | Session in RAM only | No service worker, automatic persistence or recovery promise. Next.js manifest supports standalone use, not offline recovery. |
 | D-006 | Primary iPhone Safari and Android Chrome, current/previous supported generations | Add desktop browsers. About 100 ms feedback and warm 12 MP review within five seconds are development targets, not device measurements. |
 | D-007 | Replaceable German UI texts, theme tokens and two reference themes | Green progress plus text, keyboard corners/order and focus handling. No untested accessibility conformance claim. |
@@ -40,6 +40,7 @@ Updated 24 October 2026. These decisions resolve the initial product scope. The 
 | D-034 | One-second automatic-capture trial | Explicitly requested 24 October 2026: 1,000 instead of 2,000 ms of measured stable evidence. Progress/claim share the clock; freshness, geometry, sharpness and pause/reset thresholds are unchanged. Device evaluation remains open. |
 | D-035 | Focused A2 review and shared viewer | Previous/Next/direct Finish, bounded page tiles, Cancel/Apply/Undo for editing; read-only Original and Quality close with one OK button. Tap/pinch/pan/held Before, detached corner loupe, inline actual lens status, matching orientation icons and postcard label. Queued files cannot be omitted. Preserve results on return; load/render PDFs on demand. [ADR 0020](adr/0020-focused-review-and-shared-viewer.md). |
 | D-036 | Public project preparation follows the established workspace workflow | English public documentation, AGPL source/notices, contribution/security/issue guidance, CI and secret scanning. Local configuration, diagnostics and scratchpad work are excluded. Source publication and npm release are separate; never publish private development history by accident. |
+| D-037 | Configurable measured capture stability | `autoCaptureStabilityMs` is an integer >=100; open call > controller configuration > 1,000 ms. Reference choices: 100/200/300/500/750/1,000/1,500/2,000/3,000/5,000 ms. Actual fresh observations govern progress and capture, without changing geometry, sharpness or pause thresholds. [ADR 0021](adr/0021-configurable-capture-stability.md). |
 
 ## Output and resource defaults
 

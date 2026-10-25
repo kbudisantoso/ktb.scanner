@@ -1,4 +1,5 @@
 import { initialProfile } from '../profiles.ts';
+import { resolveAutoCaptureStabilityMs } from '../capture.ts';
 import { diagnose } from '../diagnostics.ts';
 import { createRoot } from 'react-dom/client';
 import type { ScannerController, ScannerOptions, ScanResult } from '../types.ts';
@@ -12,6 +13,7 @@ export type { ScannerOptions, ScannerController } from '../types.ts';
 export function createScanner(options: ScannerOptions): ScannerController {
   resolveLimits(options.limits);
   initialProfile(options.defaultProfile);
+  resolveAutoCaptureStabilityMs(options.autoCaptureStabilityMs);
   if (
     !options.mount ||
     !options.assetBaseUrl ||
@@ -37,6 +39,10 @@ export function createScanner(options: ScannerOptions): ScannerController {
         );
       try {
         initialProfile(options.defaultProfile, initial.defaultProfile);
+        resolveAutoCaptureStabilityMs(
+          options.autoCaptureStabilityMs,
+          initial.autoCaptureStabilityMs,
+        );
       } catch (error) {
         return Promise.reject(error);
       }
@@ -50,6 +56,10 @@ export function createScanner(options: ScannerOptions): ScannerController {
         context: options.context,
         defaultProfile: initialProfile(options.defaultProfile, initial.defaultProfile),
         mode: options.initialMode ?? 'auto',
+        autoCaptureStabilityMs: resolveAutoCaptureStabilityMs(
+          options.autoCaptureStabilityMs,
+          initial.autoCaptureStabilityMs,
+        ),
         imageType: options.imageType ?? 'image/jpeg',
         engineBuffers: options.diagnostics?.engineBuffers === true,
         shutterSound: options.shutterSound ?? 'camera',

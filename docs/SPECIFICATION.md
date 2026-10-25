@@ -1,6 +1,6 @@
 # Implementation contract
 
-Version 0.7, 24 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.8, 25 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
@@ -12,7 +12,7 @@ Core imports must not access React, camera, window or document. UI/engine load a
 
 ## Controller, ownership and session state
 
-`createScanner(options)` exposes `open({ signal?, initialFiles?, defaultProfile? })` and `destroy()`. Reject invalid configuration, overlapping opens and calls after destruction. Initial files open review without requesting a camera. Host abort resolves `cancelled`; recoverable processing/export errors remain visible in the session. Destroy stops owned workers/tracks, invalidates pending jobs and releases preview resources. The host owns confirmed blobs after completion and must revoke object URLs it creates.
+`createScanner(options)` exposes `open({ signal?, initialFiles?, defaultProfile?, autoCaptureStabilityMs? })` and `destroy()`. Reject invalid configuration, overlapping opens and calls after destruction. Initial files open review without requesting a camera. Host abort resolves `cancelled`; recoverable processing/export errors remain visible in the session. Destroy stops owned workers/tracks, invalidates pending jobs and releases preview resources. The host owns confirmed blobs after completion and must revoke object URLs it creates.
 
 A confirmed result has status, schema version 1, session ID, ordered stable accepted-page IDs/revisions, image blobs, serializable geometry/orientation/format/processing/quality metadata and an optional PDF blob. Originals are returned only when requested. Images and PDF must contain the same confirmed edit revision. Never report success with a missing page. Session operations preserve old pages through processing, cancellation and replacement failures. Export locks a snapshot and releases that lock on both success and failure.
 
@@ -24,7 +24,9 @@ Prefer the rear camera and request video only. Preserve import, camera selection
 
 Live video is independent of detection. Submit at most about eight reduced frames per second and allow one detection job; discard stale waiting frames. Keep raw detection, smoothed display geometry and full-resolution still geometry separate. Display smoothing has about 180 ms response time. The tracker confirms jumps, holds display for 400 ms and fades it by 600 ms; held display supplies no capture evidence.
 
-The current D-034 trial requires 1,000 ms of measured stable evidence. The progress contour and capture gate share that duration. Measure against a fixed initial raw geometry so slow drift cannot hide behind smoothing. Starting bounds: 0.05 normalized anchor drift, 0.035 frame step and 15 percent area change. Only measured intervals up to 400 ms count. Uncertainty pauses for at most 1,200 ms since the last good measurement without later adding the missing interval. Movement, longer loss, mode change or cancellation resets the gate. Fresh sharp evidence is checked at the final claim; one claim produces one capture until explicitly rearmed.
+`autoCaptureStabilityMs` sets the required measured stable time: open-call override > controller configuration > 1,000 ms. Validate both supplied values as safe integers >=100 before opening resources. The progress contour and capture gate share the resolved duration. The reference offers 100/200/300/500/750/1,000/1,500/2,000/3,000/5,000 ms in Scan options; changes apply to subsequent sessions. API values need not match those presets. At least two distinct valid observations are necessary; the next fresh observation may arrive after the requested minimum, especially below the approximately 125 ms live-detection interval. No timer-only capture or extra post-completion delay is introduced. Record the effective duration in diagnostic session-open and camera-start events. See [ADR 0021](adr/0021-configurable-capture-stability.md).
+
+Measure against a fixed initial raw geometry so slow drift cannot hide behind smoothing. Starting bounds: 0.05 normalized anchor drift, 0.035 frame step and 15 percent area change. Only measured intervals up to 400 ms count. Uncertainty pauses for at most 1,200 ms since the last good measurement without later adding the missing interval. Movement, longer loss, mode change or cancellation resets the gate. Fresh sharp evidence is checked at the final claim; one claim produces one capture until explicitly rearmed.
 
 Unknown sharpness on a detected blank page explains that manual capture is needed; measured blur has a separate hint. Manual capture remains available in Auto and is the only trigger in Manual. Switching to Manual immediately invalidates in-flight automatic decisions. Stale live answers cannot alter an already captured still.
 
@@ -132,10 +134,10 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-16 | Physical iPhone/Android, standalone, 12 MP and long sessions | N-02, N-06 |
 | T-17 | Blob/JSON ownership and endpoint-free handoff | I-03, F-17 |
 | T-18 | Reproducible install, pins, assets and notices | N-07, N-08, N-09 |
-| T-19 | Exact 1,000 ms gate, once-only, drift/blur/gaps | F-19, F-23 |
+| T-19 | Configurable exact-boundary gate, defaults/validation/precedence, once-only, drift/blur/gaps | F-19, F-23 |
 | T-20 | Shared full-original camera/import processing | F-04, F-06, F-24 |
 | T-21 | In-flight invalidation and manual shutter | F-19, F-25 |
-| T-22 | Measured one-second progress, pauses/reset, contour/text | F-26, N-05 |
+| T-22 | Measured progress at the configured duration, pauses/reset, contour/text | F-26, N-05 |
 | T-23 | Decoded images, PDF pages/order/sizes and PDF.js pixel comparison | F-27, F-28 |
 | T-24 | Both built hosts and actual file downloads | F-29, I-01, I-06 |
 | T-25 | Opt-in diagnostics, independent ZIP reading, final bytes, limits/errors/abort | F-30, N-02, N-04 |
