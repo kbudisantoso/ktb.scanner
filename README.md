@@ -4,6 +4,20 @@ A browser document-scanning library with a framework-independent TypeScript core
 
 The library defaults to **English** and includes **German**. Both examples default to English and automatically use German when the browser's primary language is German. An explicit DE/EN selection takes precedence. This repository is the open-source library and reference implementation. A separately hosted **KTB Scanner** example will be linked here when available.
 
+## Built on
+
+Document detection and perspective correction are powered by **[Scanic](https://github.com/marquaye/scanic)**. ktb.scanner wraps that engine and adds capture/session management, stability tracking, quality checks, reversible image optimization and the integrated review/export workflow.
+
+| Dependency | Role |
+| --- | --- |
+| [Scanic](https://github.com/marquaye/scanic) | Classic document detection, perspective correction and the corner editor |
+| [jsPDF](https://github.com/parallax/jsPDF) | Browser-side multi-page PDF generation |
+| [React / React DOM](https://github.com/facebook/react) | Reusable scanner interface; peer dependencies of the library |
+| [PDF.js](https://github.com/mozilla/pdf.js) | PDF preview in the Next.js demo only |
+| [Next.js](https://github.com/vercel/next.js) / [Astro](https://github.com/withastro/astro) | Reference application hosts |
+
+These projects retain their own licenses. See [dependencies and pinned versions](docs/DEPENDENCIES.md) and [NOTICE](NOTICE) for third-party boundaries, bundled notices and media credits.
+
 ## Features
 
 | Area | Included |
@@ -113,7 +127,7 @@ The package's `prepack` builds clean output. With the current version, this crea
 From your host project, install that archive and the React peers:
 
 ```sh
-pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-scanner-0.1.0.tgz react@19.2.4 react-dom@19.2.4
+pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-scanner-0.1.0.tgz react@19.3.1 react-dom@19.3.1
 ```
 
 The archive is already built and needs no dependency install scripts; `--ignore-scripts` also avoids an unnecessary dependency postinstall prompt in pnpm 11. Use a bundler with ESM, dynamic imports and CSS support, for example Next.js, Astro or Vite. The ready-made UI requires React/React DOM 19 even when the host uses another framework. Core-only consumers do not need to render React. Within this workspace the examples use `workspace:*`; external projects should consume a reproducible package artifact, not an unbuilt sibling directory.
