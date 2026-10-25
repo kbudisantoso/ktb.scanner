@@ -11,7 +11,7 @@ Project source is AGPL-3.0-only; dependencies retain their own licenses. Direct 
 | Next.js | 16.4.2 | Full reference application | MIT; [Next.js](https://github.com/vercel/next.js) |
 | Astro | 7.4.1 | Small host example | MIT; [Astro](https://github.com/withastro/astro) |
 | @types/node | 26.6.5 | Development-only build/test types; runtime minimum is unchanged | MIT; [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
-| TypeScript | 5.9.3 | Types / declarations | Apache-2.0; [TypeScript](https://github.com/microsoft/TypeScript) |
+| TypeScript | 7.0.2 | Types / declarations | Apache-2.0; [TypeScript](https://github.com/microsoft/TypeScript) |
 | esbuild | 0.28.2 | Library/worker build | MIT; [esbuild](https://github.com/evanw/esbuild) |
 | Vitest | 5.0.5 | Tests / built import | MIT; [Vitest](https://github.com/vitest-dev/vitest) |
 | Playwright | 1.64.1 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
