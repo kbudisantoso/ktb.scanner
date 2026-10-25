@@ -51,6 +51,9 @@ test('all local cues can be previewed before opening the scanner', async ({ page
     expect(await audio.evaluate((a: HTMLAudioElement) => a.error)).toBeNull();
     expect(await audio.evaluate((a: HTMLAudioElement) => a.muted)).toBe(true);
   }
+  await choices.selectOption('off');
+  await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.paused)).toBe(true);
+  await expect(audio).not.toHaveAttribute('src');
   await info.attach('sound-selection', {
     body: await page.screenshot({
       path: `artifacts/local/sound-selection-${info.project.name}.png`,

@@ -64,8 +64,7 @@ export class Camera {
       const track = stream.getVideoTracks?.()[0];
       try {
         const capabilities = track?.getCapabilities?.() as
-          | (MediaTrackCapabilities & { focusMode?: string[] })
-          | undefined;
+          (MediaTrackCapabilities & { focusMode?: string[] }) | undefined;
         if (capabilities?.focusMode?.includes('continuous'))
           await track.applyConstraints({
             advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
