@@ -425,7 +425,7 @@
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-.scanner button:active:not(:disabled) {
+.scanner button:active:not(:disabled):not(.scanner-corner-handle) {
   transform: translateY(1px);
 }
 .scanner-camera-error {
@@ -1311,7 +1311,13 @@
   flex: 1;
   min-height: 0;
   height: auto;
-  overflow: hidden;
+  overflow: visible;
+}
+.scanner .scanner-corner-handle {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border-radius: 50%;
 }
 .scanner-workspace .scanner-corners .scanner-actions {
   margin: 0;
@@ -1384,6 +1390,8 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  /* Scanic reserves 12 px; enlarged touch handles need room beyond its canvas. */
+  padding: 20px;
 }
 .scanner-review-menu {
   position: absolute;
