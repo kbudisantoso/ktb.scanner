@@ -4,6 +4,20 @@ An embeddable browser document scanner with a framework-independent TypeScript c
 
 Capture a page or import JPEG, PNG or WebP, correct its corners, choose a reversible image profile, arrange multiple pages and export JPEG/PNG plus a multi-page raster PDF. Processing stays in the browser. There is no upload, account, automatic persistence, service worker or OCR text layer.
 
+## Built on
+
+Document detection and perspective correction are powered by **[Scanic](https://github.com/marquaye/scanic)**. ktb.scanner wraps that engine and adds capture/session management, stability tracking, quality checks, reversible image optimization and the integrated review/export workflow.
+
+| Dependency | Role |
+| --- | --- |
+| [Scanic](https://github.com/marquaye/scanic) | Classic document detection, perspective correction and the corner editor |
+| [jsPDF](https://github.com/parallax/jsPDF) | Browser-side multi-page PDF generation |
+| [React / React DOM](https://github.com/facebook/react) | Reusable scanner interface; peer dependencies of the library |
+| [PDF.js](https://github.com/mozilla/pdf.js) | PDF preview in the Next.js demo only |
+| [Next.js](https://github.com/vercel/next.js) / [Astro](https://github.com/withastro/astro) | Reference application hosts |
+
+These projects retain their own licenses. See [dependencies and pinned versions](docs/DEPENDENCIES.md) and [NOTICE](NOTICE) for third-party boundaries, bundled notices and media credits.
+
 ## Run locally
 
 Use Node >=22.13 (Node 24 LTS recommended), pnpm 11.15.1 and Python 3 for independent ZIP checks.
