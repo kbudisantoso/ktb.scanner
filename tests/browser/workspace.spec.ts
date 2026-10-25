@@ -26,6 +26,13 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
       ).join(','),
     );
   const baseline = await hash();
+  // Reprocessing replaces and revokes preview URLs. Retry the complete byte
+  // assertion if WebKit observes the old URL during that asynchronous handoff.
+  const expectBaseline = () =>
+    expect(async () => {
+      await expect(image).toBeVisible();
+      expect(await hash()).toBe(baseline);
+    }).toPass({ timeout: 30_000 });
   await surface.dblclick();
   await expect(surface).toHaveAttribute('data-zoom', '100');
   await chooseProfile(page, 'grayscale');
@@ -33,13 +40,13 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
   await expect(surface).toHaveAttribute('data-zoom', '100');
   expect(await hash()).not.toBe(baseline);
   await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
-  await expect.poll(hash).toBe(baseline);
+  await expectBaseline();
   await tone(page, 'Helligkeit');
   await page.getByRole('slider', { name: 'Helligkeit', exact: true }).press('End');
   await expect(page.locator('.scanner')).toHaveAttribute('aria-busy', 'false');
   expect(await hash()).not.toBe(baseline);
   await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
-  await expect.poll(hash).toBe(baseline);
+  await expectBaseline();
   await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
   await tool(page, 'Filter');
   await expect(page.getByRole('button', { name: 'Auto', exact: true })).toHaveAttribute(
