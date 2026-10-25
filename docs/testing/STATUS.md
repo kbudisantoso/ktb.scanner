@@ -2,9 +2,19 @@
 
 Updated 25 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Browser-language selection in the demos, 25 October 2026
+
+Both reference hosts now use English as their fallback and German for a German primary browser language, including regional variants. Explicit `?lang=en` / `?lang=de` and manual selections take precedence and survive reload; automatic detection does not rewrite the URL. The library itself retains its explicit English default. Static host HTML, Next.js metadata and the reference manifest use English.
+
+All 56 new browser-language cases passed across both hosts and Chromium, Firefox, WebKit and mobile WebKit. They cover English/German/Swiss German, unsupported browser language, explicit overrides, unsupported query fallback and manual selection followed by reload. The existing twenty localization/mobile cases also passed. Both production hosts/library/assets built; 158 native tests, three Vitest checks, typecheck, formatting and documentation checks passed.
+
+The complete 440-case run passed 394 cases and retained the 41 deliberate camera/audio/benchmark exceptions. Four isolated receipt-viewer cases still expected German without a locale provider; their selectors now exercise the intended English fallback. One desktop-WebKit landscape review case reported a clipped top-left corner handle. A subsequent eight-case run passed all four receipt-viewer and all four landscape review profiles. No corner-editor code or assertion was changed for that intermittent finding; its reproducibility and physical-device relevance remain open. This is not a claim of a single clean 440-case run.
+
+Reproduce language coverage with `pnpm exec playwright test tests/browser/i18n.spec.ts --workers=4`; the focused follow-up uses `pnpm exec playwright test tests/browser/long-receipt.spec.ts tests/browser/review-ui.spec.ts --grep 'long receipts|focused ink 844x390' --workers=2` after building.
+
 ## English/German library and reference hosts, 25 October 2026
 
-[ADR 0022](../adr/0022-localization-and-library-default.md) adds an explicit English library/viewer default, built-in German and compatible host text overrides. Both reference hosts start in German and offer English, including errors, result controls and PDF accessibility labels. Locale does not change image processing or paper-region inference. Switching result language preserves the actual PDF bytes. Diagnostics remain off by default; the outdated reference description was corrected.
+[ADR 0022](../adr/0022-localization-and-library-default.md) adds an explicit English library/viewer default, built-in German and compatible host text overrides. At this initial checkpoint both reference hosts started in German; their updated browser-aware behavior is recorded above. Errors, result controls and PDF accessibility labels are localized. Locale does not change image processing or paper-region inference. Switching result language preserves the actual PDF bytes. Diagnostics remain off by default; the outdated reference description was corrected.
 
 Verification: 158 native tests and three Vitest checks passed. The full 376-case browser regression run passed 335 cases with zero failures/retries and 41 deliberate exceptions: 38 synthetic Safari camera/audio cases and three benchmark profiles outside the desktop Chromium measurement. A subsequent 20-case localization run passed in all four browser profiles after the final label fixes, without skips. It covers the default English controller, German and host overrides, real processing/PDF export in both hosts, unchanged PDF bytes across language changes, and reachable >=44 px English review/tool controls at 320 x 568 and 844 x 390. Physical-device and assistive-technology acceptance remains open.
 

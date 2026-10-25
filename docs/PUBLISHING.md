@@ -2,7 +2,7 @@
 
 Project source is licensed under GNU AGPL version 3 only (`AGPL-3.0-only`), explicitly selected for this project. Full text is in the root and library LICENSE; NOTICE explains third-party boundaries. Workspace and example manifests stay `private: true` to prevent accidental package publication; the library is prepared for public packaging. This does not mean an npm release has occurred.
 
-Public documentation is English. The library defaults to English with built-in German; both reference applications start in German and support English. Hosts can override text. Contribution guidance, issue/PR templates, security policy, pinned CI actions, dependency updates and CLI secret scanning follow the established workspace workflow. Application code/infrastructure from other products are not copied.
+Public documentation is English. The library defaults to English with built-in German; both reference applications default to English, detect German browser language and support explicit DE/EN selection. Hosts can override text. Contribution guidance, issue/PR templates, security policy, pinned CI actions, dependency updates and CLI secret scanning follow the established workspace workflow. Application code/infrastructure from other products are not copied.
 
 Public project source: [kbudisantoso/ktb.scanner](https://github.com/kbudisantoso/ktb.scanner). Actual hosted check results are available in [Actions](https://github.com/kbudisantoso/ktb.scanner/actions); npm publication and demo deployment remain separate.
 

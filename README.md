@@ -2,7 +2,7 @@
 
 A browser document-scanning library with a framework-independent TypeScript core, a themeable React interface and complete Next.js and Astro examples. Capture or import a document, review its edges and appearance, arrange pages, then export images and a multi-page PDF. Processing stays in the browser.
 
-The library defaults to **English** and includes **German**. Both examples start in German and can switch to English. This repository is the open-source library and reference implementation. A separately hosted **KTB Scanner** example will be linked here when available.
+The library defaults to **English** and includes **German**. Both examples default to English and automatically use German when the browser's primary language is German. An explicit DE/EN selection takes precedence. This repository is the open-source library and reference implementation. A separately hosted **KTB Scanner** example will be linked here when available.
 
 ## Features
 
@@ -40,10 +40,10 @@ Open **http://localhost:3000**. `pnpm dev` builds the library and copies its wor
 
 In the workshop:
 
-1. Choose **Dokument scannen** to open the scanner, **Bilder importieren** for existing files, or the sample-documents button for synthetic examples.
-2. Capture/import, confirm uncertain corners, review the result and use **Wiederholen** to take another image. Add more pages or choose **Abschließen** to export.
+1. Choose **Scan document** to open the scanner, **Import images** for existing files, or the sample-documents button for synthetic examples.
+2. Capture/import, confirm uncertain corners, review the result and use **Retake** to take another image. Add more pages or choose **Finish** to export.
 3. Inspect actual page images and the generated PDF, then download them deliberately. Returning to the start keeps the result; discarding is explicit.
-4. Open **Optionen** to change language, initial profile, theme, output image format, capture cue and stabilization duration. Use **Sprache / Language** to switch DE/EN, or start at **http://localhost:3000/?lang=en**.
+4. Open **Options** to change language, initial profile, theme, output image format, capture cue and stabilization duration. Use **Sprache / Language** to switch DE/EN, or use `?lang=en` / `?lang=de` to override browser detection. Manual selections remain explicit in the URL when reloading.
 5. Diagnostics start **off**. Enable them explicitly if required; recorded document bytes remain local to that page session. Reloading loses in-memory scans and diagnostics.
 
 The Astro example runs separately:

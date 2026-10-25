@@ -4,7 +4,7 @@ Date: 2026-10-25. Status: accepted and implemented; validation is recorded separ
 
 ## Context
 
-A reusable library needs a stable English default and a complete German option. The reference hosts should continue to start in German and demonstrate both languages. Text overrides existed, but replacing a few labels did not localize errors, result viewers or PDF previews.
+A reusable library needs a stable English default and a complete German option. The reference hosts demonstrate both languages. The updated demo decision uses English as the fallback and detects German primary browser language. Text overrides existed, but replacing a few labels did not localize errors, result viewers or PDF previews.
 
 ## Decision
 
@@ -13,7 +13,7 @@ A reusable library needs a stable English default and a complete German option. 
 - Keep legacy German message keys compatible. English default text may also be overridden. Named placeholders support dynamic page labels without translating technical metadata keys or document contents.
 - Keep stable `ScannerError.code` values; API messages default to English and the UI localizes them. Contract tests assert error codes rather than depending on a particular display language.
 - Ship English profile/sound labels in public catalogs. Reference selectors translate them for display; IDs and processing recipes are unchanged.
-- Both examples start in German, offer a DE/EN selector and recognize `?lang=en`. Update host language/title, result labels and PDF accessibility labels. A language change must not regenerate or discard image/PDF results. Language controls are disabled while a scan session is active.
+- Both examples default to English and detect German primary browser language, including regional variants. A DE/EN selector and explicit `?lang=en` / `?lang=de` override detection and survive reload. Unsupported language parameters fall back to browser detection. Infer language without rewriting the URL; persist a choice only after explicit selection. Initial static HTML and the reference manifest use English. Update host language/title, result labels and PDF accessibility labels. A language change must not regenerate or discard image/PDF results. Language controls are disabled while a scan session is active.
 - Locale does not alter camera settings, capture evidence, quality thresholds, paper-region inference, recipes, exports or metadata. The host still owns endpoint and persistence decisions.
 
 ## Consequences

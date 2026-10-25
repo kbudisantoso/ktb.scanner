@@ -6,7 +6,13 @@ export default defineConfig({
   fullyParallel: false,
   workers: process.env.CI ? 2 : undefined,
   reporter: [['list'], ['json', { outputFile: 'artifacts/local/browser-results.json' }]],
-  use: { baseURL: 'http://127.0.0.1:3177', trace: 'retain-on-failure', actionTimeout: 20_000 },
+  // Existing integration flows deliberately exercise German; locale coverage overrides this.
+  use: {
+    baseURL: 'http://127.0.0.1:3177',
+    locale: 'de-DE',
+    trace: 'retain-on-failure',
+    actionTimeout: 20_000,
+  },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },

@@ -56,7 +56,7 @@ The adapter returns `Processed | CropRequired`. A `crop-required` state has sour
 
 ## Language and text overrides
 
-The library defaults to `locale: 'en'`, independent of browser language. Use `locale: 'de'` for German. Both reference hosts start in German; choose Sprache / Language or use `?lang=en` to switch to English. The host HTML language and PDF/result labels follow the selection; document/image/PDF bytes do not change.
+The library defaults to `locale: 'en'`, independent of browser language. Use `locale: 'de'` for German. Both reference hosts use English as the fallback and German for a German primary browser language (`de`, `de-DE`, `de-AT`, `de-CH`, etc.). Choose Sprache / Language or use `?lang=en` / `?lang=de` to override detection; manual choices remain in the URL on reload. Remove `lang` to restore automatic browser selection. The host HTML language and PDF/result labels follow the selection; document/image/PDF bytes do not change.
 
 `createTranslator(locale, texts?)` and `ScanLocale` are exported by the DOM-free core. The reusable `ImageViewer` also accepts `locale` and `texts`, defaulting to English. Existing German message keys remain valid for `texts` overrides; English default text can be overridden as well. For example, `texts: { 'Dokument scannen': 'Capture paperwork' }` or `texts: { 'Scan document': 'Capture paperwork' }`. Formatter values use named placeholders, e.g. `t('Seite {number}', { number: 2 })`.
 

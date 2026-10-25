@@ -2,12 +2,19 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createTranslator, type ScanLocale } from '@ktb/scanner';
 
-const Context = createContext({ locale: 'de' as ScanLocale, setLocale: (_: ScanLocale) => {} });
+const Context = createContext({ locale: 'en' as ScanLocale, setLocale: (_: ScanLocale) => {} });
 export function DemoLocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<ScanLocale>('de');
+  const [locale, setLocale] = useState<ScanLocale>('en');
   useEffect(() => {
     const requested = new URL(location.href).searchParams.get('lang');
-    if (requested === 'en' || requested === 'de') setLocale(requested);
+    const preferred = navigator.languages?.[0] || navigator.language;
+    setLocale(
+      requested === 'en' || requested === 'de'
+        ? requested
+        : /^de(?:-|$)/i.test(preferred)
+          ? 'de'
+          : 'en',
+    );
   }, []);
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -16,8 +23,7 @@ export function DemoLocaleProvider({ children }: { children: ReactNode }) {
   const changeLocale = (next: ScanLocale) => {
     setLocale(next);
     const url = new URL(location.href);
-    if (next === 'en') url.searchParams.set('lang', 'en');
-    else url.searchParams.delete('lang');
+    url.searchParams.set('lang', next);
     history.replaceState(null, '', url);
   };
   return (

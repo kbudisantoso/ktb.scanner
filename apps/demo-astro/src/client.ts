@@ -6,7 +6,14 @@ const input = document.querySelector<HTMLInputElement>('#file')!;
 const status = document.querySelector<HTMLElement>('#status')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const language = document.querySelector<HTMLSelectElement>('#language')!;
-let locale: ScanLocale = new URL(location.href).searchParams.get('lang') === 'en' ? 'en' : 'de';
+const requested = new URL(location.href).searchParams.get('lang');
+const preferred = navigator.languages?.[0] || navigator.language;
+let locale: ScanLocale =
+  requested === 'en' || requested === 'de'
+    ? requested
+    : /^de(?:-|$)/i.test(preferred)
+      ? 'de'
+      : 'en';
 let t = createTranslator(locale);
 let lastResult: Extract<ScanResult, { status: 'confirmed' }> | undefined;
 const reset = document.querySelector<HTMLButtonElement>('#reset')!;
@@ -93,14 +100,15 @@ function render(result: Extract<ScanResult, { status: 'confirmed' }>) {
     count: result.pages.length,
   });
 }
-function setLanguage() {
+function setLanguage(updateUrl = false) {
   locale = language.value === 'en' ? 'en' : 'de';
   t = createTranslator(locale);
   document.documentElement.lang = locale;
-  const url = new URL(location.href);
-  if (locale === 'en') url.searchParams.set('lang', 'en');
-  else url.searchParams.delete('lang');
-  history.replaceState(null, '', url);
+  if (updateUrl) {
+    const url = new URL(location.href);
+    url.searchParams.set('lang', locale);
+    history.replaceState(null, '', url);
+  }
   document.title = locale === 'de' ? 'Scanner / Astro Beispiel' : 'Scanner / Astro example';
   document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((element) => {
     element.textContent = t(element.dataset.i18n!);
@@ -110,7 +118,7 @@ function setLanguage() {
   else status.textContent = t('Bilder und PDF bleiben lokal in dieser Sitzung.');
 }
 language.value = locale;
-language.addEventListener('change', setLanguage);
+language.addEventListener('change', () => setLanguage(true));
 setLanguage();
 
 openButton.addEventListener('click', () => {

@@ -169,3 +169,49 @@ for (const [width, height] of [
     await page.getByRole('button', { name: 'Close', exact: true }).click();
   });
 }
+
+for (const host of ['next', 'astro'] as const)
+  for (const scenario of [
+    { browser: 'en-US', expected: 'en' },
+    { browser: 'de-DE', expected: 'de' },
+    { browser: 'de-CH', expected: 'de' },
+    { browser: 'fr-FR', expected: 'en' },
+    { browser: 'de-DE', query: 'en', expected: 'en' },
+    { browser: 'en-US', query: 'de', expected: 'de' },
+    { browser: 'de-AT', query: 'fr', expected: 'de' },
+  ] as const) {
+    test.describe(`${host} language ${scenario.browser} / ${'query' in scenario ? scenario.query : 'automatic'}`, () => {
+      test.use({ locale: scenario.browser });
+      test('detects browser language and retains an explicit selection after reload', async ({
+        page,
+      }) => {
+        const base = host === 'next' ? 'http://127.0.0.1:3177/' : 'http://127.0.0.1:4377/';
+        const query = 'query' in scenario ? scenario.query : undefined;
+        await page.goto(base + (query ? `?lang=${query}` : ''));
+        const selector = page.getByLabel('Sprache / Language', { exact: true });
+        await expect(selector).toHaveValue(scenario.expected);
+        await expect(page.locator('html')).toHaveAttribute('lang', scenario.expected);
+        await expect(
+          page.getByRole('button', {
+            name: scenario.expected === 'de' ? 'Dokument scannen' : 'Scan document',
+            exact: true,
+          }),
+        ).toBeVisible();
+        expect(new URL(page.url()).searchParams.get('lang')).toBe(query ?? null);
+        if (host === 'next')
+          await page
+            .getByRole('button', {
+              name: scenario.expected === 'de' ? 'Optionen' : 'Options',
+              exact: true,
+            })
+            .click();
+        const manual = scenario.expected === 'de' ? 'en' : 'de';
+        await selector.selectOption(manual);
+        await expect(page.locator('html')).toHaveAttribute('lang', manual);
+        expect(new URL(page.url()).searchParams.get('lang')).toBe(manual);
+        await page.reload();
+        await expect(selector).toHaveValue(manual);
+        await expect(page.locator('html')).toHaveAttribute('lang', manual);
+      });
+    });
+  }

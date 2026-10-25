@@ -60,7 +60,7 @@ test('long receipts stay fully visible when fitted, after scrolling at 100 perce
     }
     (window as any).showReceiptResults(pages);
   });
-  await page.getByRole('button', { name: 'Seite 1 vergrößern', exact: true }).click();
+  await page.getByRole('button', { name: 'Enlarge page 1', exact: true }).click();
   const dialog = page.getByRole('dialog'),
     image = dialog.getByRole('img');
   const fitted = async () => {
@@ -103,26 +103,26 @@ test('long receipts stay fully visible when fitted, after scrolling at 100 perce
     }).toPass({ timeout: 10000 });
   };
   for (let i = 0; i < 4; i++) {
-    await expect(image).toHaveAttribute('alt', `Vergrößerte Seite ${i + 1}`);
+    await expect(image).toHaveAttribute('alt', `Enlarged page ${i + 1}`);
     await fitted();
-    await dialog.getByRole('button', { name: '100 Prozent', exact: true }).click();
+    await dialog.getByRole('button', { name: '100 percent', exact: true }).click();
     await expect(dialog.locator('.scanner-image-surface')).toHaveAttribute('data-zoom', '100');
     const box = await dialog.locator('.scanner-image-surface').boundingBox();
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.down();
     await page.mouse.move(box!.x + box!.width / 2, box!.y + 20, { steps: 8 });
     await page.mouse.up();
-    await dialog.getByRole('button', { name: 'Bild einpassen', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Fit image', exact: true }).click();
     await fitted();
     if (i === 1)
       await info.attach('long-receipt-fit.png', {
         body: await page.screenshot(),
         contentType: 'image/png',
       });
-    if (i < 3) await dialog.getByRole('button', { name: 'Nächste Seite', exact: true }).click();
+    if (i < 3) await dialog.getByRole('button', { name: 'Next page', exact: true }).click();
   }
   await page.setViewportSize({ width: 844, height: 390 });
   await fitted();
-  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Seite 4 vergrößern', exact: true })).toBeFocused();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Enlarge page 4', exact: true })).toBeFocused();
 });
