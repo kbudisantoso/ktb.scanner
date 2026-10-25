@@ -1,5 +1,6 @@
 import { initialProfile } from '../profiles.ts';
 import { resolveAutoCaptureStabilityMs } from '../capture.ts';
+import { resolveLocale } from '../i18n.ts';
 import { diagnose } from '../diagnostics.ts';
 import { createRoot } from 'react-dom/client';
 import type { ScannerController, ScannerOptions, ScanResult } from '../types.ts';
@@ -13,6 +14,7 @@ export type { ScannerOptions, ScannerController } from '../types.ts';
 export function createScanner(options: ScannerOptions): ScannerController {
   resolveLimits(options.limits);
   initialProfile(options.defaultProfile);
+  resolveLocale(options.locale);
   resolveAutoCaptureStabilityMs(options.autoCaptureStabilityMs);
   if (
     !options.mount ||
@@ -56,6 +58,7 @@ export function createScanner(options: ScannerOptions): ScannerController {
         context: options.context,
         defaultProfile: initialProfile(options.defaultProfile, initial.defaultProfile),
         mode: options.initialMode ?? 'auto',
+        locale: resolveLocale(options.locale),
         autoCaptureStabilityMs: resolveAutoCaptureStabilityMs(
           options.autoCaptureStabilityMs,
           initial.autoCaptureStabilityMs,

@@ -62,7 +62,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | ID | Priority | Requirement |
 | --- | --- | --- |
 | I-01 | MUST | Integrate with React/Next.js and Astro, independent of business models. |
-| I-02 | MUST | Allow host colors, font, layout tokens and replaceable UI texts; no fixed application brand in the core. |
+| I-02 | MUST | Allow host colors, font, layout tokens and replaceable UI texts; no fixed application brand in the core. Provide English as the library default and built-in German, with DE/EN reference hosts. |
 | I-03 | MUST | Return files without built-in SaaS endpoints/credentials; upload and authorization belong to the host. |
 | I-04 | MUST | Pin and control runtime assets; document dependencies and any external runtime/licensing connections. |
 | I-05 | MUST | Document opening, cancellation, recoverable errors and resource ownership/cleanup. |

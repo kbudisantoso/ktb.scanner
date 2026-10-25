@@ -54,6 +54,14 @@ Call `destroy()` on host unmount too. `open({ signal })` and destruction cancel 
 
 The adapter returns `Processed | CropRequired`. A `crop-required` state has source size, proposed corners and `not-detected`/`capture-conflict`, with no image/format. Custom hosts must obtain explicit corner confirmation before issuing a processing request with those corners. Never convert it into a full-original page. The packaged UI handles this; cancelled replacement preserves the existing page. Unexpected missing export geometry fails with `CROP_REQUIRED`, not partial success.
 
+## Language and text overrides
+
+The library defaults to `locale: 'en'`, independent of browser language. Use `locale: 'de'` for German. Both reference hosts start in German; choose Sprache / Language or use `?lang=en` to switch to English. The host HTML language and PDF/result labels follow the selection; document/image/PDF bytes do not change.
+
+`createTranslator(locale, texts?)` and `ScanLocale` are exported by the DOM-free core. The reusable `ImageViewer` also accepts `locale` and `texts`, defaulting to English. Existing German message keys remain valid for `texts` overrides; English default text can be overridden as well. For example, `texts: { 'Dokument scannen': 'Capture paperwork' }` or `texts: { 'Scan document': 'Capture paperwork' }`. Formatter values use named placeholders, e.g. `t('Seite {number}', { number: 2 })`.
+
+Configuration errors reject unsupported locales before opening resources. Core error codes are stable and API messages default to English; the built-in UI localizes them. Locale is captured on opening: close/reopen to change it. It does not override paper-region inference, image recipes or result metadata.
+
 ## Capture stability
 
 `autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 600 })`; open call > configuration > default. Both supplied values must be safe integers from 100 through 5,000, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.
@@ -72,7 +80,7 @@ Standard `FormatSelection` accepts optional `orientation: 'portrait' | 'landscap
 
 ## Profile defaults and React component
 
-`ScanProfile` is `auto | photo | color | grayscale | bw`. `open({ defaultProfile })` overrides controller configuration; without either use Auto. Explicit Auto can remove a configured manual default. Invalid values fail before opening. Each new page starts with that choice; manual page settings remain. Core `SCAN_PROFILES` supplies IDs, default German labels and recipes for host selectors.
+`ScanProfile` is `auto | photo | color | grayscale | bw`. `open({ defaultProfile })` overrides controller configuration; without either use Auto. Explicit Auto can remove a configured manual default. Invalid values fail before opening. Each new page starts with that choice; manual page settings remain. Core `SCAN_PROFILES` supplies IDs, English default labels and recipes for host selectors. Apply `createTranslator(locale)` to labels for a localized selector.
 
 Auto immediately chooses Photo or Color and applies processing; it never automatically removes color with Grayscale/S/W. Preserve automatic intent in `Recipe.enhancement` and actual profile/reason/statistics/suggested tones in `autoOptimization`. Manual tones override suggestions, and custom adapters must provide consistent data for Auto and omit it for manual profiles. Export recalculates image and resolution data together. This pixel heuristic is not semantic recognition; manual override/comparison remain necessary. Lens settings are independently editable, with evidence-tested Auto initially requested by Auto profile.
 
@@ -163,7 +171,7 @@ Diagnostics are off in both library and reference. Optional `diagnostics: { onEv
 
 ## Shared React image viewer
 
-`ImageViewer` is exported by `@ktb/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
+`ImageViewer` is exported by `@ktb/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
 
 Tap/double tap switches fit/100%, magnifiers step zoom, pinch anchors at the midpoint and enlarged images can pan. Enter/Space toggles, +/- zooms and arrows pan. Hold Before to compare; pointer/keyboard release, cancellation, blur and visibility changes restore the result. Focused tools support Cancel/Apply and recipe undo. Finish accepts the confirmed current draft and exports directly; remaining imports require review or explicit discard. Tile cover crops are display-only.
 

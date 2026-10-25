@@ -103,7 +103,11 @@ test('missing crop blocks acceptance and export until confirmation; cancelled re
   await page.evaluate(() => {
     const h = (window as any).cropHarness;
     h.mount = document.body.appendChild(document.createElement('div'));
-    h.controller = h.createScanner({ mount: h.mount, assetBaseUrl: '/scanner-assets/' });
+    h.controller = h.createScanner({
+      locale: 'de',
+      mount: h.mount,
+      assetBaseUrl: '/scanner-assets/',
+    });
     h.result = h.controller.open({ initialFiles: [h.file] });
   });
   const dialog = page.getByRole('dialog');

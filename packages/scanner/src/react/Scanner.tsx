@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { errorMessage } from '../errors.ts';
+import { createTranslator } from '../i18n.ts';
 import type { OpenOptions, ScannerOptions, ScannerController, ScanResult } from '../types.ts';
 import { createScanner } from './controller.tsx';
 
@@ -52,7 +53,14 @@ export function Scanner(props: ScannerProps) {
   return (
     <div className={props.className}>
       <div ref={mount} />
-      {props.open && error && <p role="alert">{error}</p>}
+      {props.open && error && (
+        <p role="alert">
+          {createTranslator(
+            props.options.locale === 'de' ? 'de' : 'en',
+            props.options.texts,
+          )(error)}
+        </p>
+      )}
     </div>
   );
 }

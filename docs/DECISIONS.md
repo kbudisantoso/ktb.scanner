@@ -10,7 +10,7 @@ Updated 25 October 2026. These decisions resolve the initial product scope. The 
 | D-004 | Reversible conservative processing, own sharpness/exposure metrics and Auto/Manual | Auto defaults per D-029. No local OCR/full flattening. Capture stability defaults to 1,000 ms and is configurable per D-037; smoothing is display-only. |
 | D-005 | Session in RAM only | No service worker, automatic persistence or recovery promise. Next.js manifest supports standalone use, not offline recovery. |
 | D-006 | Primary iPhone Safari and Android Chrome, current/previous supported generations | Add desktop browsers. About 100 ms feedback and warm 12 MP review within five seconds are development targets, not device measurements. |
-| D-007 | Replaceable German UI texts, theme tokens and two reference themes | Green progress plus text, keyboard corners/order and focus handling. No untested accessibility conformance claim. |
+| D-007 | English library default with built-in German, host text overrides, theme tokens and two reference themes | Green progress plus text, keyboard corners/order and focus handling. No untested accessibility conformance claim. |
 | D-008 | JPEG/PNG/WebP import; JPEG 0.92/PNG and multi-page raster PDF export | No OCR layer. Original return is opt-in. TIFF, HEIC/HEIF and PDF import are deferred. |
 | D-009 | TypeScript/pnpm, one package with separate React entry | DOM/React-free core import, workers, controlled assets, Vitest and Playwright. |
 | D-010 | Paper format determines rectification target ratio | Correct both crop axes and fill the PDF page without added margins. Receipts/original ratio remain proportional. |
@@ -41,6 +41,8 @@ Updated 25 October 2026. These decisions resolve the initial product scope. The 
 | D-035 | Focused A2 review and shared viewer | Visible Repeat in review/required crop without accepting the draft, Previous/Next/direct Finish, bounded page tiles, Cancel/Apply/Undo for editing; read-only Original and Quality close with one OK button. Tap/pinch/pan/held Before, detached corner loupe, inline actual lens status, matching orientation icons and postcard label. Queued files cannot be omitted. Preserve results on return; load/render PDFs on demand. [ADR 0020](adr/0020-focused-review-and-shared-viewer.md). |
 | D-036 | Public project preparation follows the established workspace workflow | English public documentation, AGPL source/notices, contribution/security/issue guidance, CI and secret scanning. Local configuration, diagnostics and scratchpad work are excluded. Source publication and npm release are separate; never publish private development history by accident. |
 | D-037 | Configurable measured capture stability | `autoCaptureStabilityMs` is an integer from 100 through 5,000; open call > controller configuration > 1,000 ms. Reference choices: 400/600/800/1,000/1,200/1,500/2,000 ms. Actual fresh observations govern progress and capture, without changing geometry, sharpness or pause thresholds. [ADR 0021](adr/0021-configurable-capture-stability.md). |
+
+| D-038 | Built-in EN/DE localization | Library and standalone viewer default to English; explicit `locale: 'de'` selects German. Both reference hosts start in German with an English option. Language, errors, result labels and PDF preview are localized without modifying document blobs. Existing text overrides remain compatible. [ADR 0022](adr/0022-localization-and-library-default.md). |
 
 ## Output and resource defaults
 

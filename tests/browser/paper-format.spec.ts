@@ -107,6 +107,7 @@ for (const scenario of [
         h.mount = document.body.appendChild(document.createElement('div'));
         h.events = [];
         h.controller = h.createScanner({
+          locale: 'de',
           mount: h.mount,
           assetBaseUrl: '/scanner-assets/',
           paperRegion: region,

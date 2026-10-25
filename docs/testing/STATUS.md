@@ -2,6 +2,16 @@
 
 Updated 25 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## English/German library and reference hosts, 25 October 2026
+
+[ADR 0022](../adr/0022-localization-and-library-default.md) adds an explicit English library/viewer default, built-in German and compatible host text overrides. Both reference hosts start in German and offer English, including errors, result controls and PDF accessibility labels. Locale does not change image processing or paper-region inference. Switching result language preserves the actual PDF bytes. Diagnostics remain off by default; the outdated reference description was corrected.
+
+Verification: 158 native tests and three Vitest checks passed. The full 376-case browser regression run passed 335 cases with zero failures/retries and 41 deliberate exceptions: 38 synthetic Safari camera/audio cases and three benchmark profiles outside the desktop Chromium measurement. A subsequent 20-case localization run passed in all four browser profiles after the final label fixes, without skips. It covers the default English controller, German and host overrides, real processing/PDF export in both hosts, unchanged PDF bytes across language changes, and reachable >=44 px English review/tool controls at 320 x 568 and 844 x 390. Physical-device and assistive-technology acceptance remains open.
+
+The final library/assets and Next.js/Astro production builds, typecheck, formatting, documentation links and diff checks passed. The actual package archive passed the release gate with 180 files, all public entry points/sources/notices and twelve integrated cues. An independent temporary host installed that archive with React peers and ran the README asset-copy script, imported all four APIs, rendered the closed React component without browser globals and verified locale helpers/styles/worker/media assets. Dependency install scripts are unnecessary for the built archive; the README uses `--ignore-scripts` to avoid pnpm 11 rejecting a dependency postinstall. These checks perform no registry release, push or deployment.
+
+Reproduce with the standard checks, then `pnpm exec playwright test --workers=4` and `pnpm exec playwright test tests/browser/i18n.spec.ts --workers=4` against the built hosts. The second run includes the additional English mobile layout cases.
+
 ## Direct Repeat action, 25 October 2026
 
 The library review and required-crop view expose Repeat directly. It reopens the camera without accepting the candidate. Returning from the camera preserves the candidate and restores focus; a successful retake clears the prior required-crop state. Individual discard remains in More actions.

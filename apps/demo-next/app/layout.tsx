@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import './globals.css';
 import '@ktb/scanner/styles.css';
+import { DemoLocaleProvider } from './i18n';
 export const metadata = {
   title: 'Scanner Werkstatt',
   description: 'Dokumente lokal aufnehmen, prüfen und exportieren.',
@@ -9,7 +10,9 @@ export const metadata = {
 export default function Layout({ children }: { children: ReactNode }) {
   return (
     <html lang="de">
-      <body>{children}</body>
+      <body>
+        <DemoLocaleProvider>{children}</DemoLocaleProvider>
+      </body>
     </html>
   );
 }

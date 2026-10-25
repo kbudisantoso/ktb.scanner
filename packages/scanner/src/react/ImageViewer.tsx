@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createTranslator, type ScanLocale } from '../i18n.ts';
 import { useBlobUrl } from './hooks.ts';
 import { ToolIcon } from './ToolIcon.tsx';
 
@@ -8,6 +9,7 @@ export interface ImageViewerProps {
   alt: string;
   resetKey: string;
   texts?: Record<string, string>;
+  locale?: ScanLocale;
   className?: string;
 }
 type Point = { x: number; y: number };
@@ -21,9 +23,10 @@ export function ImageViewer({
   alt,
   resetKey,
   texts,
+  locale,
   className = '',
 }: ImageViewerProps) {
-  const t = (key: string) => texts?.[key] ?? key;
+  const t = createTranslator(locale, texts);
   const url = useBlobUrl(image),
     beforeUrl = useBlobUrl(before);
   const surface = useRef<HTMLDivElement>(null);
@@ -143,7 +146,7 @@ export function ImageViewer({
     start();
   };
   return (
-    <div className={`scanner-image-viewer ${className}`}>
+    <div className={`scanner-image-viewer ${className}`} lang={locale ?? 'en'}>
       <div
         ref={surface}
         className="scanner-image-surface"

@@ -26,7 +26,7 @@ class FakeWorker {
 test('worker refuses parallel jobs and cleans listeners after reply', async () => {
   const client = new WorkerClient(new URL('http://localhost/worker.js'));
   const first = client.run({ kind: 'test' });
-  await assert.rejects(client.run({ kind: 'test' }), /bereits/);
+  await assert.rejects(client.run({ kind: 'test' }), { code: 'SCANNER_BUSY' });
   const worker = FakeWorker.instances.at(-1)!;
   worker.respond('ok');
   assert.equal(await first, 'ok');
@@ -53,11 +53,11 @@ test('destroy is idempotent and rejects pending and future operations', async ()
   client.destroy();
   client.destroy();
   await assert.rejects(pending, { name: 'AbortError' });
-  await assert.rejects(client.run({}), /geschlossen/);
+  await assert.rejects(client.run({}), { code: 'SCANNER_DISPOSED' });
 });
 test('timeout actually terminates the worker', async () => {
   const client = new WorkerClient(new URL('http://localhost/worker.js'));
-  await assert.rejects(client.run({}, [], undefined, 5), /lange/);
+  await assert.rejects(client.run({}, [], undefined, 5), { code: 'PROCESSING_TIMEOUT' });
   assert.equal(FakeWorker.instances.at(-1)!.terminated, true);
   client.destroy();
 });
@@ -188,7 +188,7 @@ test('torch controls require advertised support and late changes cannot apply to
   const camera = new Camera();
   await camera.start({ play: async () => {} } as HTMLVideoElement, new AbortController().signal);
   assert.equal(camera.supportsTorch, false);
-  await assert.rejects(camera.setTorch(true), /nicht verfügbar/);
+  await assert.rejects(camera.setTorch(true), { code: 'CAMERA_UNAVAILABLE' });
   supported = true;
   const first = camera.setTorch(true);
   finish();
@@ -213,7 +213,7 @@ test('worker diagnostic stages neither finish the job nor detach abort handling'
   worker.onmessage?.({ data: { id: worker.message.id, diagnostic: { type: 'stage', data: {} } } });
   assert.equal(stages, 1);
   assert.notEqual(worker.onmessage, null);
-  await assert.rejects(client.run({}), /bereits/);
+  await assert.rejects(client.run({}), { code: 'SCANNER_BUSY' });
   abort.abort();
   await assert.rejects(pending, { name: 'AbortError' });
   assert.equal(worker.terminated, true);

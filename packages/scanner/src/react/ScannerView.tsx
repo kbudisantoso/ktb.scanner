@@ -5,6 +5,7 @@ import { ImageViewer } from './ImageViewer.tsx';
 import { ToolIcon } from './ToolIcon.tsx';
 import { initialProfile, profileRecipe } from '../profiles.ts';
 import { resolveAutoCaptureStabilityMs } from '../capture.ts';
+import { createTranslator, type Translate } from '../i18n.ts';
 import type {
   CaptureMode,
   CaptureHint,
@@ -32,12 +33,12 @@ import { SHUTTER_SOUNDS } from '../sounds.ts';
 type Edit = Pick<PageDraft, 'recipe' | 'format' | 'rotation' | 'corners' | 'edgesUncertain'>;
 const editOf = ({ recipe, format, rotation, corners, edgesUncertain }: PageDraft): Edit =>
   structuredClone({ recipe, format, rotation, corners, edgesUncertain });
-function PageImage({ blob, alt }: { blob: Blob; alt: string }) {
+function PageImage({ blob, alt, t }: { blob: Blob; alt: string; t: Translate }) {
   const url = useBlobUrl(blob);
   return url ? (
     <img src={url} alt={alt} />
   ) : (
-    <div className="scanner-image-loading" aria-label="Vorschau wird geladen" />
+    <div className="scanner-image-loading" aria-label={t('Vorschau wird geladen')} />
   );
 }
 export function ScannerView({
@@ -53,7 +54,7 @@ export function ScannerView({
   signal: AbortSignal;
   finish: (result: ScanResult) => void;
 }) {
-  const t = (key: string) => options.texts?.[key] ?? key;
+  const t = createTranslator(options.locale, options.texts);
   const [session] = useState(() => new ScanSession(resolveLimits(options.limits)));
   const [pages, setPages] = useState<readonly PageDraft[]>([]),
     [draft, setDraft] = useState<PageDraft | null>(null);
@@ -531,6 +532,7 @@ export function ScannerView({
       aria-modal="true"
       aria-busy={busy}
       aria-label={t('Dokument scannen')}
+      lang={options.locale ?? 'en'}
       tabIndex={-1}
       onKeyDown={keyboard}
       style={options.theme as React.CSSProperties}
@@ -687,6 +689,7 @@ export function ScannerView({
                       reviewPanel === 'original' ? t('Originalaufnahme') : t('Bearbeitete Seite')
                     }
                     texts={options.texts}
+                    locale={options.locale}
                   />
                   <ReviewTools
                     key={draft.id}
@@ -750,7 +753,7 @@ export function ScannerView({
                         aria-label={`${t('Seite')} ${index + 1}: ${t('Bearbeiten')}`}
                         onClick={() => editPage(page)}
                       >
-                        <PageImage blob={page.thumbnail} alt={`${t('Seite')} ${index + 1}`} />
+                        <PageImage blob={page.thumbnail} alt={`${t('Seite')} ${index + 1}`} t={t} />
                         <span>{index + 1}</span>
                       </button>
                       <div className="scanner-page-buttons">
@@ -951,7 +954,7 @@ export function ScannerView({
               disabled={busy}
               onChange={(e) => setMime(e.target.value as ImageMime)}
             >
-              <option value="image/jpeg">JPEG (0,92)</option>
+              <option value="image/jpeg">{t('JPEG (0,92)')}</option>
               <option value="image/png">PNG</option>
             </select>
           </label>

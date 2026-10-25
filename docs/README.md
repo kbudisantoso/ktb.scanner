@@ -16,4 +16,4 @@
 | [Distribution](PUBLISHING.md) | Public source and separate registry release checks |
 | [Historical evaluation](../EVALUATION.md) | Original research, not current product authorization |
 
-MUST requirements define scope rather than proof. Update requirements, implementation contract, decisions and tests together when behavior changes. Public documentation is English; quoted German labels refer to the replaceable default UI.
+MUST requirements define scope rather than proof. Update requirements, implementation contract, decisions and tests together when behavior changes. Public documentation is English; quoted German labels refer to the German reference-host locale; the library defaults to English.

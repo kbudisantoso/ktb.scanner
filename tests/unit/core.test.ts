@@ -343,7 +343,7 @@ test('export buffer limit fails without losing source pages', async () => {
       limits: resolveLimits({ resultBytes: 1 }),
       engine: adapter,
     }),
-    /groß/,
+    { code: 'LIMIT_EXCEEDED' },
   );
 });
 
@@ -376,7 +376,9 @@ test('replacement preflight includes both originals until the new page is accept
   const session = new ScanSession(resolveLimits({ originalBytes: 15 }));
   session.accept(page());
   const before = session.pages[0];
-  assert.throws(() => session.checkImport(new Blob(['12345678']), before.id), /Sitzungslimit/);
+  assert.throws(() => session.checkImport(new Blob(['12345678']), before.id), {
+    code: 'LIMIT_EXCEEDED',
+  });
   assert.equal(session.pages[0].id, before.id);
   assert.equal(session.pages[0].revision, 1);
   // Editing an already retained original does not allocate a replacement original.
@@ -386,7 +388,7 @@ test('replacement preflight includes both originals until the new page is accept
 
 test('thumbnail bytes count toward retained preview limits', () => {
   const session = new ScanSession(resolveLimits({ resultBytes: 10 }));
-  assert.throws(() => session.accept(page()), /Vorschaudaten/);
+  assert.throws(() => session.accept(page()), { code: 'LIMIT_EXCEEDED' });
   assert.equal(session.pages.length, 0);
 });
 
@@ -394,14 +396,16 @@ test('unoptimized comparison blobs count toward the session preview budget', () 
   const session = new ScanSession(resolveLimits({ resultBytes: 20 }));
   assert.throws(
     () => session.accept({ ...page(), unoptimizedPreview: new Blob(['comparison'.repeat(3)]) }),
-    /Vorschaudaten/,
+    { code: 'LIMIT_EXCEEDED' },
   );
   assert.equal(session.pages.length, 0);
 });
 
 test('replacement preflight rejects a page that no longer exists', () => {
   const session = new ScanSession();
-  assert.throws(() => session.checkImport(new Blob(['image']), 'removed-page'), /nicht mehr/);
+  assert.throws(() => session.checkImport(new Blob(['image']), 'removed-page'), {
+    code: 'PAGE_MISSING',
+  });
   assert.equal(session.pages.length, 0);
 });
 

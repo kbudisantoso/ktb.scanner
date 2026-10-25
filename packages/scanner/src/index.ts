@@ -1,4 +1,6 @@
 export type * from './types.ts';
+export { createTranslator } from './i18n.ts';
+export type { ScanLocale, Translate } from './i18n.ts';
 export { SCAN_PROFILES } from './profiles.ts';
 export { SHUTTER_SOUNDS } from './sounds.ts';
 export type { ShutterSoundId } from './sounds.ts';

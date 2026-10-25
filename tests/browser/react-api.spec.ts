@@ -42,6 +42,7 @@ for (const [configured, requested, expected] of [
         const h = (window as any).reactHarness;
         h.mount = document.body.appendChild(document.createElement('div'));
         h.controller = h.createScanner({
+          locale: 'de',
           mount: h.mount,
           assetBaseUrl: '/scanner-assets/',
           defaultProfile: configured,
@@ -80,11 +81,16 @@ test('invalid configuration and per-open profile fail before creating a dialog',
       mount = document.body.appendChild(document.createElement('div'));
     let configured;
     try {
-      h.createScanner({ mount, assetBaseUrl: '/scanner-assets/', defaultProfile: 'document' });
+      h.createScanner({
+        locale: 'de',
+        mount,
+        assetBaseUrl: '/scanner-assets/',
+        defaultProfile: 'document',
+      });
     } catch (e: any) {
       configured = e.code;
     }
-    const controller = h.createScanner({ mount, assetBaseUrl: '/scanner-assets/' });
+    const controller = h.createScanner({ locale: 'de', mount, assetBaseUrl: '/scanner-assets/' });
     const requested = await controller
       .open({ defaultProfile: 'invalid' })
       .catch((e: any) => e.code);
@@ -108,12 +114,17 @@ test('stability configuration and per-open overrides are validated before openin
     const invalid: string[] = [];
     for (const value of [0, 99, 100.5, 5001, NaN, Infinity, null, '100']) {
       try {
-        h.createScanner({ mount, assetBaseUrl: '/scanner-assets/', autoCaptureStabilityMs: value });
+        h.createScanner({
+          locale: 'de',
+          mount,
+          assetBaseUrl: '/scanner-assets/',
+          autoCaptureStabilityMs: value,
+        });
         invalid.push('accepted');
       } catch (error: any) {
         invalid.push(error.code);
       }
-      const controller = h.createScanner({ mount, assetBaseUrl: '/scanner-assets/' });
+      const controller = h.createScanner({ locale: 'de', mount, assetBaseUrl: '/scanner-assets/' });
       invalid.push(
         await controller.open({ autoCaptureStabilityMs: value }).catch((error: any) => error.code),
       );
@@ -128,6 +139,7 @@ test('stability configuration and per-open overrides are validated before openin
       [1000, 875],
     ]) {
       const controller = h.createScanner({
+        locale: 'de',
         mount,
         assetBaseUrl: '/scanner-assets/',
         autoCaptureStabilityMs: configured,
@@ -166,6 +178,7 @@ test('declarative component survives StrictMode and callback updates, snapshots 
             open,
             className: 'host-scanner',
             options: {
+              locale: 'de',
               assetBaseUrl: '/scanner-assets/',
               defaultProfile: profile,
               theme: { '--scanner-accent': '#4931aa' },
@@ -246,6 +259,7 @@ test('twenty imported pages remain navigable in a bounded scrolling tile grid', 
     h.mount = document.body.appendChild(document.createElement('div'));
     const file = new File([await (await fetch(data)).blob()], 'page.png', { type: 'image/png' });
     h.controller = h.createScanner({
+      locale: 'de',
       mount: h.mount,
       assetBaseUrl: '/scanner-assets/',
       createPdf: false,
@@ -296,6 +310,7 @@ test('declarative configuration errors are reported once and hidden when closed'
             open,
             className: 'host-scanner',
             options: {
+              locale: 'de',
               assetBaseUrl: '/scanner-assets/',
               defaultProfile: 'invalid',
               shutterSound: 'off',
@@ -332,6 +347,7 @@ test('a failed queued page cannot duplicate the accepted page or disappear durin
     const h = (window as any).reactHarness;
     h.mount = document.body.appendChild(document.createElement('div'));
     h.controller = h.createScanner({
+      locale: 'de',
       mount: h.mount,
       assetBaseUrl: '/scanner-assets/',
       limits: { pages: 1 },

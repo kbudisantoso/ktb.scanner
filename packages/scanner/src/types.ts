@@ -1,5 +1,6 @@
 import type { DiagnosticOptions } from './diagnostics.ts';
 import type { ShutterSoundId } from './sounds.ts';
+import type { ScanLocale } from './i18n.ts';
 export interface Point {
   x: number;
   y: number;
@@ -125,6 +126,8 @@ export interface ScannerOptions {
   assetBaseUrl: string;
   theme?: Record<`--scanner-${string}`, string>;
   texts?: Record<string, string>;
+  /** UI language. English by default; German is built in. */
+  locale?: ScanLocale;
   context?: 'invoice' | 'expense' | 'generic';
   /** ISO region used only as a weak A4/Letter prior; otherwise the primary browser locale. */
   paperRegion?: string;

@@ -12,4 +12,4 @@ export function useBlobUrl(blob?: Blob): string | undefined {
   }, [blob]);
   return resource?.blob === blob ? resource?.url : undefined;
 }
-export type Translate = (key: string) => string;
+export type { Translate } from '../i18n.ts';

@@ -10,6 +10,7 @@ import {
 import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb/scanner';
 import { useUrl } from './blob-url';
 import Results from './Results';
+import { useDemoLocale } from './i18n';
 const Scanner = lazy(() =>
   import('@ktb/scanner/react').then((module) => ({ default: module.Scanner })),
 );
@@ -20,6 +21,7 @@ type Request = {
   trace?: DiagnosticRecording;
 };
 export default function Page() {
+  const { locale, setLocale, t } = useDemoLocale();
   const active = useRef(false),
     input = useRef<HTMLInputElement>(null),
     soundPreview = useRef<HTMLAudioElement>(null);
@@ -139,6 +141,7 @@ export default function Page() {
     setRequest({
       options: {
         assetBaseUrl: '/scanner-assets/',
+        locale,
         theme: tokens,
         context,
         imageType: mime,
@@ -193,23 +196,23 @@ export default function Page() {
               setPanel((p) => (p === 'options' ? null : 'options'));
             }}
           >
-            Optionen
+            {t('Optionen')}
           </button>
           <button
-            aria-label="Diagnosedaten für Erkennung und Export"
+            aria-label={t('Diagnosedaten für Erkennung und Export')}
             aria-expanded={panel === 'diagnostics'}
             onClick={(e) => {
               panelTrigger.current = e.currentTarget;
               setPanel((p) => (p === 'diagnostics' ? null : 'diagnostics'));
             }}
           >
-            Diagnose {diagnosticEnabled ? 'an' : 'aus'}
+            {t(diagnosticEnabled ? 'Diagnose an' : 'Diagnose aus')}
           </button>
         </div>
       </nav>
       {error && (
         <p className="app-error" role="alert">
-          {error}
+          {t(error)}
         </p>
       )}
       {result && (
@@ -224,9 +227,9 @@ export default function Page() {
       )}
       <section className="hero" hidden={(!!result && resultVisible) || !!panel}>
         <div>
-          <h1>Dokumente erfassen.</h1>
+          <h1>{t('Dokumente erfassen.')}</h1>
           <p className="intro">
-            Aufnehmen oder importieren, Seiten prüfen und als Bild oder PDF mitnehmen.
+            {t('Aufnehmen oder importieren, Seiten prüfen und als Bild oder PDF mitnehmen.')}
           </p>
           <div className="actions">
             <button
@@ -237,80 +240,97 @@ export default function Page() {
               }}
               aria-disabled={busy}
             >
-              Dokument scannen <span aria-hidden="true">↗</span>
+              {t('Dokument scannen')} <span aria-hidden="true">↗</span>
             </button>
             <button onClick={() => input.current?.click()} disabled={busy}>
-              Bilder importieren
+              {t('Bilder importieren')}
             </button>
           </div>
           <button className="text-button" onClick={() => void examples()} disabled={busy}>
-            Mit zwei Beispielbelegen ausprobieren
+            {t('Mit zwei Beispielbelegen ausprobieren')}
           </button>
           {result && (
-            <button onClick={() => setResultVisible(true)}>Letztes Ergebnis öffnen</button>
+            <button onClick={() => setResultVisible(true)}>{t('Letztes Ergebnis öffnen')}</button>
           )}
-          <p className="privacy">Lokal im Browser · kein Upload.</p>
+          <p className="privacy">{t('Lokal im Browser · kein Upload.')}</p>
         </div>
       </section>
-      <aside className="setup app-panel" hidden={panel !== 'options'} aria-label="Scanoptionen">
+      <aside
+        className="setup app-panel"
+        hidden={panel !== 'options'}
+        aria-label={t('Scanoptionen')}
+      >
         <header>
-          <h2>Scanoptionen</h2>
-          <button onClick={closePanel} aria-label="Optionen schließen">
-            Schließen
+          <h2>{t('Scanoptionen')}</h2>
+          <button onClick={closePanel} aria-label={t('Optionen schließen')}>
+            {t('Schließen')}
           </button>
         </header>
         <div className="setup-fields">
           <label>
-            Stabilisierungsdauer
+            {t('Sprache')}
             <select
-              aria-label="Stabilisierungsdauer"
+              aria-label="Sprache / Language"
+              value={locale}
+              disabled={busy}
+              onChange={(event) => setLocale(event.target.value as 'en' | 'de')}
+            >
+              <option value="de">Deutsch</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label>
+            {t('Stabilisierungsdauer')}
+            <select
+              aria-label={t('Stabilisierungsdauer')}
               value={stabilityMs}
               disabled={busy}
               onChange={(e) => setStabilityMs(Number(e.target.value))}
             >
               {AUTO_CAPTURE_STABILITY_PRESETS_MS.map((duration) => (
                 <option key={duration} value={duration}>
-                  {duration} ms{duration === DEFAULT_AUTO_CAPTURE_STABILITY_MS ? ' (Standard)' : ''}
+                  {duration} ms
+                  {duration === DEFAULT_AUTO_CAPTURE_STABILITY_MS ? ` (${t('Standard')})` : ''}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Startprofil
+            {t('Startprofil')}
             <select
-              aria-label="Startprofil"
+              aria-label={t('Startprofil')}
               value={profile}
               disabled={busy}
               onChange={(e) => setProfile(e.target.value as ScanProfile)}
             >
               {SCAN_PROFILES.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.label}
+                  {t(p.label)}
                 </option>
               ))}
             </select>
           </label>
           <label>
-            Dokumentkontext
+            {t('Dokumentkontext')}
             <select
               value={context}
               onChange={(e) => setContext(e.target.value as typeof context)}
               disabled={busy}
             >
-              <option value="invoice">Rechnung</option>
-              <option value="expense">Auslage</option>
-              <option value="generic">Allgemein</option>
+              <option value="invoice">{t('Rechnung')}</option>
+              <option value="expense">{t('Auslage')}</option>
+              <option value="generic">{t('Allgemein')}</option>
             </select>
           </label>
           <label>
-            Gestaltung
+            {t('Gestaltung')}
             <select value={theme} onChange={(e) => setTheme(e.target.value)} disabled={busy}>
-              <option value="forest">Wald</option>
-              <option value="ink">Tinte</option>
+              <option value="forest">{t('Wald')}</option>
+              <option value="ink">{t('Tinte')}</option>
             </select>
           </label>
           <label>
-            Bildformat
+            {t('Bildformat')}
             <select
               value={mime}
               onChange={(e) => setMime(e.target.value as typeof mime)}
@@ -321,7 +341,7 @@ export default function Page() {
             </select>
           </label>
           <label>
-            Aufnahmeton
+            {t('Aufnahmeton')}
             <select
               value={shutterSound}
               onChange={(e) => setShutterSound(e.target.value as typeof shutterSound)}
@@ -329,7 +349,7 @@ export default function Page() {
             >
               {SHUTTER_SOUNDS.map((sound) => (
                 <option key={sound.id} value={sound.id}>
-                  {sound.label}
+                  {t(sound.label)}
                 </option>
               ))}
             </select>
@@ -344,7 +364,7 @@ export default function Page() {
             void audio.play().catch(() => setError('Der Ton konnte nicht abgespielt werden.'));
           }}
         >
-          Ton anhören
+          {t('Ton anhören')}
         </button>
         <audio
           ref={soundPreview}
@@ -355,16 +375,16 @@ export default function Page() {
       <section
         className="diagnostics app-panel"
         hidden={panel !== 'diagnostics'}
-        aria-label="Diagnosedaten"
+        aria-label={t('Diagnosedaten')}
       >
         <header>
-          <h2>Diagnose</h2>
-          <button onClick={closePanel} aria-label="Diagnose schließen">
-            Schließen
+          <h2>{t('Diagnose')}</h2>
+          <button onClick={closePanel} aria-label={t('Diagnose schließen')}>
+            {t('Schließen')}
           </button>
         </header>
         <p className="diagnostic-summary">
-          Aktueller Entwicklungsstand: standardmäßig an. Nur lokal im RAM.
+          {t('Diagnose optional; standardmäßig aus. Nur lokal im RAM.')}
         </p>
         <label className="diagnostic-toggle">
           <input
@@ -373,7 +393,7 @@ export default function Page() {
             disabled={busy || archiving}
             onChange={(event) => setDiagnosticEnabled(event.target.checked)}
           />
-          Diagnose aufzeichnen
+          {t('Diagnose aufzeichnen')}
         </label>
         <label className="diagnostic-toggle">
           <input
@@ -382,26 +402,28 @@ export default function Page() {
             disabled={busy || archiving || !diagnosticEnabled}
             onChange={(event) => setEngineBuffers(event.target.checked)}
           />
-          Interne Scanic-Puffer einschließen
+          {t('Interne Scanic-Puffer einschließen')}
         </label>
         {recording && (
           <>
             <p role="status">
-              {recording.summary.sessions} Sitzungen, {recording.summary.events} Ereignisse,{' '}
-              {recording.summary.files} Dateien, {(recording.summary.bytes / 1024 ** 2).toFixed(1)}{' '}
-              MiB.{' '}
-              {recording.summary.stopped
-                ? 'Aufzeichnungsgrenze erreicht; vorhandene Daten sind exportierbar.'
-                : recording.summary.detailStopped
-                  ? 'Detailgrenze erreicht; Fotos und Exporte werden weiter aufgezeichnet.'
-                  : ''}
+              {recording.summary.sessions} {t('Sitzungen,')} {recording.summary.events}{' '}
+              {t('Ereignisse,')} {recording.summary.files} {t('Dateien,')}{' '}
+              {(recording.summary.bytes / 1024 ** 2).toFixed(1)} MiB.{' '}
+              {t(
+                recording.summary.stopped
+                  ? 'Aufzeichnungsgrenze erreicht; vorhandene Daten sind exportierbar.'
+                  : recording.summary.detailStopped
+                    ? 'Detailgrenze erreicht; Fotos und Exporte werden weiter aufgezeichnet.'
+                    : '',
+              )}
             </p>
             <div className="actions">
               <button
                 disabled={busy || archiving || !recording.summary.events}
                 onClick={() => void makeArchive()}
               >
-                {archiving ? 'ZIP wird erstellt...' : 'Diagnose-ZIP erstellen'}
+                {t(archiving ? 'ZIP wird erstellt...' : 'Diagnose-ZIP erstellen')}
               </button>
               {archiveUrl && (
                 <a
@@ -418,28 +440,26 @@ export default function Page() {
                     setRetentionRevision((value) => value + 1);
                   }}
                 >
-                  Diagnose-ZIP herunterladen
+                  {t('Diagnose-ZIP herunterladen')}
                 </a>
               )}
               <button disabled={busy || archiving} onClick={clearDiagnostics}>
-                Diagnosedaten löschen
+                {t('Diagnosedaten löschen')}
               </button>
             </div>
           </>
         )}
         <details className="diagnostic-info">
-          <summary>Umfang und Löschung</summary>
+          <summary>{t('Umfang und Löschung')}</summary>
           <p>
-            Originale, Zwischenbilder und Exporte bleiben lokal. Neuladen verwirft die Sammlung.
-            Löschung nach einer Stunde ohne Download oder zehn Minuten nach Download.
+            {t(
+              'Originale, Zwischenbilder und Exporte bleiben lokal. Neuladen verwirft die Sammlung. Löschung nach einer Stunde ohne Download oder zehn Minuten nach Download.',
+            )}
           </p>{' '}
           <p>
-            Die Aufzeichnung kostet zusätzliche Zeit. Interne Puffer ändern zusätzlich den
-            Scanic-Verarbeitungspfad. Zwischenbilder maximal 1.000 px, verarbeitete Liveframes
-            maximal 800 px; kein lückenloses Kameravideo. Livebilder: bis 240 Frames / 60 Sekunden.
-            Gesamtbudget: 512 MiB, davon höchstens 128 MiB für Livebilder und interne Puffer. Der
-            Rest bleibt für Fotos, Bildaufbereitung und Exporte reserviert. Das Budget gilt für alle
-            gesammelten Sitzungen zusammen; vorhandene Daten werden nicht überschrieben.
+            {t(
+              'Die Aufzeichnung kostet zusätzliche Zeit. Interne Puffer ändern zusätzlich den Scanic-Verarbeitungspfad. Zwischenbilder maximal 1.000 px, verarbeitete Liveframes maximal 800 px; kein lückenloses Kameravideo. Livebilder: bis 240 Frames / 60 Sekunden. Gesamtbudget: 512 MiB, davon höchstens 128 MiB für Livebilder und interne Puffer. Der Rest bleibt für Fotos, Bildaufbereitung und Exporte reserviert. Das Budget gilt für alle gesammelten Sitzungen zusammen; vorhandene Daten werden nicht überschrieben.',
+            )}
           </p>
         </details>
       </section>
@@ -459,7 +479,7 @@ export default function Page() {
         <Suspense
           fallback={
             <p className="app-loading" role="status">
-              Scanner wird geöffnet...
+              {t('Scanner wird geöffnet...')}
             </p>
           }
         >

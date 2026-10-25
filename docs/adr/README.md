@@ -23,3 +23,5 @@ Each record separates context, decision, consequences and evidence. Historical v
 - [0019: Fit long receipts reliably](0019-long-receipt-viewer.md)
 - [0020: Focused review and shared image viewer](0020-focused-review-and-shared-viewer.md)
 - [0021: Configurable measured capture stability](0021-configurable-capture-stability.md)
+
+- [0022: Localization and the English library default](0022-localization-and-library-default.md)

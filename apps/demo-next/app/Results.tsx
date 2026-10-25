@@ -2,6 +2,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ScanPage, ScanResult } from '@ktb/scanner';
 import { useUrl } from './blob-url';
+import { useDemoLocale } from './i18n';
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const ImageViewer = lazy(() =>
   import('@ktb/scanner/react').then((module) => ({ default: module.ImageViewer })),
@@ -22,6 +23,7 @@ function ResultViewer({
   move: (index: number) => void;
   restoreFocus: () => void;
 }) {
+  const { locale, t } = useDemoLocale();
   const dialog = useRef<HTMLDialogElement>(null),
     url = useUrl(page.image);
   useEffect(() => {
@@ -54,30 +56,42 @@ function ResultViewer({
     >
       <header>
         <h2 id="result-viewer-title">
-          Seite {index + 1} <span>von {count}</span>
+          {t('Seite')} {index + 1}{' '}
+          <span>
+            {t('von')} {count}
+          </span>
         </h2>
-        <button onClick={close}>Schließen</button>
+        <button onClick={close}>{t('Schließen')}</button>
       </header>
-      <Suspense fallback={<p role="status">Bild wird geladen...</p>}>
-        <ImageViewer image={page.image} resetKey={page.id} alt={`Vergrößerte Seite ${index + 1}`} />
+      <Suspense fallback={<p role="status">{t('Bild wird geladen...')}</p>}>
+        <ImageViewer
+          image={page.image}
+          resetKey={page.id}
+          locale={locale}
+          alt={t('Vergrößerte Seite {number}', { number: index + 1 })}
+        />
       </Suspense>
       <div className="viewer-actions">
-        <button disabled={index === 0} onClick={() => move(index - 1)} aria-label="Vorherige Seite">
-          Zurück
+        <button
+          disabled={index === 0}
+          onClick={() => move(index - 1)}
+          aria-label={t('Vorherige Seite')}
+        >
+          {t('Zurück')}
         </button>
         <button
           disabled={index === count - 1}
           onClick={() => move(index + 1)}
-          aria-label="Nächste Seite"
+          aria-label={t('Nächste Seite')}
         >
-          Weiter
+          {t('Weiter')}
         </button>
         <a
           className="primary"
           href={url}
           download={`scan-${index + 1}.${page.image.type === 'image/png' ? 'png' : 'jpg'}`}
         >
-          Herunterladen
+          {t('Herunterladen')}
         </a>
       </div>
     </dialog>
@@ -95,21 +109,22 @@ function ImageResult({
   active: boolean;
   inspect: () => void;
 }) {
+  const { t } = useDemoLocale();
   const url = useUrl(page.image);
   return (
     <article className="result-page" hidden={!active}>
       <button
         className="result-image-button"
-        aria-label={`Seite ${index + 1} vergrößern`}
+        aria-label={t('Seite {number} vergrößern', { number: index + 1 })}
         onClick={(event) => {
           event.currentTarget.focus();
           inspect();
         }}
       >
         {url ? (
-          <img src={url} alt={`Exportierte Seite ${index + 1}`} />
+          <img src={url} alt={t('Exportierte Seite {number}', { number: index + 1 })} />
         ) : (
-          <span className="image-placeholder">Bild wird geladen...</span>
+          <span className="image-placeholder">{t('Bild wird geladen...')}</span>
         )}
         <span className="image-inspect">100 %</span>
       </button>
@@ -133,6 +148,7 @@ export default function Results({
   hidden: boolean;
   back: () => void;
 }) {
+  const { t } = useDemoLocale();
   const [index, setIndex] = useState(0),
     [view, setView] = useState<'image' | 'pdf'>('image'),
     [inspecting, setInspecting] = useState(false),
@@ -160,40 +176,42 @@ export default function Results({
     >
       <div className="result-heading">
         <h2>
-          {result.pages.length} {result.pages.length === 1 ? 'Seite' : 'Seiten'} fertig
+          {t(result.pages.length === 1 ? '{count} Seite fertig' : '{count} Seiten fertig', {
+            count: result.pages.length,
+          })}
         </h2>
         <div className="actions">
           <button
             ref={infoTrigger}
             onClick={() => setDetails((v) => !v)}
-            aria-label="Integrationsdetails"
+            aria-label={t('Integrationsdetails')}
             aria-expanded={details}
           >
-            Info
+            {t('Info')}
           </button>
-          <button onClick={scan} aria-label="Neues Dokument">
-            Neu
+          <button onClick={scan} aria-label={t('Neues Dokument')}>
+            {t('Neu')}
           </button>
-          <button onClick={back}>Zurück</button>
+          <button onClick={back}>{t('Zurück')}</button>
         </div>
       </div>
       {discard && (
         <div
           className="result-discard"
           role="alertdialog"
-          aria-label="Ergebnisse verwerfen?"
+          aria-label={t('Ergebnisse verwerfen?')}
           aria-modal="false"
         >
-          <p>Ergebnisse aus diesem Browser entfernen?</p>
+          <p>{t('Ergebnisse aus diesem Browser entfernen?')}</p>
           <button autoFocus onClick={() => setDiscard(false)}>
-            Behalten
+            {t('Behalten')}
           </button>
-          <button onClick={reset}>Jetzt verwerfen</button>
+          <button onClick={reset}>{t('Jetzt verwerfen')}</button>
         </div>
       )}
-      <div className="result-switch" role="group" aria-label="Ergebnisansicht">
+      <div className="result-switch" role="group" aria-label={t('Ergebnisansicht')}>
         <button aria-pressed={view === 'image'} onClick={() => setView('image')}>
-          Bilder
+          {t('Bilder')}
         </button>
         <button disabled={!result.pdf} aria-pressed={view === 'pdf'} onClick={() => setView('pdf')}>
           PDF
@@ -201,17 +219,17 @@ export default function Results({
       </div>
       <div className="result-pager">
         <button
-          aria-label="Vorherige Seite"
+          aria-label={t('Vorherige Seite')}
           disabled={index === 0}
           onClick={() => setIndex((i) => i - 1)}
         >
           ‹
         </button>
         <span>
-          Seite {index + 1} / {result.pages.length}
+          {t('Seite')} {index + 1} / {result.pages.length}
         </span>
         <button
-          aria-label="Nächste Seite"
+          aria-label={t('Nächste Seite')}
           disabled={index === result.pages.length - 1}
           onClick={() => setIndex((i) => i + 1)}
         >
@@ -233,9 +251,9 @@ export default function Results({
         <section
           className="pdf-result"
           hidden={view !== 'pdf' || details}
-          aria-label="PDF-Vorschau"
+          aria-label={t('PDF-Vorschau')}
         >
-          <Suspense fallback={<p role="status">PDF wird geladen...</p>}>
+          <Suspense fallback={<p role="status">{t('PDF wird geladen...')}</p>}>
             <PdfPreview blob={result.pdf} activeIndex={index} />
           </Suspense>
         </section>
@@ -243,31 +261,40 @@ export default function Results({
       <div className="result-downloads">
         <a
           className="primary"
-          aria-label="Bild herunterladen"
+          aria-label={t('Bild herunterladen')}
           href={imageUrl}
           download={`scan-${index + 1}.${result.pages[index].image.type === 'image/png' ? 'png' : 'jpg'}`}
         >
-          Bild laden
+          {t('Bild laden')}
         </a>
         {result.pdf && (
-          <a className="primary" aria-label="PDF herunterladen" href={pdfUrl} download="scan.pdf">
-            PDF laden
+          <a
+            className="primary"
+            aria-label={t('PDF herunterladen')}
+            href={pdfUrl}
+            download="scan.pdf"
+          >
+            {t('PDF laden')}
           </a>
         )}
       </div>
-      <aside className="integration-details" hidden={!details} aria-label="Integrationsdetails">
+      <aside
+        className="integration-details"
+        hidden={!details}
+        aria-label={t('Integrationsdetails')}
+      >
         <header>
-          <h3>Integrationsdetails</h3>
-          <button onClick={closeDetails} aria-label="Integrationsdetails schließen">
-            Schließen
+          <h3>{t('Integrationsdetails')}</h3>
+          <button onClick={closeDetails} aria-label={t('Integrationsdetails schließen')}>
+            {t('Schließen')}
           </button>
         </header>
-        <button onClick={() => setDiscard(true)} aria-label="Ergebnisse verwerfen">
-          Ergebnisse verwerfen
+        <button onClick={() => setDiscard(true)} aria-label={t('Ergebnisse verwerfen')}>
+          {t('Ergebnisse verwerfen')}
         </button>
         <p>
-          Schema {result.schemaVersion} · PDF{' '}
-          {result.pdf ? `${(result.pdf.size / 1024).toFixed(0)} KiB` : 'deaktiviert'}
+          {t('Schema')} {result.schemaVersion} · PDF{' '}
+          {result.pdf ? `${(result.pdf.size / 1024).toFixed(0)} KiB` : t('deaktiviert')}
         </p>
         <pre>
           {JSON.stringify(

@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useDemoLocale } from './i18n';
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
 export default function PdfPreview({
   blob,
@@ -8,6 +9,7 @@ export default function PdfPreview({
   blob: Blob;
   activeIndex?: number;
 }) {
+  const { locale, t } = useDemoLocale();
   const container = useRef<HTMLDivElement>(null);
   const cache = useRef(new Map<number, HTMLCanvasElement>());
   const [document, setDocument] = useState<{ blob: Blob; pdf: PDFDocumentProxy }>();
@@ -50,7 +52,10 @@ export default function PdfPreview({
     let disposed = false,
       rendering: RenderTask | undefined;
     const canvases = cache.current;
-    for (const [index, canvas] of canvases) canvas.hidden = index !== activeIndex;
+    for (const [index, canvas] of canvases) {
+      canvas.hidden = index !== activeIndex;
+      canvas.setAttribute('aria-label', t('PDF-Seite {number}', { number: index + 1 }));
+    }
     const cached = canvases.get(activeIndex);
     if (cached) {
       canvases.delete(activeIndex);
@@ -74,7 +79,7 @@ export default function PdfPreview({
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
         canvas.setAttribute('role', 'img');
-        canvas.setAttribute('aria-label', `PDF-Seite ${activeIndex + 1}`);
+        canvas.setAttribute('aria-label', t('PDF-Seite {number}', { number: activeIndex + 1 }));
         rendering = page.render({ canvas, viewport });
         await rendering.promise;
         if (disposed) return;
@@ -101,7 +106,7 @@ export default function PdfPreview({
       disposed = true;
       rendering?.cancel();
     };
-  }, [document, blob, activeIndex]);
+  }, [document, blob, activeIndex, locale]);
   useEffect(
     () => () => {
       for (const canvas of cache.current.values()) canvas.width = canvas.height = 1;
@@ -113,14 +118,14 @@ export default function PdfPreview({
     <div>
       {!error && ready !== activeIndex && (
         <p className="pdf-loading" role="status">
-          PDF-Seite wird geladen...
+          {t('PDF-Seite wird geladen...')}
         </p>
       )}
       <div ref={container} className="pdf-pages" />
       {error && (
         <div>
-          <p role="alert">{error}</p>
-          <button onClick={() => setRetry((n) => n + 1)}>Erneut versuchen</button>
+          <p role="alert">{t(error)}</p>
+          <button onClick={() => setRetry((n) => n + 1)}>{t('Erneut versuchen')}</button>
         </div>
       )}
     </div>

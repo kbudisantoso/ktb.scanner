@@ -21,6 +21,7 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
     mount,
     assetBaseUrl: '/scanner-assets/',
     initialMode: 'auto',
+    locale: 'en',
     autoCaptureStabilityMs: 1000,
     imageType: 'image/jpeg',
     shutterSound: 'camera', // Use 'off' to avoid audio loading and playback.
@@ -36,6 +37,8 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
 ```
 
 `initialFiles` opens review without requesting a camera. `open({ signal })` supports host cancellation and returns `{ status: 'cancelled' }`. Recoverable processing/export errors keep the session open. `destroy()` stops owned tracks and workers and releases preview resources. One session per controller; a destroyed controller cannot reopen. The host owns confirmed image/PDF blobs and serializable metadata.
+
+`locale` defaults to `en`; `de` is built in. Both examples start in German and support English. The standalone `ImageViewer` also accepts `locale`. `createTranslator(locale, texts?)` is exported from the core; existing German message-key overrides and English-text overrides remain supported. Error codes are stable while API messages default to English. See the root [README](../../README.md) for complete demo setup, package installation, asset copying, React/controller integration and result ownership.
 
 `defaultProfile` accepts `auto`, `photo`, `color`, `grayscale` or `bw`. An `open()` override takes precedence over controller configuration; without either, Auto chooses and applies Photo or Color immediately. Grayscale and soft monochrome remain manual choices. All edits are recalculated from the original. `paperRegion` is a weak regional A4/Letter preference, not a GPS request or a size measurement. Manual paper formats and orientation take precedence; paper axes are separate from 90-degree image rotation.
 

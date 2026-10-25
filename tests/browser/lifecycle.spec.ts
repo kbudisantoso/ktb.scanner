@@ -31,6 +31,7 @@ test('controller handles busy, pre-abort, reopen, host abort and destroy', async
     const mount = document.createElement('div');
     document.body.append(mount);
     const controller = (window as any).scannerHarness.createScanner({
+      locale: 'de',
       mount,
       assetBaseUrl: '/scanner-assets/',
     });
@@ -77,7 +78,7 @@ test('host abort during PDF generation never confirms a partial result', async (
     document.body.append(mount);
     h.mount = mount;
     h.abort = new AbortController();
-    h.controller = h.createScanner({ mount, assetBaseUrl: '/scanner-assets/' });
+    h.controller = h.createScanner({ locale: 'de', mount, assetBaseUrl: '/scanner-assets/' });
     h.result = h.controller.open({
       signal: h.abort.signal,
       initialFiles: [
@@ -141,7 +142,7 @@ test('repeated real processing releases workers and preview URLs on host abort',
       document.body.append(mount);
       const bytes = await (await fetch(url)).blob();
       h.abort = new AbortController();
-      h.controller = h.createScanner({ mount, assetBaseUrl: '/scanner-assets/' });
+      h.controller = h.createScanner({ locale: 'de', mount, assetBaseUrl: '/scanner-assets/' });
       h.result = h.controller.open({
         signal: h.abort.signal,
         initialFiles: [new File([bytes], 'synthetic.png', { type: 'image/png' })],

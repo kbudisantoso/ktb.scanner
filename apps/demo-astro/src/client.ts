@@ -1,9 +1,14 @@
+import { createTranslator, type ScanLocale, type ScanResult } from '@ktb/scanner';
 import type { ScannerController } from '@ktb/scanner';
 const openButton = document.querySelector<HTMLButtonElement>('#open')!;
 const importButton = document.querySelector<HTMLButtonElement>('#import')!;
 const input = document.querySelector<HTMLInputElement>('#file')!;
 const status = document.querySelector<HTMLElement>('#status')!;
 const results = document.querySelector<HTMLElement>('#results')!;
+const language = document.querySelector<HTMLSelectElement>('#language')!;
+let locale: ScanLocale = new URL(location.href).searchParams.get('lang') === 'en' ? 'en' : 'de';
+let t = createTranslator(locale);
+let lastResult: Extract<ScanResult, { status: 'confirmed' }> | undefined;
 const reset = document.querySelector<HTMLButtonElement>('#reset')!;
 let scanner: ScannerController | undefined,
   busy = false,
@@ -14,12 +19,14 @@ function clear() {
   urls = [];
   results.replaceChildren();
   reset.hidden = true;
+  lastResult = undefined;
 }
 async function open(files?: File[]) {
   if (busy) return;
   busy = true;
   openButton.setAttribute('aria-disabled', 'true');
   importButton.disabled = true;
+  language.disabled = true;
   const current = generation;
   try {
     const { createScanner } = await import('@ktb/scanner/react');
@@ -28,6 +35,7 @@ async function open(files?: File[]) {
       mount: document.querySelector<HTMLElement>('#scanner-mount')!,
       assetBaseUrl: '/scanner-assets/',
       createPdf: true,
+      locale,
       theme: {
         '--scanner-background': '#f0eef5',
         '--scanner-accent': '#594a93',
@@ -38,44 +46,73 @@ async function open(files?: File[]) {
     });
     const result = await scanner.open({ initialFiles: files });
     if (result.status !== 'confirmed' || current !== generation) return;
-    clear();
-    result.pages.forEach((page, index) => {
-      const url = URL.createObjectURL(page.image);
-      urls.push(url);
-      const article = document.createElement('article'),
-        image = document.createElement('img'),
-        link = document.createElement('a');
-      image.src = url;
-      image.alt = `Seite ${index + 1}`;
-      link.href = url;
-      link.download = `scan-${index + 1}.${page.image.type === 'image/png' ? 'png' : 'jpg'}`;
-      link.textContent = `Seite ${index + 1} herunterladen`;
-      article.append(image, link);
-      results.append(article);
-    });
-    if (result.pdf) {
-      const url = URL.createObjectURL(result.pdf);
-      urls.push(url);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'scan.pdf';
-      link.className = 'download';
-      link.textContent = 'PDF herunterladen';
-      results.append(link);
-    }
-    reset.hidden = false;
-    status.textContent = `${result.pages.length} Seiten exportiert. Kein Upload ausgeführt.`;
+    render(result);
   } catch {
-    status.textContent =
-      'Scanner konnte nicht geöffnet werden. Bitte Assets und Paketbuild prüfen.';
+    status.textContent = t(
+      'Scanner konnte nicht geöffnet werden. Bitte Assets und Paketbuild prüfen.',
+    );
   } finally {
     await scanner?.destroy();
     scanner = undefined;
     busy = false;
     openButton.setAttribute('aria-disabled', 'false');
     importButton.disabled = false;
+    language.disabled = false;
   }
 }
+
+function render(result: Extract<ScanResult, { status: 'confirmed' }>) {
+  clear();
+  lastResult = result;
+  result.pages.forEach((page, index) => {
+    const url = URL.createObjectURL(page.image);
+    urls.push(url);
+    const article = document.createElement('article'),
+      image = document.createElement('img'),
+      link = document.createElement('a');
+    image.src = url;
+    image.alt = t('Seite {number}', { number: index + 1 });
+    link.href = url;
+    link.download = `scan-${index + 1}.${page.image.type === 'image/png' ? 'png' : 'jpg'}`;
+    link.textContent = t('Seite {number} herunterladen', { number: index + 1 });
+    article.append(image, link);
+    results.append(article);
+  });
+  if (result.pdf) {
+    const url = URL.createObjectURL(result.pdf);
+    urls.push(url);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'scan.pdf';
+    link.className = 'download';
+    link.textContent = t('PDF herunterladen');
+    results.append(link);
+  }
+  reset.hidden = false;
+  status.textContent = t('{count} Seiten exportiert. Kein Upload ausgeführt.', {
+    count: result.pages.length,
+  });
+}
+function setLanguage() {
+  locale = language.value === 'en' ? 'en' : 'de';
+  t = createTranslator(locale);
+  document.documentElement.lang = locale;
+  const url = new URL(location.href);
+  if (locale === 'en') url.searchParams.set('lang', 'en');
+  else url.searchParams.delete('lang');
+  history.replaceState(null, '', url);
+  document.title = locale === 'de' ? 'Scanner / Astro Beispiel' : 'Scanner / Astro example';
+  document.querySelectorAll<HTMLElement>('[data-i18n]').forEach((element) => {
+    element.textContent = t(element.dataset.i18n!);
+  });
+  results.setAttribute('aria-label', t('Scanergebnisse'));
+  if (lastResult) render(lastResult);
+  else status.textContent = t('Bilder und PDF bleiben lokal in dieser Sitzung.');
+}
+language.value = locale;
+language.addEventListener('change', setLanguage);
+setLanguage();
+
 openButton.addEventListener('click', () => {
   openButton.focus();
   void open();
