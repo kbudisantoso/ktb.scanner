@@ -22,7 +22,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-06 | MUST | Correct approximately planar perspective, crop at the actual paper boundary and preserve content. No universal polygon inset/outset as a substitute for edge evidence. |
 | F-07 | MUST | Rotate in 90-degree steps with matching preview, image, metadata and PDF. |
 | F-08 | MUST | Offer conservative reversible contrast/noise processing while retaining original bytes and a comparison. |
-| F-09 | MUST | Review, repeat, accept and discard individual captures before handoff. |
+| F-09 | MUST | Review, repeat, accept and discard individual captures before handoff. Repeat must be directly visible after capture and during required corner confirmation; returning from the camera keeps the current candidate without accepting it. |
 | F-10 | MUST | Derive format suggestions from unconstrained detected geometry, never from an already forced output ratio. |
 | F-11 | MUST | Rank plausible formats using independent geometry and weak defaults; account for perspective and regional A4/Letter ambiguity. A4 defaults the indistinguishable A-series group; expose A6 without claiming receipt-block recognition. |
 | F-12 | MUST | Offer A3/A4/A5/A6, Letter, postcard 100 x 150 mm, receipt and original ratio, all manually selectable. |

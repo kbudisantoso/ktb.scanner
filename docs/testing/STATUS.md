@@ -2,6 +2,14 @@
 
 Updated 25 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Direct Repeat action, 25 October 2026
+
+The library review and required-crop view expose Repeat directly. It reopens the camera without accepting the candidate. Returning from the camera preserves the candidate and restores focus; a successful retake clears the prior required-crop state. Individual discard remains in More actions.
+
+Verification: 32 browser cases passed without skips or retries across Chromium, Firefox, WebKit and mobile WebKit. They cover required-crop and review cancellation, unchanged preview bytes after returning, replacement without an extra exported page, preservation of accepted pages during cancelled replacement, and both themes at 320 x 568, 390 x 664 and 844 x 390. A separate mobile WebKit check verified Repeat and all quick actions, including a quality hint, fit at 320 x 568 with >=44 px targets. Library/Next.js/Astro builds, typecheck, formatting, three Vitest tests, documentation links and diff checks passed. Camera access is deliberately denied in the retake test; actual camera acquisition remains covered separately and physical phone acceptance remains open.
+
+Reproduce with `pnpm exec playwright test tests/browser/flows.spec.ts tests/browser/crop-required.spec.ts tests/browser/review-ui.spec.ts --grep 'visible repeat|missing crop blocks|focused' --workers=2` after building.
+
 ## Configurable capture stability, 25 October 2026
 
 [ADR 0021](../adr/0021-configurable-capture-stability.md) adds library/per-open stability duration and reference Scan options. Default remains 1,000 ms. The reference choices are 400/600/800/1,000/1,200/1,500/2,000 ms. Independently, the library accepts any integer from 100 through 5,000 ms. Native checks cover all seven presets, both API guardrail boundaries and the non-preset 875 ms value. Invalid values, precedence, stale/duplicate/unknown observations, Manual and once-only claims are covered. Diagnostic session-open and camera-start record the effective value.

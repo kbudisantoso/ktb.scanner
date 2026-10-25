@@ -10,6 +10,84 @@ async function acceptExamples(page: import('@playwright/test').Page) {
   await acceptPage(page);
   await acceptPage(page);
 }
+test('visible repeat preserves a cancelled scan and replaces an unaccepted capture without adding a page', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          throw new DOMException('Denied', 'NotAllowedError');
+        },
+        enumerateDevices: async () => [],
+      },
+    }),
+  );
+  await page.goto('/');
+  const blank = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 600;
+    canvas.height = 800;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, 600, 800);
+    return canvas.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('main > input[type=file]').setInputFiles({
+    name: 'blank.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(blank, 'base64'),
+  });
+  const repeat = page.getByRole('button', { name: 'Wiederholen', exact: true });
+  await expect(
+    page.getByRole('heading', { name: 'Dokumentecken festlegen', exact: true }),
+  ).toBeVisible();
+  await repeat.click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Berechtigung');
+  await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await expect(repeat).toBeFocused();
+  const importRetake = async (index: number) => {
+    await repeat.click();
+    const replacement = await page.evaluate(fixtureInBrowser, fixtures[index]);
+    const choosing = page.waitForEvent('filechooser');
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Bilder importieren', exact: true })
+      .click();
+    await (
+      await choosing
+    ).setFiles({
+      name: 'retake.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(replacement.split(',')[1], 'base64'),
+    });
+  };
+  await importRetake(1);
+  const preview = page.getByRole('img', { name: 'Bearbeitete Seite', exact: true });
+  await expect(preview).toBeVisible();
+  const hash = () =>
+    preview.evaluate(async (img: HTMLImageElement) =>
+      Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest('SHA-256', await (await fetch(img.src)).arrayBuffer()),
+        ),
+      ).join(','),
+    );
+  const before = await hash();
+  await repeat.click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Berechtigung');
+  await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await expect(repeat).toBeFocused();
+  expect(await hash()).toBe(before);
+  await importRetake(3);
+  await expect(preview).toBeVisible();
+  await expect.poll(hash).not.toBe(before);
+  await expect(page.getByRole('button', { name: 'Weiter', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '1 Seite fertig', exact: true })).toBeVisible();
+});
 test('initial page does not load scanner engine or PDF and opens with focus', async ({ page }) => {
   const requests: string[] = [];
   page.on('request', (r) => requests.push(r.url()));

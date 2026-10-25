@@ -1016,6 +1016,7 @@
 }
 .scanner-review-quick {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .scanner-review-quick button {
@@ -1028,6 +1029,20 @@
 }
 .scanner-review-quick .scanner-hints {
   margin-left: auto;
+}
+.scanner .scanner-repeat {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.scanner-crop-guidance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.scanner-crop-guidance .scanner-warning {
+  flex: 1;
+  margin: 0;
 }
 .scanner-toolstrip {
   display: grid;

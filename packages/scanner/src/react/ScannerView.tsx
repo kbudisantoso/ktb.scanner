@@ -72,6 +72,7 @@ export function ScannerView({
     [mime, setMime] = useState<ImageMime>(options.imageType ?? 'image/jpeg');
   const [camera, setCamera] = useState(false),
     [editingCorners, setEditingCorners] = useState(false);
+  const repeatFocus = useRef(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [discard, setDiscard] = useState(false);
@@ -120,6 +121,19 @@ export function ScannerView({
     prepareSound();
     setCamera(true);
   };
+  const repeatCapture = () => {
+    if (guard.current) return;
+    repeatFocus.current = true;
+    startCamera();
+  };
+  useEffect(() => {
+    if (camera || busy || discard || !repeatFocus.current) return;
+    const button = root.current?.querySelector<HTMLButtonElement>('.scanner-repeat');
+    if (button) {
+      repeatFocus.current = false;
+      button.focus();
+    }
+  }, [camera, busy, discard, draft, pendingCrop]);
   const syncPages = () => setPages(session.pages);
   const getEngine = () =>
     (engine.current ??= createScanicAdapter(options.assetBaseUrl, options.diagnostics));
@@ -197,6 +211,7 @@ export function ScannerView({
               preferredPaper: paperPreference,
               geometryUncertain: result.edgesUncertain,
             }));
+      setPendingCrop(null);
       setDraft({
         ...result,
         id,
@@ -626,7 +641,12 @@ export function ScannerView({
             )}
             {pendingCrop && !camera && (
               <>
-                <p className="scanner-warning">{t('Bitte die vier Blattecken bestätigen.')}</p>
+                <div className="scanner-crop-guidance">
+                  <p className="scanner-warning">{t('Bitte die vier Blattecken bestätigen.')}</p>
+                  <button className="scanner-repeat" disabled={busy} onClick={repeatCapture}>
+                    {t('Wiederholen')}
+                  </button>
+                </div>
                 <CornerEditor
                   page={pendingCrop}
                   t={t}
@@ -684,7 +704,7 @@ export function ScannerView({
                     undo={undo}
                     canUndo={!!history.length}
                     discard={discardDraft}
-                    repeat={startCamera}
+                    repeat={repeatCapture}
                   />
                 </div>
               ))}

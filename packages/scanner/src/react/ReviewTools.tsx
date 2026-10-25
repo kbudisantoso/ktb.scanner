@@ -83,6 +83,9 @@ export function ReviewTools({
       {!panel ? (
         <>
           <div className="scanner-review-quick">
+            <button className="scanner-repeat" disabled={busy} onClick={repeat}>
+              {t('Wiederholen')}
+            </button>
             <button
               disabled={busy}
               aria-label={t('Weitere Aktionen')}
@@ -122,15 +125,6 @@ export function ReviewTools({
           </div>
           {more && (
             <div className="scanner-review-menu">
-              <button
-                disabled={busy}
-                onClick={() => {
-                  setMore(false);
-                  repeat();
-                }}
-              >
-                {t('Wiederholen')}
-              </button>
               <button disabled={busy} aria-label={t('Aufnahme verwerfen')} onClick={discard}>
                 {t('Verwerfen')}
               </button>

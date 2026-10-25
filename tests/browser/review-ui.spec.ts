@@ -72,6 +72,7 @@ for (const theme of ['forest', 'ink'])
         finish = page.getByRole('button', { name: 'Abschließen', exact: true });
       await expect(next).toBeEnabled();
       await expect(finish).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Wiederholen', exact: true })).toBeVisible();
       await fits(page, '.scanner');
       const surface = page.locator('.scanner-image-surface');
       await surface.press('Enter');
