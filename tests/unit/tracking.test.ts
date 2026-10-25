@@ -21,7 +21,7 @@ const frame = (
   sharpness: LiveDetection['sharpness'] = 'sharp',
 ): LiveDetection => ({ timestamp, corners, sharpness });
 
-for (const duration of [...AUTO_CAPTURE_STABILITY_PRESETS_MS, 875]) {
+for (const duration of [...AUTO_CAPTURE_STABILITY_PRESETS_MS, 100, 875, 5000]) {
   test(`${duration} ms stability uses measured time, never triggers early and claims once`, () => {
     const gate = new AutoCapture('auto', duration);
     assert.equal(gate.update(frame(0), 0).capture, false);
@@ -46,13 +46,14 @@ test('stability defaults, per-open precedence and invalid values are explicit', 
   assert.equal(new AutoCapture().stabilityMs, 1000);
   assert.equal(resolveAutoCaptureStabilityMs(), 1000);
   assert.equal(resolveAutoCaptureStabilityMs(2000), 2000);
-  assert.equal(resolveAutoCaptureStabilityMs(2000, 300), 300);
+  assert.equal(resolveAutoCaptureStabilityMs(2000, 600), 600);
   assert.equal(resolveAutoCaptureStabilityMs(undefined, 875), 875);
   for (const invalid of [
     0,
     -100,
     99,
     100.5,
+    5001,
     NaN,
     Infinity,
     Number.MAX_SAFE_INTEGER + 1,

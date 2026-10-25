@@ -3,16 +3,14 @@ import { area, quadDrift, validQuad } from './geometry.ts';
 import { ScannerError } from './errors.ts';
 
 export const DEFAULT_AUTO_CAPTURE_STABILITY_MS = 1000;
-export const AUTO_CAPTURE_STABILITY_PRESETS_MS = [
-  100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 5000,
-] as const;
+export const AUTO_CAPTURE_STABILITY_PRESETS_MS = [400, 600, 800, 1000, 1200, 1500, 2000] as const;
 
 export function resolveAutoCaptureStabilityMs(configured?: number, requested?: number): number {
   for (const value of [configured, requested])
-    if (value !== undefined && (!Number.isSafeInteger(value) || value < 100))
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 100 || value > 5000))
       throw new ScannerError(
         'CONFIG_INVALID',
-        'Die Stabilisierungsdauer muss eine ganze Zahl ab 100 ms sein.',
+        'Die Stabilisierungsdauer muss eine ganze Zahl zwischen 100 und 5000 ms sein.',
       );
   return requested ?? configured ?? DEFAULT_AUTO_CAPTURE_STABILITY_MS;
 }

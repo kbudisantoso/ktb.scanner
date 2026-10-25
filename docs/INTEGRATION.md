@@ -56,11 +56,11 @@ The adapter returns `Processed | CropRequired`. A `crop-required` state has sour
 
 ## Capture stability
 
-`autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 500 })`; open call > configuration > default. Both supplied values must be safe integers >=100, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.
+`autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 600 })`; open call > configuration > default. Both supplied values must be safe integers from 100 through 5,000, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.
 
-Core integrations can use `new AutoCapture('auto', 500)`. `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` are exported from `@ktb/scanner`. The presets are 100/200/300/500/750/1,000/1,500/2,000/3,000/5,000 ms; other integer values >=100 also work. In the reference application choose **Optionen > Stabilisierungsdauer** before starting a session.
+Core integrations can use `new AutoCapture('auto', 600)`. `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` are exported from `@ktb/scanner`. The presets are 400/600/800/1,000/1,200/1,500/2,000 ms; other integer values from 100 through 5,000 also work. In the reference application choose **Optionen > Stabilisierungsdauer** before starting a session.
 
-This is a minimum measured-evidence window, not a timer or a delay after the green contour closes. At least two fresh valid observations are needed. Detection is capped at about eight jobs per second, so especially 100-300 ms values depend on sampling and processing cadence. Unknown sharpness, movement and missing evidence still pause/reset capture. Diagnostics record the resolved value in `session-open` and `camera-start`.
+This is a minimum measured-evidence window, not a timer or a delay after the green contour closes. At least two fresh valid observations are needed. Detection is capped at about eight jobs per second, so the actual claim follows the next eligible fresh measurement after the selected minimum. Unknown sharpness, movement and missing evidence still pause/reset capture. Diagnostics record the resolved value in `session-open` and `camera-start`.
 
 ## Geometry, format and region
 

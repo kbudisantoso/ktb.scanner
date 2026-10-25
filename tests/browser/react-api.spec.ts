@@ -106,7 +106,7 @@ test('stability configuration and per-open overrides are validated before openin
     const h = (window as any).reactHarness;
     const mount = document.body.appendChild(document.createElement('div'));
     const invalid: string[] = [];
-    for (const value of [0, 99, 100.5, NaN, Infinity, null, '100']) {
+    for (const value of [0, 99, 100.5, 5001, NaN, Infinity, null, '100']) {
       try {
         h.createScanner({ mount, assetBaseUrl: '/scanner-assets/', autoCaptureStabilityMs: value });
         invalid.push('accepted');
@@ -123,8 +123,8 @@ test('stability configuration and per-open overrides are validated before openin
     const durations: number[] = [];
     for (const [configured, requested] of [
       [undefined, undefined],
-      [2000, undefined],
-      [2000, 100],
+      [5000, undefined],
+      [5000, 100],
       [1000, 875],
     ]) {
       const controller = h.createScanner({
@@ -144,9 +144,9 @@ test('stability configuration and per-open overrides are validated before openin
     mount.remove();
     return { invalid, childrenAfterInvalid, durations };
   });
-  expect(result.invalid).toEqual(Array(14).fill('CONFIG_INVALID'));
+  expect(result.invalid).toEqual(Array(16).fill('CONFIG_INVALID'));
   expect(result.childrenAfterInvalid).toBe(0);
-  expect(result.durations).toEqual([1000, 2000, 100, 875]);
+  expect(result.durations).toEqual([1000, 5000, 100, 875]);
 });
 test('declarative component survives StrictMode and callback updates, snapshots options, cleans up and reopens', async ({
   page,
