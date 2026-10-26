@@ -19,6 +19,8 @@ Scanic supplies document detection, perspective correction and the corner editor
 - `@ktb-tools/scanner/export`: serial image and PDF creation.
 - `@ktb-tools/scanner/styles.css`: scoped styles and semantic theme variables.
 
+For all supported CSS variables/defaults, imperative/React themes, light/dark palettes, locally served fonts, viewer inheritance and styling limits, see the [public UI styling guide](https://github.com/kbudisantoso/ktb.scanner/blob/main/docs/UI-THEMING.md).
+
 React 19 and React DOM are peers. Build the library and serve the complete `dist/assets/` directory at a same-origin URL. Workspace examples do this with `pnpm build:library` and `pnpm assets`. No CDN fallback, service worker or global cross-origin isolation is required.
 
 ```ts

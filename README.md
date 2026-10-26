@@ -326,7 +326,7 @@ const theme = {
 };
 ```
 
-Pass this as `theme` in either API. The unreleased UI-theme extension also applies theme variables to the backdrop, adds primary/warning foregrounds and camera palette/focus tokens, and lets standalone `ImageViewer` consume inherited `--scanner-font` directly. Existing defaults stay unchanged; see the [token contract](docs/adr/0026-complete-ui-theme-tokens.md). Full [configuration, viewer and lifecycle details](docs/INTEGRATION.md).
+Pass this as `theme` in either API. The unreleased UI-theme extension also applies theme variables to the backdrop, adds primary/warning foregrounds and camera palette/focus tokens, and lets standalone `ImageViewer` consume inherited `--scanner-font` directly. Existing defaults stay unchanged; see the [token contract](docs/adr/0026-complete-ui-theme-tokens.md). See the complete [UI styling guide](docs/UI-THEMING.md) for every token/default, light/dark examples, fonts, inheritance and the standalone viewer. Full [configuration, viewer and lifecycle details](docs/INTEGRATION.md).
 
 Default limits: **20 pages**, **20 MiB/file**, **24 MP input**, **100 MiB originals**, **8 MP/4,096 px output** without upscaling, **128 MiB retained results**, **384 MiB estimated working buffers**, and one high-resolution page at a time. These are configurable budgets, not a browser RSS guarantee. Extremely long receipts remain limited by source/output resolution.
 

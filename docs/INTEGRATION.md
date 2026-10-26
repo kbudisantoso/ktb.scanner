@@ -198,6 +198,10 @@ export function ScanButton({ onResult }: { onResult: (result: ScanResult) => voi
 
 `options` is `ScannerOptions` without mount; `openOptions` accepts entry, files, signal and per-open profile. Options are captured when `open` becomes true; close/reopen for a new configuration. Callback updates do not restart sessions. Closing/unmounting cleans up without a late result callback. An explicit user cancellation resolves `cancelled`; then set `open=false`. `onError` handles opening/configuration errors; recoverable processing errors stay in the scanner. Core/React imports are SSR-safe, but invoke `createScanner` client-side. `className`, `theme` variables and `texts` are styling/localization hooks.
 
+## UI styling
+
+Import `@ktb-tools/scanner/styles.css` once and pass `theme` through `ScannerOptions` in either API. The complete [UI styling guide](UI-THEMING.md) inventories all ten consumed variables and defaults, explains root/ancestor precedence and captured React options, and provides checked imperative/React examples, light/dark themes, local fonts and a standalone viewer container. It also records fixed-color/layout limits and how to align `locale`/`texts` with the host's existing confirmed-result handler.
+
 ## Use confirmed results
 
 The host owns returned blobs and any URLs it creates. Trigger downloads only through explicit user actions and revoke URLs when their views are removed.

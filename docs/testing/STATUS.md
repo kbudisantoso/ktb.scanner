@@ -2,6 +2,16 @@
 
 Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Public UI styling guide, 26 October 2026
+
+The [UI styling guide](../UI-THEMING.md) inventories the ten root variables with exact defaults and scope, explains CSS root/ancestor precedence, and documents fixed backdrop/mobile camera colors, primary white text and partially fixed dimensions. It provides complete [public-API examples](../examples/ui-theming.tsx) with light/dark themes, result handling and a standalone viewer host. No runtime CSS or new styling API is introduced.
+
+The published `@ktb-tools/scanner@0.1.0` archive was fetched with install scripts disabled. Its `dist/styles.css` is byte-identical to the current source; SHA-256 is `db3e3e7a2ccc021887880cfaf38ab7c219fade050647f5a9d5d5afa769b9a8bd`. Public core/React/CSS exports resolve. Both the complete example and the guide's imperative block typecheck against built public declarations, with the host bundler's ordinary CSS-module declaration. The example bundles through the public package exports.
+
+Chromium rendered the light and dark workspace at 1280 x 900 and 390 x 664, with zero horizontal overflow and visible keyboard focus. Screenshots were inspected for the light desktop workspace, dark mobile workspace and a dark standalone viewer displaying a synthetic document. Computed styles confirmed the configured background/accent and inherited viewer colors/font. This is a bounded example check; camera states, an actual custom font file, all editing states, physical devices and assistive technology were not visually accepted by this documentation pass. The font example requires a host-owned licensed font.
+
+Local checks passed: full library/Next.js/Astro build, 161 native tests, three Vitest checks, typecheck, formatting, document links, actual package archive and delivered notices. Generated screenshots and temporary verification scripts remain local and untracked. Hosted checks and any wider regression runs are evaluated separately on the PR.
+
 ## Complete reusable UI theming, 27 October 2026
 
 The existing ten theme variables/defaults remain supported. Forty additional consumed fallback tokens close backdrop/stacking, primary/warning contrast pairs, camera palette/focus/overlays/shutter/flash, chrome radii/spacing/shadows, capture contour/loupe, select caret and standalone viewer gaps. The controller applies theme properties to its owned backdrop; an explicit global focus also reaches the camera unless a camera-specific value is supplied. `ImageViewer` consumes inherited font without an extra host font declaration. A selected paper-orientation cascade conflict was corrected so its primary foreground remains visible on the accent background. [ADR 0026](../adr/0026-complete-ui-theme-tokens.md) records every supported fallback and scope. New tokens are unreleased and do not alter npm 0.1.0.
@@ -11,6 +21,7 @@ Local verification passed: complete library/Next.js/Astro build, 161 core tests,
 The final targeted run passed 66 cases with two existing WebKit canvas-stream exceptions across Chromium, Firefox, WebKit and mobile WebKit. All 36 new theme cases passed: both public UIs, custom and default backdrop/foreground/spacing/radii/focus, denied mobile-camera/error/options/shutter states, shadow roles, explicit camera-focus precedence, actual SVG contour colors, real corner-loupe canvas pixels, default values, standalone viewer font/inherited fallback and keyboard Tab focus, plus the actual selected Format-panel orientation foreground. Twenty-four existing focused-review cases passed in two themes and three viewport sizes, as did denied-camera recovery in all four profiles. The first run exposed a pre-existing thumbnail test race: cards can render before Blob URL images; the assertion now waits for those images before computing styles. Intermediate new-test selector/import-path errors were corrected before the final run. Audio output was physically muted by the shared fixture; documents were synthetic.
 
 Reproduce with `pnpm exec playwright test tests/browser/theming.spec.ts tests/browser/mobile-camera.spec.ts tests/browser/review-ui.spec.ts --workers=4` after building. Screenshots are attached by the synthetic renderer tests. Rendered/computed-style checks and emulation do not establish physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked independently on the pull request; no tag, release, registry publication or deployment is included.
+
 
 ## Global UI preference notifications, 26 October 2026
 
@@ -33,6 +44,7 @@ Local checks passed: library and both production host builds, 161 native tests, 
 All 56 new entry browser cases passed across Chromium, Firefox, WebKit and mobile WebKit: defaults, Auto/Manual independence, file precedence, invalid entries and EN/DE errors, denied permission/retry/import, confirmed blobs, pre-abort, pending abort/destroy/React close/unmount, StrictMode, late tracks and reentrant cancellation during opening. A broader 220-case run passed 209 cases with ten existing WebKit canvas-stream exceptions; an existing Chromium reopen test exposed a missing wait for the host's closed render. After adding that wait, the reopen test passed all four profiles. The remaining broad cases include the twenty-cycle real-processing worker/URL cleanup checks. Synthetic mobile denial screenshots are attached to the entry tests. Audio output was physically muted by the shared test fixture.
 
 Reproduce after building with `pnpm exec playwright test tests/browser/entry.spec.ts tests/browser/react-api.spec.ts tests/browser/lifecycle.spec.ts tests/browser/i18n.spec.ts tests/browser/camera.spec.ts tests/browser/mobile-camera.spec.ts --workers=4`. These are emulated/browser checks, not physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked on the pull request independently; no release, tag, registry publication or deployment is part of this change.
+
 
 ## Dependency capability review, 26 October 2026
 
