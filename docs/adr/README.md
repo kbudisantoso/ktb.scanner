@@ -26,3 +26,5 @@ Each record separates context, decision, consequences and evidence. Historical v
 
 - [0022: Localization and the English library default](0022-localization-and-library-default.md)
 - [0023: npm namespace and GitHub release workflow](0023-npm-release-workflow.md)
+
+- [0024: Per-open direct camera entry](0024-direct-camera-entry.md)

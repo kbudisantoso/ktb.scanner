@@ -29,17 +29,20 @@ export function createScanner(options: ScannerOptions): ScannerController {
     );
   resolveShutterSoundUrl(options);
   assetUrl(options.assetBaseUrl, 'processing.worker.js');
-  let disposed = false;
+  let disposed = false,
+    opening = false;
   let active: { finish: (result: ScanResult) => void } | undefined;
   return {
     open(initial = {}) {
       if (disposed)
         return Promise.reject(new ScannerError('SCANNER_DISPOSED', 'Scanner wurde geschlossen.'));
-      if (active)
+      if (active || opening)
         return Promise.reject(
           new ScannerError('SCANNER_BUSY', 'Eine Sitzung ist bereits geöffnet.'),
         );
       try {
+        if (initial.entry !== undefined && !['workspace', 'camera'].includes(initial.entry))
+          throw new ScannerError('CONFIG_INVALID', 'Ungültiger Scanner-Einstieg.');
         initialProfile(options.defaultProfile, initial.defaultProfile);
         resolveAutoCaptureStabilityMs(
           options.autoCaptureStabilityMs,
@@ -53,6 +56,7 @@ export function createScanner(options: ScannerOptions): ScannerController {
         options.paperRegion,
         navigator.languages?.length ? navigator.languages : [navigator.language],
       );
+      opening = true;
       diagnose(options.diagnostics, 'session-open', {
         paperPreference,
         context: options.context,
@@ -67,6 +71,12 @@ export function createScanner(options: ScannerOptions): ScannerController {
         engineBuffers: options.diagnostics?.engineBuffers === true,
         shutterSound: options.shutterSound ?? 'camera',
       });
+      opening = false;
+      // Diagnostic receivers can synchronously abort, destroy or try to open again.
+      if (disposed || initial.signal?.aborted) {
+        diagnose(options.diagnostics, 'session-close', { status: 'cancelled' });
+        return Promise.resolve({ status: 'cancelled' });
+      }
       const restoreFocus = document.activeElement as HTMLElement | null;
       const host = document.createElement('div');
       host.className = 'scanner-backdrop';

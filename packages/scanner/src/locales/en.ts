@@ -1,4 +1,5 @@
 export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
+  'Ungültiger Scanner-Einstieg.': 'Invalid scanner entry.',
   Anpassen: 'Adjust',
   Lizenzen: 'Licenses',
   Quellcode: 'Source code',

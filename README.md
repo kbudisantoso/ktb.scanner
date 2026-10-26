@@ -125,7 +125,7 @@ Open `https://192.168.1.20:3443` on the phone and allow camera access. The devel
 
 ### 1. Obtain and install the package
 
-The npm organization is `ktb-tools`; the package name is **`@ktb-tools/scanner`**. The first registry release is still pending. Until it is published, use a built archive as described below. After publication, install an exact released version with `pnpm add @ktb-tools/scanner@0.1.0 react@19 react-dom@19`. See the [release guide](docs/PUBLISHING.md#registry-release) for the first-publication setup and GitHub release workflow.
+The npm organization is `ktb-tools`; **`@ktb-tools/scanner@0.1.0` is published** (tag `v0.1.0`, commit `d277d32d6f9df52c6c95dd31e79885ddd3b11793`). Install it with `pnpm add @ktb-tools/scanner@0.1.0 react@19 react-dom@19`. The new `OpenOptions.entry` API described below is unreleased; use a locally built archive to try it. Do not overwrite the published version. See the [release guide](docs/PUBLISHING.md#registry-release).
 
 From this repository:
 
@@ -207,7 +207,7 @@ export async function scanDocument(
 }
 ```
 
-An empty open shows the capture/import workspace; `initialFiles` enters review without requesting a camera. The mount belongs exclusively to the scanner. Forward a host `AbortSignal` for navigation/unmount. Do not create controllers during SSR or module initialization; importing the core/React entry itself is SSR-safe. Keep at most one active session per controller. A destroyed controller cannot reopen.
+An empty open shows the capture/import workspace. To enter the existing camera directly from the host button, use `scanner.open({ entry: 'camera', signal })`. `entry` accepts `workspace` (default) or `camera`; it is independent of `initialMode: 'auto' | 'manual'`. Nonempty `initialFiles` always enter import/review without requesting a camera, even with `entry: 'camera'`; an empty array does not override the entry. Invalid entries reject with `CONFIG_INVALID` before resources open, including when files are supplied. Camera denial retains retry, import and cancellation. The mount belongs exclusively to the scanner. Forward a host `AbortSignal` for navigation/unmount. Do not create controllers during SSR or module initialization; importing the core/React entry itself is SSR-safe. Keep at most one active session per controller. A destroyed controller cannot reopen.
 
 For React/Next.js, use the shared declarative component in a client module:
 
@@ -229,6 +229,7 @@ export function DocumentCapture({ onScan }: { onScan: (result: ScanResult) => vo
         <Suspense fallback={<p role="status">Opening scanner...</p>}>
           <Scanner
             open
+            openOptions={{ entry: 'camera' }}
             options={{ assetBaseUrl: '/scanner-assets/', locale: 'en', createPdf: true }}
             onResult={(result) => {
               setOpen(false);
@@ -246,7 +247,7 @@ export function DocumentCapture({ onScan }: { onScan: (result: ScanResult) => vo
 }
 ```
 
-The component owns mount/unmount cleanup. Options are captured on opening; close/reopen to apply another locale or configuration. Callback updates do not restart sessions. `openOptions` accepts initial files, cancellation, a per-open `defaultProfile` and `autoCaptureStabilityMs`. The [Next.js host](apps/demo-next/app/page.tsx) and [Astro host](apps/demo-astro/src/client.ts) are complete working references.
+The component owns mount/unmount cleanup. Options are captured on opening; close/reopen to apply another locale or configuration. Callback updates do not restart sessions. `openOptions` accepts `entry: 'camera' | 'workspace'`, initial files, cancellation, a per-open `defaultProfile` and `autoCaptureStabilityMs`. The [Next.js host](apps/demo-next/app/page.tsx) and [Astro host](apps/demo-astro/src/client.ts) are complete working references.
 
 ### 4. Handle results and file ownership
 

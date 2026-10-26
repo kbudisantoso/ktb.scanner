@@ -10,7 +10,7 @@ The project is positioned as a complete embeddable document-scanning workflow bu
 
 The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. The host owns authentication, permissions, business records, uploads and subsequent OCR/extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
 
-Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. Preparing that workflow does not imply the first npm version is available; first-release account setup and registry verification remain explicit in the [publishing guide](PUBLISHING.md#registry-release).
+Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. Version 0.1.0 is published; subsequent SDK changes require a separate release. Registry verification remains explicit in the [publishing guide](PUBLISHING.md#registry-release).
 
 Primary journeys: capture an invoice, collect an expense receipt, import an existing image, correct/replace a page and export a reviewed multi-page result. Cancelling a new page or failing to process/export must preserve previously accepted pages.
 
@@ -60,6 +60,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-40 | MUST | Offer Auto, Photo, Color, Grayscale and soft Black-and-white. Whiten likely white paper in Color/Grayscale; suppress paper noise while preserving weak strokes and gray edges in S/W. Manual overrides take precedence. |
 | F-41 | MUST | Use bounded phone workspaces with fixed actions and focused tools. Previous/Next/Finish exports directly; unreviewed files cannot disappear. Use independently scrollable tiles with minimum readable cover thumbnails. Support fit/100%, steps, pinch/pan, held Before, tool Cancel/Apply, Undo and a detached loupe. Preserve results on return to start; load/render PDF preview on demand. |
 | F-42 | MUST | Allow profile defaults per library configuration and open call, with call > configuration > Auto. A reusable themeable React component and imperative facade share the same encapsulated session/processing implementation. |
+| F-43 | MUST | Offer a typed direct camera entry in both SDK UIs while preserving the default workspace. Nonempty initial files always import without camera access; empty arrays follow the entry. Validate entry before resources. Retain retry/import/cancel after denial and clean abort/destroy/StrictMode/late-stream behavior. |
 
 ## Integration requirements
 
