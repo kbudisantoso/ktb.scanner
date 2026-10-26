@@ -15,6 +15,7 @@ import type {
   PageDraft,
   Quad,
   ScannerOptions,
+  ScannerPreferenceChange,
   ScanResult,
   FormatSelection,
   PaperPreference,
@@ -101,6 +102,40 @@ export function ScannerView({
     input = useRef<HTMLInputElement>(null),
     root = useRef<HTMLElement>(null);
   const alive = useRef(true);
+  // Update synchronously: repeated input events can arrive before React renders again.
+  const preferences = useRef({ initialMode: mode, imageType: mime });
+  const notifyPreference = (change: ScannerPreferenceChange) => {
+    try {
+      // Host persistence may be asynchronous. Neither throws nor rejected promises own the scan.
+      void Promise.resolve(options.onPreferenceChange?.(change)).catch(() => {});
+    } catch {
+      // The UI change is already applied; a host callback cannot roll it back.
+    }
+  };
+  const changeMode = (value: CaptureMode) => {
+    if (
+      !alive.current ||
+      signal.aborted ||
+      !['auto', 'manual'].includes(value) ||
+      value === preferences.current.initialMode
+    )
+      return;
+    preferences.current.initialMode = value;
+    setMode(value);
+    notifyPreference({ preference: 'initialMode', value });
+  };
+  const changeImageType = (value: string) => {
+    if (
+      !alive.current ||
+      signal.aborted ||
+      (value !== 'image/jpeg' && value !== 'image/png') ||
+      value === preferences.current.imageType
+    )
+      return;
+    preferences.current.imageType = value;
+    setMime(value);
+    notifyPreference({ preference: 'imageType', value });
+  };
   useEffect(() => {
     if (pageActions)
       root.current
@@ -629,7 +664,7 @@ export function ScannerView({
                   options.autoCaptureStabilityMs,
                   initial.autoCaptureStabilityMs,
                 )}
-                setMode={setMode}
+                setMode={changeMode}
                 onShutter={() => shutter.current?.play() ?? false}
                 onPrepareSound={prepareSound}
                 onCapture={(blob, hint) => void processInput(blob, 'camera', hint)}
@@ -951,7 +986,7 @@ export function ScannerView({
               aria-label={t('Bildexport')}
               value={mime}
               disabled={busy}
-              onChange={(e) => setMime(e.target.value as ImageMime)}
+              onChange={(e) => changeImageType(e.target.value)}
             >
               <option value="image/jpeg">{t('JPEG (0,92)')}</option>
               <option value="image/png">PNG</option>

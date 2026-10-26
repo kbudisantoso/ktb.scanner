@@ -81,6 +81,74 @@ The library defaults to `locale: 'en'`, independent of browser language. Use `lo
 
 Configuration errors reject unsupported locales before opening resources. Core error codes are stable and API messages default to English; the built-in UI localizes them. Locale is captured on opening: close/reopen to change it. It does not override paper-region inference, image recipes or result metadata.
 
+## Global UI preferences (unreleased)
+
+`ScannerOptions.onPreferenceChange` receives a public `ScannerPreferenceChange` union:
+
+```ts
+type ScannerPreferenceChange =
+  | { preference: 'initialMode'; value: 'auto' | 'manual' }
+  | { preference: 'imageType'; value: 'image/jpeg' | 'image/png' };
+```
+
+The type is exported from both `@ktb-tools/scanner` and `@ktb-tools/scanner/react`. Notifications follow real global user changes inside the reusable UI, including when the person later cancels. The image-export choice applies to the whole session's image output. Do not reconstruct defaults from final page metadata. Initialization, reapplication, repeated unchanged selections, invalid values, page corners/rotation/profiles/corrections and session closure emit no preferences. Payloads contain no images, filenames, session/device identifiers or diagnostic data. Callback throws and rejected promises are isolated; the SDK does not retry a failed host write.
+
+An imperative host can keep defaults in its own state:
+
+```ts
+import type { ScannerOptions, ScannerPreferenceChange } from '@ktb-tools/scanner';
+import { createScanner } from '@ktb-tools/scanner/react';
+import '@ktb-tools/scanner/styles.css';
+
+let defaults: Pick<ScannerOptions, 'initialMode' | 'imageType'> = {
+  initialMode: 'auto', imageType: 'image/jpeg',
+};
+function remember(change: ScannerPreferenceChange) {
+  if (change.preference === 'initialMode') defaults.initialMode = change.value;
+  else defaults.imageType = change.value;
+}
+export async function scanWithDefaults(mount: HTMLElement) {
+  const scanner = createScanner({
+    mount, assetBaseUrl: '/scanner-assets/', ...defaults,
+    onPreferenceChange: remember,
+  });
+  try { return await scanner.open(); }
+  finally { await scanner.destroy(); }
+}
+```
+
+Reading, validating, migrating, writing and resetting durable preferences all remain host responsibilities. This example deliberately retains values only in host memory. No SDK storage/settings abstraction or external control of the live scanner state is introduced. Theme and shutter sound are already chosen by the host and can be retained there separately.
+
+React uses the same callback in `options`:
+
+```tsx
+'use client';
+import { useState } from 'react';
+import type { ScannerOptions, ScannerPreferenceChange, ScanResult } from '@ktb-tools/scanner';
+import { Scanner } from '@ktb-tools/scanner/react';
+import '@ktb-tools/scanner/styles.css';
+
+export function Capture({ onResult }: { onResult: (result: ScanResult) => void }) {
+  const [open, setOpen] = useState(false);
+  const [defaults, setDefaults] = useState<Pick<ScannerOptions, 'initialMode' | 'imageType'>>({
+    initialMode: 'auto', imageType: 'image/jpeg',
+  });
+  const remember = (change: ScannerPreferenceChange) => setDefaults(current =>
+    change.preference === 'initialMode'
+      ? { ...current, initialMode: change.value }
+      : { ...current, imageType: change.value });
+  return <>
+    <button onClick={() => setOpen(true)}>Scan document</button>
+    <Scanner open={open}
+      options={{ assetBaseUrl: '/scanner-assets/', ...defaults, onPreferenceChange: remember }}
+      onResult={result => { setOpen(false); onResult(result); }}
+      onError={() => setOpen(false)} />
+  </>;
+}
+```
+
+React options are captured on opening; callback updates alone reach the current handler without restarting a session or camera. Updating host defaults in the callback applies to a later opening and generates no feedback loop. Closing/unmounting stops future events. There is no additional `onPreferenceChange` prop outside `options`. This extension requires a local source build until a separate release; npm 0.1.0 does not contain it.
+
 ## Capture stability
 
 `autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 600 })`; open call > configuration > default. Both supplied values must be safe integers from 100 through 5,000, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.

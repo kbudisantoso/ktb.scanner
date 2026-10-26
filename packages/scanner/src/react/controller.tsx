@@ -89,8 +89,8 @@ export function createScanner(options: ScannerOptions): ScannerController {
         const finish = (result: ScanResult) => {
           if (done) return;
           done = true;
-          diagnose(options.diagnostics, 'session-close', { status: result.status });
           abort.abort();
+          diagnose(options.diagnostics, 'session-close', { status: result.status });
           initial.signal?.removeEventListener('abort', cancel);
           // Unmount after React's current event/effect finishes, then release all owned resources.
           queueMicrotask(() => {

@@ -358,7 +358,10 @@ export function CameraView({
       document.removeEventListener('visibilitychange', pause);
     };
   }, [device, restart]);
+  const selectedMode = useRef(mode);
   const changeMode = (next: CaptureMode) => {
+    if (!['auto', 'manual'].includes(next) || next === selectedMode.current) return;
+    selectedMode.current = next;
     diagnose(diagnostics, 'capture-mode', { mode: next });
     gate.current.setMode(next);
     setProgress(0);

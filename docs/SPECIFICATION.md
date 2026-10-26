@@ -24,6 +24,12 @@ A confirmed result has status, schema version 1, session ID, ordered stable acce
 
 Only accepted pages are exportable. A `CropRequired` processing result has `status: crop-required`, source size, proposed corners and a reason, but no image or format. The ready-made UI requires explicit corner confirmation before processing/acceptance. Custom hosts must do the same. Export encountering such a state fails with `CROP_REQUIRED`; it must not substitute the original or confirm a partial document.
 
+## Global UI preference notifications
+
+Optional `ScannerOptions.onPreferenceChange(change: ScannerPreferenceChange)` reports `{ preference: 'initialMode', value: CaptureMode }` or `{ preference: 'imageType', value: ImageMime }` only after genuine global UI changes. Export the union from core and React. Synchronous refs deduplicate events even before a React render. Validate UI values before changing state/gates; no events on initialization/reapplication, unchanged/invalid values, individual page edits or after session abort/end. Changes precede later cancellation and contain no document or session/device data. Callback throws/rejections cannot damage scanning.
+
+Controller and React share the same option. React forwards to the latest handler through its existing props ref, preserving the open/configuration snapshot and camera lifetime. Reapply through `initialMode` and `imageType` on a later opening; do not add live external state control. Validation/migration/storage/reset and any theme/sound defaults belong to the host. No SDK localStorage, cookies or diagnosis-based preference channel. The result/completion contract is unchanged. See [ADR 0025](adr/0025-ui-preference-notifications.md) and [host examples](INTEGRATION.md#global-ui-preferences-unreleased). This source API is unreleased.
+
 ## Camera and automatic capture
 
 Prefer the rear camera and request video only. Preserve import, camera selection and restart after denial/interruption. Request continuous autofocus only if supported; failure must not block camera startup. Camera light appears only when `torch` is supported, uses constraints and invalidates stale light requests on restart. Pause capture evidence while changing light.
@@ -162,5 +168,6 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-34 | Neutral byte equivalence, manual values/reset, radial positives/negatives and matching comparison/export | F-38, F-39, N-04 |
 | T-35 | Profile precedence, React lifecycle, focused tools, measured mobile targets, tiles, direct finish, queue failures, undo/cancel, zoom/pinch/held comparison, loupe, long receipts, themes and real downloads | F-40, F-41, F-42, F-37, N-05 |
 | T-36 | Default/direct entry, file precedence/empty arrays/invalid values, denial/retry/import, pre/during abort, destroy, StrictMode and late streams | F-43, F-03, N-03 |
+| T-37 | Genuine mode/export changes before cancel, silent reapplication, same-turn deduplication, invalid values, page-edit exclusion, callback failures/latest React handler and no events after close | F-44, F-25, F-28, N-03, N-04 |
 
 Synthetic calibration and acceptance fixtures remain separate. Browser emulation does not satisfy T-16 or formal assistive-technology acceptance. [Test status](testing/STATUS.md) and [device protocol](testing/DEVICE-PROTOCOL.md) identify that remaining work explicitly.
