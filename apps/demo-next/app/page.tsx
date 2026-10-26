@@ -6,13 +6,13 @@ import {
   SHUTTER_SOUNDS,
   AUTO_CAPTURE_STABILITY_PRESETS_MS,
   DEFAULT_AUTO_CAPTURE_STABILITY_MS,
-} from '@ktb/scanner';
-import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb/scanner';
+} from '@ktb-tools/scanner';
+import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb-tools/scanner';
 import { useUrl } from './blob-url';
 import Results from './Results';
 import { useDemoLocale } from './i18n';
 const Scanner = lazy(() =>
-  import('@ktb/scanner/react').then((module) => ({ default: module.Scanner })),
+  import('@ktb-tools/scanner/react').then((module) => ({ default: module.Scanner })),
 );
 type Result = Extract<ScanResult, { status: 'confirmed' }>;
 type Request = {

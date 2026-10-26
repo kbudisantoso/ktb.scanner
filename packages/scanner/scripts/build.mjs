@@ -5,6 +5,7 @@ import { cp, copyFile, mkdir, readFile, writeFile, readdir } from 'node:fs/promi
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 const require = createRequire(import.meta.url);
+const packageManifest = JSON.parse(await readFile('package.json', 'utf8'));
 const common = {
   bundle: true,
   format: 'esm',
@@ -61,7 +62,7 @@ await writeFile(
   'dist/assets/versions.json',
   JSON.stringify(
     {
-      adapter: '0.1.0',
+      adapter: packageManifest.version,
       scanic: manifest.version,
       detector: 'classical',
       scanicInstrumentation: 'candidate-selection-and-debug-v2',

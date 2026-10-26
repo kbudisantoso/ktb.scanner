@@ -10,6 +10,8 @@ The project is positioned as a complete embeddable document-scanning workflow bu
 
 The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. The host owns authentication, permissions, business records, uploads and subsequent OCR/extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
 
+Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. Preparing that workflow does not imply the first npm version is available; first-release account setup and registry verification remain explicit in the [publishing guide](PUBLISHING.md#registry-release).
+
 Primary journeys: capture an invoice, collect an expense receipt, import an existing image, correct/replace a page and export a reviewed multi-page result. Cancelling a new page or failing to process/export must preserve previously accepted pages.
 
 ## Functional requirements

@@ -1,5 +1,5 @@
 {
-  "name": "@ktb/scanner",
+  "name": "@ktb-tools/scanner",
   "version": "0.1.0",
   "private": false,
   "license": "AGPL-3.0-only",
@@ -64,6 +64,7 @@
     "url": "https://github.com/kbudisantoso/ktb.scanner/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

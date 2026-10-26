@@ -1,6 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { createTranslator, type ScanLocale } from '@ktb/scanner';
+import { createTranslator, type ScanLocale } from '@ktb-tools/scanner';
 
 const Context = createContext({ locale: 'en' as ScanLocale, setLocale: (_: ScanLocale) => {} });
 export function DemoLocaleProvider({ children }: { children: ReactNode }) {

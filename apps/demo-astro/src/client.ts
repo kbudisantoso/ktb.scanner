@@ -1,5 +1,5 @@
-import { createTranslator, type ScanLocale, type ScanResult } from '@ktb/scanner';
-import type { ScannerController } from '@ktb/scanner';
+import { createTranslator, type ScanLocale, type ScanResult } from '@ktb-tools/scanner';
+import type { ScannerController } from '@ktb-tools/scanner';
 const openButton = document.querySelector<HTMLButtonElement>('#open')!;
 const importButton = document.querySelector<HTMLButtonElement>('#import')!;
 const input = document.querySelector<HTMLInputElement>('#file')!;
@@ -36,7 +36,7 @@ async function open(files?: File[]) {
   language.disabled = true;
   const current = generation;
   try {
-    const { createScanner } = await import('@ktb/scanner/react');
+    const { createScanner } = await import('@ktb-tools/scanner/react');
     if (current !== generation) return;
     scanner = createScanner({
       mount: document.querySelector<HTMLElement>('#scanner-mount')!,

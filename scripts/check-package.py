@@ -30,7 +30,7 @@ with tarfile.open(sys.argv[1], "r:gz") as archive:
     }
     assert required <= names, sorted(required - names)
     manifest = json.load(archive.extractfile("package/package.json"))
-    assert manifest["name"] == "@ktb/scanner"
+    assert manifest["name"] == "@ktb-tools/scanner"
     assert manifest["license"] == "AGPL-3.0-only" and manifest["private"] is False
     assert manifest["publishConfig"]["access"] == "public"
     for entry in [".", "./react", "./scanic", "./export"]:

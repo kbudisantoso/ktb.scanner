@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import './globals.css';
-import '@ktb/scanner/styles.css';
+import '@ktb-tools/scanner/styles.css';
 import { DemoLocaleProvider } from './i18n';
 export const metadata = {
   title: 'Scanner workshop',

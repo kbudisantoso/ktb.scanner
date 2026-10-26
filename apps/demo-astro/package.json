@@ -10,7 +10,7 @@
     "preview": "astro preview --host 0.0.0.0 --port 4321"
   },
   "dependencies": {
-    "@ktb/scanner": "workspace:*",
+    "@ktb-tools/scanner": "workspace:*",
     "astro": "7.4.1",
     "react": "19.3.1",
     "react-dom": "19.3.1"

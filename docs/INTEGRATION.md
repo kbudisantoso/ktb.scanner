@@ -8,6 +8,7 @@ pnpm build
 pnpm typecheck
 pnpm lint
 pnpm test:core
+pnpm test:release
 pnpm test
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
@@ -23,12 +24,12 @@ pnpm check:package
 Load only types and CSS initially, then import UI in a client-side action:
 
 ```ts
-import type { ScannerController } from '@ktb/scanner';
-import '@ktb/scanner/styles.css';
+import type { ScannerController } from '@ktb-tools/scanner';
+import '@ktb-tools/scanner/styles.css';
 
 let scanner: ScannerController | undefined;
 async function scan(mount: HTMLElement, initialFiles?: File[]) {
-  const { createScanner } = await import('@ktb/scanner/react');
+  const { createScanner } = await import('@ktb-tools/scanner/react');
   scanner = createScanner({
     mount,
     assetBaseUrl: '/scanner-assets/',
@@ -66,7 +67,7 @@ Configuration errors reject unsupported locales before opening resources. Core e
 
 `autoCaptureStabilityMs` controls measured stable time before Auto capture, default 1,000 ms. Override per session with `scanner.open({ autoCaptureStabilityMs: 600 })`; open call > configuration > default. Both supplied values must be safe integers from 100 through 5,000, otherwise `CONFIG_INVALID` is raised before opening. The React `Scanner` accepts the same fields through `options` and `openOptions`, captured when opening. Manual capture is unaffected.
 
-Core integrations can use `new AutoCapture('auto', 600)`. `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` are exported from `@ktb/scanner`. The presets are 400/600/800/1,000/1,200/1,500/2,000 ms; other integer values from 100 through 5,000 also work. In the reference application choose **Optionen > Stabilisierungsdauer** before starting a session.
+Core integrations can use `new AutoCapture('auto', 600)`. `DEFAULT_AUTO_CAPTURE_STABILITY_MS` and `AUTO_CAPTURE_STABILITY_PRESETS_MS` are exported from `@ktb-tools/scanner`. The presets are 400/600/800/1,000/1,200/1,500/2,000 ms; other integer values from 100 through 5,000 also work. In the reference application choose **Optionen > Stabilisierungsdauer** before starting a session.
 
 This is a minimum measured-evidence window, not a timer or a delay after the green contour closes. At least two fresh valid observations are needed. Detection is capped at about eight jobs per second, so the actual claim follows the next eligible fresh measurement after the selected minimum. Unknown sharpness, movement and missing evidence still pause/reset capture. Diagnostics record the resolved value in `session-open` and `camera-start`.
 
@@ -88,9 +89,9 @@ In a client component:
 
 ```tsx
 import { lazy, Suspense, useState } from 'react';
-import type { ScanResult } from '@ktb/scanner';
-import '@ktb/scanner/styles.css';
-const Scanner = lazy(() => import('@ktb/scanner/react').then(m => ({ default: m.Scanner })));
+import type { ScanResult } from '@ktb-tools/scanner';
+import '@ktb-tools/scanner/styles.css';
+const Scanner = lazy(() => import('@ktb-tools/scanner/react').then(m => ({ default: m.Scanner })));
 
 export function ScanButton({ onResult }: { onResult: (result: ScanResult) => void }) {
   const [open, setOpen] = useState(false);
@@ -173,7 +174,7 @@ Diagnostics are off in both library and reference. Optional `diagnostics: { onEv
 
 ## Shared React image viewer
 
-`ImageViewer` is exported by `@ktb/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
+`ImageViewer` is exported by `@ktb-tools/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
 
 Tap/double tap switches fit/100%, magnifiers step zoom, pinch anchors at the midpoint and enlarged images can pan. Enter/Space toggles, +/- zooms and arrows pan. Hold Before to compare; pointer/keyboard release, cancellation, blur and visibility changes restore the result. Focused tools support Cancel/Apply and recipe undo. Finish accepts the confirmed current draft and exports directly; remaining imports require review or explicit discard. Tile cover crops are display-only.
 

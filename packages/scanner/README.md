@@ -1,4 +1,4 @@
-# @ktb/scanner
+# @ktb-tools/scanner
 
 An embeddable document-scanning workflow for web applications. Built on [Scanic](https://github.com/marquaye/scanic), with a customizable React interface, reversible image processing and browser-side image/PDF export.
 
@@ -13,19 +13,19 @@ Scanic supplies document detection, perspective correction and the corner editor
 
 ## Entry points
 
-- `@ktb/scanner`: DOM-free session, types, geometry, profiles and metadata.
-- `@ktb/scanner/react`: `createScanner`, themeable `Scanner` and reusable `ImageViewer` components.
-- `@ktb/scanner/scanic`: classic Scanic in an abortable worker.
-- `@ktb/scanner/export`: serial image and PDF creation.
-- `@ktb/scanner/styles.css`: scoped styles and semantic theme variables.
+- `@ktb-tools/scanner`: DOM-free session, types, geometry, profiles and metadata.
+- `@ktb-tools/scanner/react`: `createScanner`, themeable `Scanner` and reusable `ImageViewer` components.
+- `@ktb-tools/scanner/scanic`: classic Scanic in an abortable worker.
+- `@ktb-tools/scanner/export`: serial image and PDF creation.
+- `@ktb-tools/scanner/styles.css`: scoped styles and semantic theme variables.
 
 React 19 and React DOM are peers. Build the library and serve the complete `dist/assets/` directory at a same-origin URL. Workspace examples do this with `pnpm build:library` and `pnpm assets`. No CDN fallback, service worker or global cross-origin isolation is required.
 
 ```ts
-import '@ktb/scanner/styles.css';
+import '@ktb-tools/scanner/styles.css';
 
 async function scan(mount: HTMLElement, initialFiles?: File[]) {
-  const { createScanner } = await import('@ktb/scanner/react');
+  const { createScanner } = await import('@ktb-tools/scanner/react');
   const scanner = createScanner({
     mount,
     assetBaseUrl: '/scanner-assets/',

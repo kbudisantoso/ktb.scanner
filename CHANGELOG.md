@@ -2,6 +2,7 @@
 
 ## 0.1.0 - Unreleased
 
+- Public package namespace `@ktb-tools/scanner` and a GitHub release workflow with full checks, inspected artifacts and npm OIDC publishing after one-time bootstrap setup.
 - GNU AGPL version 3 source license, English project documentation and separate third-party media notices.
 - Focused mobile tools, direct finish, scrollable page tiles and a shared pinch/zoom/held-comparison viewer.
 - Browser document-scanner library with a framework-independent core and reusable React interface.

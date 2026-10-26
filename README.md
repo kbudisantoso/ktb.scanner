@@ -125,22 +125,22 @@ Open `https://192.168.1.20:3443` on the phone and allow camera access. The devel
 
 ### 1. Obtain and install the package
 
-`@ktb/scanner` has **not been released to npm**. The package name does not establish ownership of that registry namespace. Use a locally built archive for now; do not assume `pnpm add @ktb/scanner` installs this project.
+The npm organization is `ktb-tools`; the package name is **`@ktb-tools/scanner`**. The first registry release is still pending. Until it is published, use a built archive as described below. After publication, install an exact released version with `pnpm add @ktb-tools/scanner@0.1.0 react@19 react-dom@19`. See the [release guide](docs/PUBLISHING.md#registry-release) for the first-publication setup and GitHub release workflow.
 
 From this repository:
 
 ```sh
 pnpm install --frozen-lockfile
 mkdir -p artifacts/local/packages
-pnpm --filter @ktb/scanner pack --pack-destination "$PWD/artifacts/local/packages"
+pnpm --filter @ktb-tools/scanner pack --pack-destination "$PWD/artifacts/local/packages"
 ```
 
-The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-scanner-0.1.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
+The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-tools-scanner-0.1.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
 
 From your host project, install that archive and the React peers:
 
 ```sh
-pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-scanner-0.1.0.tgz react@19.3.1 react-dom@19.3.1
+pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-tools-scanner-0.1.0.tgz react@19.3.1 react-dom@19.3.1
 ```
 
 The archive is already built and needs no dependency install scripts; `--ignore-scripts` also avoids an unnecessary dependency postinstall prompt in pnpm 11. Use a bundler with ESM, dynamic imports and CSS support, for example Next.js, Astro or Vite. The ready-made UI requires React/React DOM 19 even when the host uses another framework. Core-only consumers do not need to render React. Within this workspace the examples use `workspace:*`; external projects should consume a reproducible package artifact, not an unbuilt sibling directory.
@@ -153,7 +153,7 @@ Create `scripts/copy-scanner-assets.mjs` in your project:
 import { cp, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const source = fileURLToPath(new URL('./assets/', import.meta.resolve('@ktb/scanner')));
+const source = fileURLToPath(new URL('./assets/', import.meta.resolve('@ktb-tools/scanner')));
 const destination = 'public/scanner-assets';
 await mkdir(destination, { recursive: true });
 await cp(source, destination, { recursive: true });
@@ -170,7 +170,7 @@ node scripts/copy-scanner-assets.mjs
 Import the styles once in your global/client entry (the root layout for Next.js):
 
 ```ts
-import '@ktb/scanner/styles.css';
+import '@ktb-tools/scanner/styles.css';
 ```
 
 Verify `/scanner-assets/processing.worker.js`, `/scanner-assets/pdf.worker.js` and `/scanner-assets/scanic.js` return JavaScript, not an HTML fallback/404. Your host CSP must allow the actual module workers, Blob previews/media, injected editor styles and any required WASM execution. No global cross-origin isolation is required. [Asset/CSP details](docs/INTEGRATION.md#assets-csp-and-lazy-loading).
@@ -180,15 +180,15 @@ Verify `/scanner-assets/processing.worker.js`, `/scanner-assets/pdf.worker.js` a
 The imperative controller works in React, Astro and other browser hosts. Call it from a client-side interaction after the mount exists:
 
 ```ts
-import type { ScanResult } from '@ktb/scanner';
-import '@ktb/scanner/styles.css';
+import type { ScanResult } from '@ktb-tools/scanner';
+import '@ktb-tools/scanner/styles.css';
 
 export async function scanDocument(
   mount: HTMLElement,
   initialFiles?: File[],
   signal?: AbortSignal,
 ): Promise<ScanResult> {
-  const { createScanner } = await import('@ktb/scanner/react');
+  const { createScanner } = await import('@ktb-tools/scanner/react');
   const scanner = createScanner({
     mount,
     assetBaseUrl: '/scanner-assets/',
@@ -214,10 +214,10 @@ For React/Next.js, use the shared declarative component in a client module:
 ```tsx
 'use client';
 import { lazy, Suspense, useState } from 'react';
-import type { ScanResult } from '@ktb/scanner';
+import type { ScanResult } from '@ktb-tools/scanner';
 
 const Scanner = lazy(() =>
-  import('@ktb/scanner/react').then((module) => ({ default: module.Scanner })),
+  import('@ktb-tools/scanner/react').then((module) => ({ default: module.Scanner })),
 );
 
 export function DocumentCapture({ onScan }: { onScan: (result: ScanResult) => void }) {
@@ -270,7 +270,7 @@ Append the link to your UI and revoke its URL with `URL.revokeObjectURL(link.hre
 For a future upload, build a `FormData` payload in the host:
 
 ```ts
-import type { ScanResult } from '@ktb/scanner';
+import type { ScanResult } from '@ktb-tools/scanner';
 
 export function scanPayload(result: Extract<ScanResult, { status: 'confirmed' }>): FormData {
   const data = new FormData();
@@ -330,11 +330,11 @@ Default limits: **20 pages**, **20 MiB/file**, **24 MP input**, **100 MiB origin
 
 | Entry | Responsibility |
 | --- | --- |
-| `@ktb/scanner` | DOM-free session, types, geometry, profiles, locale helpers and metadata |
-| `@ktb/scanner/react` | `createScanner`, `Scanner` and reusable `ImageViewer` |
-| `@ktb/scanner/scanic` | Abortable worker adapter for classic Scanic detection/correction |
-| `@ktb/scanner/export` | Serial images and browser PDF creation |
-| `@ktb/scanner/styles.css` | Scoped styles and theme variables |
+| `@ktb-tools/scanner` | DOM-free session, types, geometry, profiles, locale helpers and metadata |
+| `@ktb-tools/scanner/react` | `createScanner`, `Scanner` and reusable `ImageViewer` |
+| `@ktb-tools/scanner/scanic` | Abortable worker adapter for classic Scanic detection/correction |
+| `@ktb-tools/scanner/export` | Serial images and browser PDF creation |
+| `@ktb-tools/scanner/styles.css` | Scoped styles and theme variables |
 
 React/engine resources load on scanner open; PDF generation and the reference PDF.js viewer load when needed. Serve controlled assets locally. No service worker is registered and no backend or global cross-origin isolation is required.
 
@@ -342,6 +342,7 @@ React/engine resources load on scanner open; PDF generation and the reference PD
 
 ```sh
 pnpm test:core
+pnpm test:release
 pnpm build
 pnpm typecheck
 pnpm lint

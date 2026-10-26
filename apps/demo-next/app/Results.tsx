@@ -1,11 +1,11 @@
 'use client';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import type { ScanPage, ScanResult } from '@ktb/scanner';
+import type { ScanPage, ScanResult } from '@ktb-tools/scanner';
 import { useUrl } from './blob-url';
 import { useDemoLocale } from './i18n';
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const ImageViewer = lazy(() =>
-  import('@ktb/scanner/react').then((module) => ({ default: module.ImageViewer })),
+  import('@ktb-tools/scanner/react').then((module) => ({ default: module.ImageViewer })),
 );
 type Result = Extract<ScanResult, { status: 'confirmed' }>;
 function ResultViewer({

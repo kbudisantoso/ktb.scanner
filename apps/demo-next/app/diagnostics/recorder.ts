@@ -1,4 +1,4 @@
-import type { DiagnosticEvent, DiagnosticOptions } from '@ktb/scanner';
+import type { DiagnosticEvent, DiagnosticOptions } from '@ktb-tools/scanner';
 
 export class DiagnosticRecording {
   readonly startedAt = new Date().toISOString();

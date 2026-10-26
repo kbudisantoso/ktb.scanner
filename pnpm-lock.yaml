@@ -41,7 +41,7 @@ importers:
 
   apps/demo-astro:
     dependencies:
-      '@ktb/scanner':
+      '@ktb-tools/scanner':
         specifier: workspace:*
         version: link:../../packages/scanner
       astro:
@@ -56,7 +56,7 @@ importers:
 
   apps/demo-next:
     dependencies:
-      '@ktb/scanner':
+      '@ktb-tools/scanner':
         specifier: workspace:*
         version: link:../../packages/scanner
       next:

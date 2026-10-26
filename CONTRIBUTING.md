@@ -28,6 +28,7 @@ Create a branch such as `fix/42-receipt-preview` or `feat/57-export-option`. Use
 
 ```sh
 pnpm test:core
+pnpm test:release
 pnpm build
 pnpm typecheck
 pnpm lint
