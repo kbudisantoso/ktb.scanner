@@ -3,7 +3,7 @@
 | Document | Purpose |
 | --- | --- |
 | [Requirements](REQUIREMENTS.md) | Required product, integration and quality scope |
-| [Implementation contract](SPECIFICATION.md) | Architecture, processing, lifecycle, limits and T-01..T-35 traceability |
+| [Implementation contract](SPECIFICATION.md) | Architecture, processing, lifecycle, limits and T-01..T-38 traceability |
 | [Decisions](DECISIONS.md) | Current defaults and deferred extensions |
 | [Architecture records](adr/README.md) | Dated decisions and superseded historical choices |
 | [Integration](INTEGRATION.md) | API, assets, HTTPS, profiles, result ownership and uploads |
