@@ -12,7 +12,7 @@ with tarfile.open(sys.argv[1], "r:gz") as archive:
         path = PurePosixPath(member.name)
         assert not path.is_absolute() and ".." not in path.parts, member.name
         assert not member.issym() and not member.islnk(), member.name
-        assert not any(part in {"AGENTS.md", "CLAUDE.md", ".agents", ".codex", ".claude", ".certificates", "artifacts", "local-assets"} or part.startswith(".env") for part in path.parts), member.name
+        assert not any(part in {"AGENTS.md", "CLAUDE.md", ".agents", ".codex", ".claude", ".certificates", "artifacts"} or part.startswith(".env") or part.endswith(".gitignore") for part in path.parts), member.name
     required = {
         "package/LICENSE", "package/NOTICE", "package/README.md",
         "package/dist/index.js", "package/dist/index.d.ts",

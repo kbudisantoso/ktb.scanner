@@ -59,7 +59,7 @@ The package includes built entry points, declarations, source/build scripts, sty
 
 ## Media and artifacts
 
-The two bundled capture recordings retain their CC0-1.0 designation. Preserve each creator/source/checksum notice, the complete CC0 dedication, and Scanic/jsPDF/PDF.js notices. The former Pixabay downloads are local-only experiments under ignored `local-assets/`; only source-page suggestions remain in the [custom sound guide](SOUNDS.md). This removes them from the current source tree and future artifacts, without rewriting pre-existing Git history.
+The two bundled capture recordings retain their CC0-1.0 designation. Preserve each creator/source/checksum notice, the complete CC0 dedication, and Scanic/jsPDF/PDF.js notices. The former Pixabay downloads are untracked experiments outside build inputs; only source-page suggestions remain in the [custom sound guide](SOUNDS.md). This removes them from the current source tree and future artifacts, without rewriting pre-existing Git history.
 
 The [third-party audit](testing/LICENSE-AUDIT.md) records the media replacement and the accepted jsPDF upstream-MIT policy. Include supplemental WASM notices and the full project license in controlled assets. Both reference builds generate a linked notice collection; `pnpm check:notices` verifies its contents. A server/container deployment needs a separate inventory of the native dependencies it actually redistributes.
 

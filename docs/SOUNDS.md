@@ -86,4 +86,4 @@ The following Pixabay links are inspiration for host-owned custom sounds. No fil
 | transformers-sound | lolsuckmujuice (Freesound) | [Pixabay 43700](https://pixabay.com/de/sound-effects/film-spezialeffekte-transformers-sound-43700/) |
 | Electric Boom 1 | AleXZavesa | [Pixabay 463651](https://pixabay.com/de/sound-effects/electric-boom-1-463651/) |
 
-The previous downloads and acquisition notices are preserved only in ignored `local-assets/sounds/pixabay/`, with a checksum inventory. That directory is absent from clean clones and release archives and must remain outside build inputs. The removal changes the current tree and future artifacts; pre-existing Git history is not rewritten.
+The previous downloads and acquisition notices are preserved outside versioned source, with a checksum inventory. They are absent from clean clones and release archives and must remain outside build inputs. The removal changes the current tree and future artifacts; pre-existing Git history is not rewritten.

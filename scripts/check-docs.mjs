@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 const files = [];
 async function walk(path) {
   for (const entry of await readdir(path, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.endsWith('.gitignore')) continue;
     if (
       [
         'node_modules',

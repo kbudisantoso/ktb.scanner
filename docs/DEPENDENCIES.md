@@ -29,7 +29,7 @@ The project relies on jsPDF's upstream MIT declaration under D-041 and preserves
 
 The current catalog ships two CC0-1.0 recordings plus silence: [Camera Shutter by roachpowder](https://freesound.org/people/roachpowder/sounds/170229/) and [Pentax MZ-7 Shutter by AudioSea](https://freesound.org/people/AudioSea/sounds/645335/). Their publicly supplied HQ MP3s are included unchanged. Creator/title/source/date/checksum attributions and the complete CC0 text accompany the files. See [capture sounds and custom audio](SOUNDS.md) for the credits, alternative CC0 candidate, integration options and link-only Pixabay ideas.
 
-The twelve previous Pixabay downloads and notices are preserved in ignored `local-assets/sounds/pixabay/` and excluded from the current source tree, package and demo build. Earlier Git history is unchanged. The jsPDF upstream-MIT policy is separate from this media replacement.
+The twelve previous Pixabay downloads and notices are preserved outside versioned source and excluded from the current source tree, package and demo build. Earlier Git history is unchanged. The jsPDF upstream-MIT policy is separate from this media replacement.
 
 ## Security audit
 

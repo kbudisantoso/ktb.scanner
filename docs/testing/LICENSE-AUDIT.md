@@ -26,7 +26,7 @@ Unused Scanic ML/ONNX models/loaders are not copied into controlled assets. The 
 
 ## Media decision - resolved for the current distribution
 
-On 26 October 2026 the bundled Pixabay catalog was removed from the current tree and future build/package outputs. Its unchanged files and original notices are retained only in ignored `local-assets/sounds/pixabay/`. Source-page links are documented solely as ideas for independently licensed custom audio. Pre-existing Git history was not rewritten.
+On 26 October 2026 the bundled Pixabay catalog was removed from the current tree and future build/package outputs. Its unchanged files and original notices are retained outside versioned source and build inputs. Source-page links are documented solely as ideas for independently licensed custom audio. Pre-existing Git history was not rewritten.
 
 Both replacement source pages explicitly designate the recordings CC0-1.0. The included files are unchanged public HQ MP3 previews, not the login-only original AIFF/WAV downloads. The [sound guide](../SOUNDS.md) and supplied notices preserve the exact source, creator, hashes and full dedication. No creator endorsement is implied. The NoTomorrow12 CC0 candidate was superseded by the later roachpowder suggestion and is linked only as an alternative. The independent jsPDF MD5 observation is handled by the accepted upstream-MIT policy D-041 above.
 
