@@ -29,3 +29,5 @@ Each record separates context, decision, consequences and evidence. Historical v
 
 - [0024: Per-open direct camera entry](0024-direct-camera-entry.md)
 - [0025: Global UI preferences without persistence](0025-ui-preference-notifications.md)
+
+- [0026: Complete reusable UI theme tokens](0026-complete-ui-theme-tokens.md)

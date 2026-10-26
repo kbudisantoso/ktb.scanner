@@ -80,6 +80,9 @@ export function createScanner(options: ScannerOptions): ScannerController {
       const restoreFocus = document.activeElement as HTMLElement | null;
       const host = document.createElement('div');
       host.className = 'scanner-backdrop';
+      for (const [name, value] of Object.entries(options.theme ?? {})) {
+        if (name.startsWith('--scanner-')) host.style.setProperty(name, value);
+      }
       options.mount.append(host);
       const root = createRoot(host),
         abort = new AbortController();

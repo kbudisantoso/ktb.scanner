@@ -568,7 +568,13 @@ export function ScannerView({
       lang={options.locale ?? 'en'}
       tabIndex={-1}
       onKeyDown={keyboard}
-      style={options.theme as React.CSSProperties}
+      style={
+        {
+          ...options.theme,
+          '--scanner-camera-focus':
+            options.theme?.['--scanner-camera-focus'] ?? options.theme?.['--scanner-focus'],
+        } as React.CSSProperties
+      }
     >
       <header className="scanner-header">
         <div>

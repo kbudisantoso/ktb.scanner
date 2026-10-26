@@ -143,6 +143,8 @@ for (const theme of ['forest', 'ink'])
       await page.getByRole('button', { name: /^Seitenübersicht/ }).click();
       await expect(page.locator('.scanner-pages article')).toHaveCount(2);
       await fits(page, '.scanner');
+      // Blob preview URLs mount after the page cards themselves.
+      await expect(page.locator('.scanner-page-tile img')).toHaveCount(2);
       const thumbs = await page.locator('.scanner-page-tile').evaluateAll((nodes) =>
         nodes.map((n) => {
           const r = n.getBoundingClientRect();

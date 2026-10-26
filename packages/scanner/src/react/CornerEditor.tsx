@@ -64,7 +64,8 @@ export function CornerEditor({
           canvas.dataset.position = key === 'topLeft' || key === 'bottomRight' ? 'bottom' : 'top';
           const side = canvas.width,
             zoom = 3;
-          context.fillStyle = '#f4f6f2';
+          context.fillStyle =
+            tokens.getPropertyValue('--scanner-loupe-background').trim() || '#f4f6f2';
           context.fillRect(0, 0, side, side);
           context.drawImage(
             image,
@@ -77,7 +78,8 @@ export function CornerEditor({
             side,
             side,
           );
-          context.strokeStyle = '#137458';
+          context.strokeStyle =
+            tokens.getPropertyValue('--scanner-loupe-crosshair').trim() || '#137458';
           context.lineWidth = 2;
           context.beginPath();
           context.moveTo(side / 2, 0);
