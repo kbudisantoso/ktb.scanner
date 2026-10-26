@@ -29,7 +29,7 @@ import { useBlobUrl } from './hooks.ts';
 import { CornerEditor } from './CornerEditor.tsx';
 import { CameraView } from './CameraView.tsx';
 import { ShutterSound } from '../shutter-sound.ts';
-import { SHUTTER_SOUNDS } from '../sounds.ts';
+import { resolveShutterSoundUrl } from '../sounds.ts';
 type Edit = Pick<PageDraft, 'recipe' | 'format' | 'rotation' | 'corners' | 'edgesUncertain'>;
 const editOf = ({ recipe, format, rotation, corners, edgesUncertain }: PageDraft): Edit =>
   structuredClone({ recipe, format, rotation, corners, edgesUncertain });
@@ -110,10 +110,7 @@ export function ScannerView({
         ?.focus();
   }, [activePageIndex, pageActions]);
   const shutter = useRef<ShutterSound | null>(null);
-  const soundFile = SHUTTER_SOUNDS.find(
-    (sound) => sound.id === (options.shutterSound ?? 'camera'),
-  )?.file;
-  const shutterUrl = soundFile ? `${options.assetBaseUrl.replace(/\/$/, '')}/${soundFile}` : null;
+  const shutterUrl = resolveShutterSoundUrl(options);
   const prepareSound = () => {
     if (!shutterUrl) return;
     (shutter.current ??= new ShutterSound(shutterUrl)).prepare();

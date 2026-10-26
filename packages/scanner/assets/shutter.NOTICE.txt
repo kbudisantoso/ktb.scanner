@@ -1,11 +1,15 @@
-iPhone Camera Capture (Pixabay sound effect 6448)
-Artist: pooky1 (Freesound); uploader: freesound_community
-Source: https://pixabay.com/sound-effects/film-special-effects-iphone-camera-capture-6448/
-Download: https://cdn.pixabay.com/download/audio/2021/08/04/audio_96dec480f3.mp3
-Retrieved: 2026-10-18
-License: Pixabay Content License
-License summary: https://pixabay.com/service/license-summary/
-Binding terms: https://pixabay.com/service/terms/
+Camera Shutter
+Creator: roachpowder
+Freesound ID: 170229
+Source: https://freesound.org/people/roachpowder/sounds/170229/
+Download: https://cdn.freesound.org/previews/170/170229_3133582-hq.mp3
+Retrieved and CC0 designation verified: 2026-10-26
+License: CC0-1.0 (Creative Commons Zero 1.0 Universal)
+License: https://creativecommons.org/publicdomain/zero/1.0/
+Full legal text: CC0-1.0.LICENSE
+SHA-256: b5c29f81b6daedb089273859ce88575549154cbe33fb13d37c12795364f95a5f
 
-Used as an integrated camera shutter cue. Do not redistribute as a standalone
-sound collection. The upstream sound file is unchanged.
+Project label: Sharp click. Catalog ID: camera.
+The publicly supplied HQ MP3 preview is included unchanged. The source page
+describes a Canon T2i shutter; its original AIFF file is not included.
+Credit is preserved voluntarily; no endorsement by the creator is implied.

@@ -26,6 +26,12 @@ for (const app of ['demo-next', 'demo-astro']) {
   const root = `apps/${app}/public`;
   const text = await readFile(`${root}/third-party-notices.txt`, 'utf8');
   assert(text.includes(license) && text.includes(notice), `${app}: project notices missing`);
+  assert(text.includes(await readFile(`${base}/CC0-1.0.LICENSE`, 'utf8')));
+  assert(!text.includes('Pixabay Content License'), `${app}: retired media notices remain`);
+  assert.deepEqual(
+    (await readdir(`${root}/scanner-assets`)).filter((file) => file.endsWith('.mp3')).sort(),
+    ['reflex.mp3', 'shutter.mp3'],
+  );
   assert.equal(await readFile(`${root}/scanner-assets/ktb-scanner.LICENSE`, 'utf8'), license);
   assert.equal(await readFile(`${root}/scanner-assets/ktb-scanner.NOTICE`, 'utf8'), notice);
   for (const file of (await readdir(base)).filter((name) => name.endsWith('.NOTICE.txt')))

@@ -5,11 +5,12 @@ Project source is licensed under the GNU Affero General Public License,
 version 3 only (SPDX: AGPL-3.0-only). See LICENSE for the full text.
 The software is provided without warranty as described in that license.
 
-Third-party components and media retain their own licenses. This project
-license does not relicense the integrated Pixabay audio clips. Preserve
-all individual *.NOTICE.txt files and upstream code license texts supplied
-under dist/assets/. Audio is supplied as integrated scanner feedback, not
-as a standalone sound collection.
+Third-party components retain their own licenses. The two integrated capture
+recordings are CC0-1.0: Camera Shutter by roachpowder (Freesound 170229)
+and Pentax MZ-7 Shutter by AudioSea (Freesound 645335).
+Preserve their individual *.NOTICE.txt attributions and the complete
+CC0-1.0.LICENSE text supplied under dist/assets/, alongside upstream code
+license texts. CC0 audio is not relicensed as AGPL project source.
 
 Supplemental Rust/WASM notices are in third-party/scanic-wasm/ in the library
 package and dist/assets/third-party/scanic-wasm/ in the controlled assets.

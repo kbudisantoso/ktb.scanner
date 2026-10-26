@@ -23,7 +23,10 @@ for (const host of ['next', 'astro']) {
       expect(text).toContain('react-dom@19.3.1 / LICENSE');
       expect(text).toContain('wasm-bindgen 0.2.100');
       expect(text).toContain('UNICODE LICENSE V3');
-      expect(text).toContain('Pixabay Content License');
+      expect(text).toContain('CC0-1.0');
+      expect(text).toContain('roachpowder');
+      expect(text).toContain('AudioSea');
+      expect(text).not.toContain('Pixabay Content License');
       expect(text).not.toMatch(/\/Users\/|\/home\/runner\//);
       if (host === 'next') {
         expect(text).toContain('pdfjs-dist@6.4.299 / LICENSE');

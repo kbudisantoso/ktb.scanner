@@ -1,5 +1,6 @@
 import { acceptPage } from './helpers';
 import { build } from 'esbuild';
+import { readFile } from 'node:fs/promises';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 import { tool } from './helpers';
@@ -27,6 +28,62 @@ test.beforeEach(async ({ page }) => {
   await page.addScriptTag({ type: 'module', content: harness });
   await expect.poll(() => page.evaluate(() => !!(window as any).reactHarness)).toBe(true);
 });
+
+for (const sound of ['camera', 'off'] as const) {
+  test(`host-owned capture audio/${sound}: custom URL is decoded or stays completely silent`, async ({
+    page,
+  }) => {
+    const requests: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('.mp3')) requests.push(new URL(request.url()).pathname);
+    });
+    await page.route('**/custom-capture.mp3', async (route) =>
+      route.fulfill({
+        contentType: 'audio/mpeg',
+        body: await readFile('packages/scanner/assets/reflex.mp3'),
+      }),
+    );
+    await page.evaluate((sound) => {
+      const h = (window as any).reactHarness;
+      h.audio = { contexts: 0, duration: 0 };
+      const Native = window.AudioContext;
+      window.AudioContext = class extends Native {
+        constructor() {
+          super();
+          h.audio.contexts++;
+        }
+      };
+      const decode = Native.prototype.decodeAudioData;
+      Native.prototype.decodeAudioData = async function (bytes) {
+        const result = await decode.call(this, bytes);
+        h.audio.duration = result.duration;
+        return result;
+      };
+      h.mount = document.body.appendChild(document.createElement('div'));
+      h.controller = h.createScanner({
+        mount: h.mount,
+        assetBaseUrl: '/scanner-assets/',
+        shutterSound: sound,
+        shutterSoundUrl: '/custom-capture.mp3',
+      });
+      h.promise = h.controller.open();
+    }, sound);
+    await expect(page.locator('.scanner')).toBeVisible();
+    if (sound !== 'off')
+      await expect
+        .poll(() => page.evaluate(() => (window as any).reactHarness.audio.duration))
+        .toBeGreaterThan(0);
+    await page.evaluate(async () => {
+      const h = (window as any).reactHarness;
+      await h.controller.destroy();
+      await h.promise;
+    });
+    expect(requests).toEqual(sound === 'off' ? [] : ['/custom-capture.mp3']);
+    expect(await page.evaluate(() => (window as any).reactHarness.audio.contexts)).toBe(
+      sound === 'off' ? 0 : 1,
+    );
+  });
+}
 for (const [configured, requested, expected] of [
   [undefined, undefined, 'Auto'],
   ['photo', undefined, 'Foto'],

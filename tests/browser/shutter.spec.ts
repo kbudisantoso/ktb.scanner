@@ -41,7 +41,8 @@ test('all local cues can be previewed before opening the scanner', async ({ page
     .evaluateAll((options) =>
       options.map((o) => (o as HTMLOptionElement).value).filter((id) => id !== 'off'),
     );
-  expect(sounds).toHaveLength(12);
+  expect(await choices.locator('option').count()).toBe(3);
+  expect(sounds).toEqual(['camera', 'reflex']);
   for (const sound of sounds) {
     await page.getByRole('combobox', { name: 'Aufnahmeton', exact: true }).selectOption(sound);
     await page.getByRole('button', { name: 'Ton anhören', exact: true }).click();
@@ -64,17 +65,9 @@ test('all local cues can be previewed before opening the scanner', async ({ page
 
 for (const [mode, sound] of [
   ['manual', 'camera'],
-  ['auto', 'deepscan'],
-  ['manual', 'soul'],
-  ['manual', 'notification'],
-  ['manual', 'xylophone'],
-  ['manual', 'beep'],
-  ['manual', 'warp'],
-  ['manual', 'powerdown'],
-  ['manual', 'instant'],
-  ['manual', 'teleport'],
-  ['manual', 'transformer'],
-  ['manual', 'electric'],
+  ['auto', 'camera'],
+  ['manual', 'reflex'],
+  ['auto', 'reflex'],
 ] as const)
   test(`${mode}/${sound}: shutter freezes and sounds before encoding; photo remains during processing`, async ({
     page,

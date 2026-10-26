@@ -137,6 +137,8 @@ export interface ScannerOptions {
   defaultProfile?: ScanProfile;
   imageType?: ImageMime;
   shutterSound?: ShutterSoundId;
+  /** Host-owned audio URL overriding the selected cue. 'off' always stays silent. */
+  shutterSoundUrl?: string;
   createPdf?: boolean;
   includeOriginals?: boolean;
   diagnostics?: DiagnosticOptions;

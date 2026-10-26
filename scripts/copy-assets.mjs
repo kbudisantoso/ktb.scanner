@@ -1,4 +1,4 @@
-import { cp, copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { resolve, dirname } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -11,23 +11,15 @@ const files = [
   'ktb-scanner.LICENSE',
   'ktb-scanner.NOTICE',
   'versions.json',
-  ...[
-    'shutter',
-    'deepscan',
-    'soul',
-    'notification',
-    'xylophone',
-    'beep',
-    'warp',
-    'powerdown',
-    'instant',
-    'teleport',
-    'transformer',
-    'electric',
-  ].flatMap((name) => [`${name}.mp3`, `${name}.NOTICE.txt`]),
+  ...(await readdir('packages/scanner/dist/assets'))
+    .filter((name) => /\.(mp3|NOTICE\.txt)$/.test(name) || name === 'CC0-1.0.LICENSE')
+    .sort(),
 ];
 for (const app of ['demo-next', 'demo-astro']) {
   const target = `apps/${app}/public/scanner-assets`;
+  // This is a build-owned directory. Remove retired assets as well as copying
+  // current ones; host-owned custom sounds belong outside this directory.
+  await rm(target, { recursive: true, force: true });
   await mkdir(target, { recursive: true });
   const hashes = {};
   for (const file of files) {

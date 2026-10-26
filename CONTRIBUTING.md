@@ -44,7 +44,7 @@ The full build produces the library, copies assets and builds both hosts. Browse
 
 Headless Firefox on Linux needs an available audio backend for native Web Audio tests. CI starts PulseAudio with a virtual null sink; output stays muted and no hardware speaker is required. Use an equivalent audio backend when reproducing these tests on a headless Linux machine.
 
-`pnpm licenses:inventory` records the resolved production dependencies locally. Preserve third-party license notices, including the separate Pixabay audio terms. Do not assume the source-code license relicenses media.
+`pnpm licenses:inventory` records the resolved production dependencies locally. Preserve third-party license notices, including CC0 audio attribution and the full CC0 dedication. Do not assume the source-code license relicenses media.
 
 ## Community
 

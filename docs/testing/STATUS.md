@@ -1,6 +1,16 @@
 # Implementation and verification status
 
-Updated 25 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+
+## CC0 capture audio and host-owned URLs, 26 October 2026
+
+D-040 replaces the previous twelve-clip catalog with silence and two CC0 recordings: roachpowder's Camera Shutter and AudioSea's Pentax MZ-7 Shutter. Exact public HQ MP3 bytes, creator/source/date/checksum notices and full CC0 text are supplied. The NoTomorrow12 candidate remains a link-only alternative after the later roachpowder preference. Previous Pixabay files/notices are retained byte-for-byte only in ignored `local-assets/sounds/pixabay/`; the current tree and built/package assets exclude them. Earlier Git history is unchanged. D-041 accepts jsPDF's upstream MIT declaration and preserves its historical MD5 attribution as informational uncertainty, without a further clearance requirement.
+
+`shutterSoundUrl` supports host-owned audio without changing the library/catalog. Controller and React use the same URL resolution; `off` creates neither a request nor an AudioContext, including when an override is configured. Relative HTTP(S), absolute HTTP(S) and Blob URLs are allowed; unsupported schemes and retired catalog IDs fail before audio opens. Generated host assets are rebuilt so stale retired sounds cannot remain publicly served. See [sound integration and credits](../SOUNDS.md).
+
+Both hosts/library built, all 161 native tests and three Vitest checks passed, as did typecheck, formatting, document links and delivered-notice checks. The independent archive gate verified 179 files and exactly two MP3s with CC0 notices and matching source hashes. All 24 archived original files match their local checksum inventory; every current source/generated asset directory contains only the two CC0 clips.
+
+The focused Chromium/WebKit/mobile-WebKit audio/notice run passed 22 cases with eight deliberate WebKit synthetic-camera exceptions. It exercises all three choices, real muted preview playback, both sounds under Auto/Manual in Chromium, exact frame/audio timing, and delivered attribution texts. Nine additional final-build URL/configuration cases passed in those three profiles without skips/retries, verifying native custom-URL decoding, no built-in fallback request, explicit silence and configuration errors. Physical sound output remained muted throughout. Firefox and a complete four-browser regression were not repeated for this change; physical iPhone/Android acceptance remains separate.
 
 ## Browser-language selection in the demos, 25 October 2026
 

@@ -8,7 +8,7 @@ import { ScannerError } from '../errors.ts';
 import { resolveLimits } from '../session.ts';
 import { assetUrl } from '../worker-client.ts';
 import { ScannerView } from './ScannerView.tsx';
-import { SHUTTER_SOUNDS } from '../sounds.ts';
+import { resolveShutterSoundUrl } from '../sounds.ts';
 import { resolvePaperPreference } from '../paper-region.ts';
 export type { ScannerOptions, ScannerController } from '../types.ts';
 export function createScanner(options: ScannerOptions): ScannerController {
@@ -21,13 +21,13 @@ export function createScanner(options: ScannerOptions): ScannerController {
     !options.assetBaseUrl ||
     (options.imageType && !['image/jpeg', 'image/png'].includes(options.imageType)) ||
     (options.initialMode && !['auto', 'manual'].includes(options.initialMode)) ||
-    (options.paperRegion !== undefined && !/^[a-z]{2}$/i.test(options.paperRegion)) ||
-    (options.shutterSound && !SHUTTER_SOUNDS.some((sound) => sound.id === options.shutterSound))
+    (options.paperRegion !== undefined && !/^[a-z]{2}$/i.test(options.paperRegion))
   )
     throw new ScannerError(
       'CONFIG_INVALID',
       'Bitte Mount, Assetpfad, Bildformat, Aufnahmemodus und Papierregion prüfen.',
     );
+  resolveShutterSoundUrl(options);
   assetUrl(options.assetBaseUrl, 'processing.worker.js');
   let disposed = false;
   let active: { finish: (result: ScanResult) => void } | undefined;

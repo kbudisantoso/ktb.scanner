@@ -300,7 +300,8 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `autoCaptureStabilityMs` | 1,000; any integer **100-5,000 ms**, with a per-open override. Demo presets are 400/600/800/1,000/1,200/1,500/2,000 ms |
 | `imageType` | `image/jpeg` at 0.92; `image/png` is also supported |
 | `createPdf` | `true`; raster PDF without searchable OCR text |
-| `shutterSound` | `camera`; twelve local cues or `off` for no sound/context/request |
+| `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no sound/context/request |
+| `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` stays silent. See [custom audio](docs/SOUNDS.md) |
 | `paperRegion` | Optional ISO region as a weak A4/Letter prior; no GPS/IP permission |
 | `theme` | Semantic `--scanner-*` CSS variables |
 | `includeOriginals` | `false`; original bytes/EXIF are returned only when explicitly enabled |
@@ -357,6 +358,6 @@ Further documentation: [package API](packages/scanner/README.md), [requirements]
 
 ## License
 
-Project source is [GNU AGPL version 3](LICENSE), SPDX `AGPL-3.0-only`. Third-party code/media retain their own licenses and notices. Integrated Pixabay audio is not relicensed under AGPL and must not be distributed as a standalone sound collection. Preserve dependency/media notices when distributing the package. See [dependencies](docs/DEPENDENCIES.md).
+Project source is [GNU AGPL version 3](LICENSE), SPDX `AGPL-3.0-only`. Third-party code/media retain their own licenses and notices. The two supplied capture recordings are CC0-1.0, with creator/source attributions and the full dedication included. Preserve dependency/media notices when distributing the package. See [dependencies](docs/DEPENDENCIES.md).
 
-The [third-party audit](docs/testing/LICENSE-AUDIT.md) records the verified distribution checks and remaining media-license question. Both reference hosts link their generated full license collection and project source. `pnpm check:notices` verifies delivered notice text after building.
+The [third-party audit](docs/testing/LICENSE-AUDIT.md) records the verified distribution checks and replacement of restricted audio with CC0 recordings. Both reference hosts link their generated full license collection and project source. `pnpm check:notices` verifies delivered notice text after building.

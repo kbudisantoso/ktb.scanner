@@ -30,6 +30,7 @@ export async function writeHostNotices(app) {
   const add = async (label, path) => sections.push(`${label}\n\n${await readFile(path, 'utf8')}`);
   for (const file of ['LICENSE', 'NOTICE']) await add(`ktb.scanner / ${file}`, file);
   const assets = 'packages/scanner/dist/assets';
+  await add('Capture audio / CC0-1.0.LICENSE', join(assets, 'CC0-1.0.LICENSE'));
   for (const file of (await readdir(assets)).filter((name) => name.endsWith('.NOTICE.txt')).sort())
     await add(`Capture audio / ${file}`, join(assets, file));
   for (const path of await noticesIn(join(assets, 'licenses'), true))

@@ -26,7 +26,8 @@ await copyFile('LICENSE', 'dist/assets/ktb-scanner.LICENSE');
 await copyFile('NOTICE', 'dist/assets/ktb-scanner.NOTICE');
 await cp('third-party', 'dist/assets/third-party', { recursive: true });
 for (const file of await readdir('assets')) {
-  if (/\.(mp3|NOTICE\.txt)$/.test(file)) await copyFile(`assets/${file}`, `dist/assets/${file}`);
+  if (/\.(mp3|NOTICE\.txt|LICENSE)$/.test(file))
+    await copyFile(`assets/${file}`, `dist/assets/${file}`);
 }
 // The version-checked debug adaptation exposes existing buffers; ML is never activated.
 const scanicRoot = resolve(dirname(require.resolve('scanic')), '..');
