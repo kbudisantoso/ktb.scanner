@@ -1,0 +1,38 @@
+Supplemental notices for the classical WASM embedded in Scanic 1.7.1
+
+Upstream package source commit:
+https://github.com/marquaye/scanic/tree/dec0cd018899a7e1c5d8f4880223f0e54941f616
+
+The upstream dev/Dockerfile specifies Rust 1.92. Its wasm_blur/Cargo.lock
+specifies wasm-bindgen 0.2.100, cfg-if 1.0.1 and once_cell 1.21.3.
+The adjacent files preserve the original upstream notices for these runtime
+components, Rust and Rust's Unicode data. For components dual-licensed under
+MIT OR Apache-2.0, the MIT option is used; Rust's Apache text is also retained.
+Unicode data retains Unicode-3.0. Scanic's own MIT license is supplied separately.
+
+This is a conservative source-based notice collection. It is not an attested
+binary composition report from the upstream publisher. Build-only Rust macro
+dependencies and unused Scanic ML/ONNX resources are not represented as shipped
+runtime components.
+
+Original notice sources, checked 26 October 2026:
+
+wasm-bindgen 0.2.100:
+https://github.com/rustwasm/wasm-bindgen/blob/0.2.100/LICENSE-MIT
+
+cfg-if 1.0.1:
+https://static.crates.io/crates/cfg-if/cfg-if-1.0.1.crate
+Archive SHA-256, matched against Scanic's Cargo.lock:
+9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268
+
+once_cell 1.21.3:
+https://github.com/matklad/once_cell/blob/v1.21.3/LICENSE-MIT
+
+Rust 1.92.0:
+https://github.com/rust-lang/rust/blob/1.92.0/LICENSE-MIT
+https://github.com/rust-lang/rust/blob/1.92.0/LICENSE-APACHE
+https://github.com/rust-lang/rust/blob/1.92.0/COPYRIGHT
+https://github.com/rust-lang/rust/blob/1.92.0/LICENSES/Unicode-3.0.txt
+
+Rust's license-metadata.json identifies the Unicode data separately:
+https://github.com/rust-lang/rust/blob/1.92.0/license-metadata.json

@@ -36,6 +36,8 @@ jobs:
       - run: pnpm test
       - run: pnpm check:docs
       - run: pnpm check:package
+      - run: pnpm licenses:inventory
+      - run: pnpm check:notices
 
   browser:
     name: Browser (${{ matrix.project }})

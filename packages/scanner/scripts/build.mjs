@@ -1,7 +1,7 @@
 import { instrumentScanic } from './instrument-scanic.mjs';
 import { collectNotices } from './notices.mjs';
 import { build } from 'esbuild';
-import { copyFile, mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
+import { cp, copyFile, mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 const require = createRequire(import.meta.url);
@@ -10,6 +10,7 @@ const common = {
   format: 'esm',
   target: 'es2022',
   sourcemap: true,
+  legalComments: 'eof',
   platform: 'browser',
   logLevel: 'info',
 };
@@ -21,6 +22,9 @@ await build({
   external: ['react', 'react-dom/client', 'react/jsx-runtime', 'scanic', 'jspdf'],
 });
 await mkdir('dist/assets', { recursive: true });
+await copyFile('LICENSE', 'dist/assets/ktb-scanner.LICENSE');
+await copyFile('NOTICE', 'dist/assets/ktb-scanner.NOTICE');
+await cp('third-party', 'dist/assets/third-party', { recursive: true });
 for (const file of await readdir('assets')) {
   if (/\.(mp3|NOTICE\.txt)$/.test(file)) await copyFile(`assets/${file}`, `dist/assets/${file}`);
 }

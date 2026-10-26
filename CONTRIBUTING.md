@@ -34,6 +34,8 @@ pnpm lint
 pnpm test
 pnpm check:docs
 pnpm check:package
+pnpm licenses:inventory
+pnpm check:notices
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 ```

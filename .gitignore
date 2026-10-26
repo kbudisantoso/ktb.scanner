@@ -16,6 +16,7 @@ artifacts/local/
 apps/*/public/scanner-assets/
 apps/*/public/pdf.worker.min.mjs
 apps/*/public/pdfjs.LICENSE
+apps/*/public/third-party-notices.txt
 apps/demo-next/next-env.d.ts
 .certificates/
 

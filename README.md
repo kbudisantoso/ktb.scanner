@@ -358,3 +358,5 @@ Further documentation: [package API](packages/scanner/README.md), [requirements]
 ## License
 
 Project source is [GNU AGPL version 3](LICENSE), SPDX `AGPL-3.0-only`. Third-party code/media retain their own licenses and notices. Integrated Pixabay audio is not relicensed under AGPL and must not be distributed as a standalone sound collection. Preserve dependency/media notices when distributing the package. See [dependencies](docs/DEPENDENCIES.md).
+
+The [third-party audit](docs/testing/LICENSE-AUDIT.md) records the verified distribution checks and remaining media-license question. Both reference hosts link their generated full license collection and project source. `pnpm check:notices` verifies delivered notice text after building.

@@ -8,6 +8,7 @@
     "dist",
     "src",
     "scripts",
+    "third-party",
     "tsconfig.build.json",
     "README.md",
     "LICENSE",

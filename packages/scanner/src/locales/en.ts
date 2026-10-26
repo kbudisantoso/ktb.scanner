@@ -1,5 +1,7 @@
 export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   Anpassen: 'Adjust',
+  Lizenzen: 'Licenses',
+  Quellcode: 'Source code',
   '100 Prozent': '100 percent',
   '90° drehen': 'Rotate 90°',
   Abbrechen: 'Cancel',

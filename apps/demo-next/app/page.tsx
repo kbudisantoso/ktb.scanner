@@ -254,7 +254,16 @@ export default function Page() {
           {result && (
             <button onClick={() => setResultVisible(true)}>{t('Letztes Ergebnis öffnen')}</button>
           )}
-          <p className="privacy">{t('Lokal im Browser · kein Upload.')}</p>
+          <p className="privacy">
+            {t('Lokal im Browser · kein Upload.')}{' '}
+            <a href="/third-party-notices.txt" target="_blank" rel="noreferrer">
+              {t('Lizenzen')}
+            </a>
+            {' · '}
+            <a href="https://github.com/kbudisantoso/ktb.scanner" target="_blank" rel="noreferrer">
+              {t('Quellcode')}
+            </a>
+          </p>
         </div>
       </section>
       <aside

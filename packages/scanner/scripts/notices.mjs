@@ -1,7 +1,7 @@
 import { readFile, readdir, mkdir, copyFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve, join } from 'node:path';
 import { createRequire } from 'node:module';
-async function packageRoot(name, from) {
+export async function packageRoot(name, from) {
   const require = createRequire(join(from, 'package.json'));
   let directory;
   try {
@@ -35,9 +35,14 @@ export async function collectNotices() {
     seen.add(id);
     const target = resolve('dist/assets/licenses', id.replaceAll('/', '__'));
     await mkdir(target, { recursive: true });
-    const notices = (await readdir(root)).filter((file) =>
-      /^(licen[cs]e|notice|copying)([._-]|$)/i.test(file),
-    );
+    const notices = (await readdir(root, { withFileTypes: true }))
+      .filter(
+        (file) =>
+          file.isFile() && /^(licen[cs]e|notice|copying|copyright)([._-]|$)/i.test(file.name),
+      )
+      .map((file) => file.name)
+      .sort();
+    if (!notices.length) throw new Error(`License notices missing for ${id}`);
     for (const notice of notices) await copyFile(join(root, notice), join(target, notice));
     inventory.push({
       name: metadata.name,

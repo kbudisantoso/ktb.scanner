@@ -21,6 +21,10 @@ Scanic 1.7.1 provides scanDocument, extractDocument and createCornerEditor with 
 
 jsPDF supplies raster images/page operations; PDF.js independently renders generated files. `pnpm licenses:inventory` writes the resolved production inventory to ignored `artifacts/local/licenses.json`. Library builds collect transitive notices under `dist/assets/licenses/` with an inventory. Host copying includes Scanic/PDF.js notices. Inspect the actual packed archive before distribution with `pnpm check:package`. Notice discovery includes hyphenated filenames such as stackblur-canvas `LICENSE-MIT.txt`; the archive gate rejects dependencies with missing notice files.
 
+Supplemental Rust/WASM notices accompany the classic Scanic engine under `third-party/scanic-wasm/`. Both examples generate `/third-party-notices.txt` for their bundled React/framework/PDF.js code and link the full notices and project source. The asset tree includes the project license and NOTICE. `pnpm check:notices` verifies these delivered copies after a build. See the [licensing audit](testing/LICENSE-AUDIT.md) for exact scope, host/native dependencies and the unresolved free-content boundary of Pixabay audio.
+
+The installed jsPDF bundle also preserves a historical MD5 attribution without an explicit original-author license. Its independent provenance clearance remains unverified; the package's MIT declaration is not presented as proof resolving that question. See the audit for the checked primary sources.
+
 ## Integrated media
 
 Twelve unchanged local Pixabay cues retain separate media terms; they are not AGPL/MIT source assets. Product display labels come from `SHUTTER_SOUNDS`; original titles/artists below preserve provenance. Silence is always available. No API key/external audio request is required at runtime. Do not redistribute as a standalone sound collection. Preserve supplied notices, the [Pixabay license summary](https://pixabay.com/service/license-summary/) and [binding terms](https://pixabay.com/service/terms/).
@@ -43,3 +47,5 @@ Twelve unchanged local Pixabay cues retain separate media terms; they are not AG
 ## Security audit
 
 Next.js was updated from 16.3.8 to pinned 16.4.1 after the 23 October audit reported [SVG optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw), [Server Actions denial of service](https://github.com/advisories/GHSA-p3m5-59mp-jv5r) and [typed-array use-cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) advisories. The repeat production audit on 24 October 2026 reports zero known vulnerabilities in every severity. This describes the resolved tree at that time, not a general security guarantee. Recheck after dependency changes.
+
+The 26 October 2026 audit of the updated complete dependency tree, including development packages, also reported zero known vulnerabilities in every severity. Its scope and remaining licensing questions are recorded in the audit above.

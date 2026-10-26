@@ -10,6 +10,8 @@ One TypeScript package provides the DOM-free `@ktb/scanner` core and separate `/
 
 Classic Scanic 1.7.1 runs behind an adapter in a module worker. Build-time instrumentation checks the exact version and unique source anchors before exposing existing debug buffers and an optional candidate-selection callback. It fails closed on source drift. The installed vendor package is unchanged. Classic WASM is embedded in the distributed Scanic build; no ML mode or CDN fallback is activated. The corner editor loads on demand. jsPDF creates PDFs in a separate export worker; PDF.js belongs only to the reference preview.
 
+Controlled assets carry the project license/NOTICE, dependency notices and supplemental Rust/WASM notices. Worker builds preserve bundled legal comments. Both reference hosts generate and link full notice collections and project source, including their React/framework and applicable PDF.js notices. Archive and delivered-notice checks run in CI; the [licensing audit](testing/LICENSE-AUDIT.md) records source/provenance limits and the separate restricted-media question.
+
 Core imports must not access React, camera, window or document. UI/engine load after a host action; PDF generation and preview code load only when needed. The library installs no service worker and requires no global cross-origin isolation. Build and integration instructions are in [INTEGRATION.md](INTEGRATION.md).
 
 ## Controller, ownership and session state

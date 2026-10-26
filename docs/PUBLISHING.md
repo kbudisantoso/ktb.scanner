@@ -24,4 +24,6 @@ The package includes built entry points, declarations, source/build scripts, sty
 
 The project source license does not relicense third-party code or the twelve integrated audio clips. Preserve each `*.NOTICE.txt`, Scanic/jsPDF dependency notices and PDF.js notices. Audio is integrated feedback, not a standalone collection. The [Pixabay terms](https://pixabay.com/service/terms/) remain authoritative.
 
+The [third-party audit](testing/LICENSE-AUDIT.md) records the remaining media distribution question: Pixabay clips are restricted assets, so do not claim that every file is freely reusable under the project license. A separate decision is required before describing the full distribution as containing only free software/content. Include supplemental WASM notices and the full project license in controlled assets. Both reference builds generate a linked notice collection; `pnpm check:notices` verifies its contents. A server/container deployment needs a separate inventory of the native dependencies it actually redistributes.
+
 Hosted browser artifacts contain only synthetic test output and expire after seven days. Private diagnostic material is never a CI input. npm publication and public demo deployment remain separate actions from source preparation/publication.

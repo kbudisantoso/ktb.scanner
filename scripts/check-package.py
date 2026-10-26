@@ -18,6 +18,9 @@ with tarfile.open(sys.argv[1], "r:gz") as archive:
         "package/dist/scanic.js", "package/dist/export.js", "package/dist/styles.css",
         "package/dist/assets/processing.worker.js", "package/dist/assets/pdf.worker.js",
         "package/dist/assets/scanic.js", "package/dist/assets/scanic.LICENSE",
+        "package/dist/assets/ktb-scanner.LICENSE", "package/dist/assets/ktb-scanner.NOTICE",
+        "package/dist/assets/third-party/scanic-wasm/NOTICE",
+        "package/third-party/scanic-wasm/NOTICE",
         "package/dist/assets/licenses/inventory.json", "package/src/types.ts",
         "package/src/react/ImageViewer.tsx", "package/scripts/build.mjs",
         "package/scripts/clean.mjs", "package/scripts/instrument-scanic.mjs",
@@ -46,4 +49,11 @@ with tarfile.open(sys.argv[1], "r:gz") as archive:
         for notice in item["notices"]:
             directory = (item["name"] + "@" + item["version"]).replace("/", "__")
             assert f"package/dist/assets/licenses/{directory}/{notice}" in names
+    for name in names:
+        if name.startswith("package/third-party/") and archive.getmember(name).isfile():
+            copied = name.replace("package/third-party/", "package/dist/assets/third-party/", 1)
+            assert copied in names, copied
+            assert archive.extractfile(copied).read() == archive.extractfile(name).read(), copied
+    for filename in ["LICENSE", "NOTICE"]:
+        assert archive.extractfile(f"package/{filename}").read() == archive.extractfile(f"package/dist/assets/ktb-scanner.{filename}").read()
     print(f"Package verified: {len(names)} files, all entry points/sources/notices, 12 integrated cues, no local configuration.")

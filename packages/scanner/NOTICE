@@ -11,5 +11,10 @@ all individual *.NOTICE.txt files and upstream code license texts supplied
 under dist/assets/. Audio is supplied as integrated scanner feedback, not
 as a standalone sound collection.
 
+Supplemental Rust/WASM notices are in third-party/scanic-wasm/ in the library
+package and dist/assets/third-party/scanic-wasm/ in the controlled assets.
+Reference application builds provide third-party-notices.txt, including
+React, host-framework vendored notices and PDF.js notices where applicable.
+
 Complete project source and workspace build inputs:
 https://github.com/kbudisantoso/ktb.scanner
