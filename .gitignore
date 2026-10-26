@@ -21,7 +21,7 @@ apps/*/public/third-party-notices.txt
 apps/demo-next/next-env.d.ts
 .certificates/
 
-# Local working instructions and tool configuration
+# Do not track vibe coding stuff
 **/AGENTS.md
 **/CLAUDE.md
 .agents/
