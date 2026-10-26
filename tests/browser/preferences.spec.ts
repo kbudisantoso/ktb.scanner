@@ -52,7 +52,7 @@ test.beforeEach(async ({ page }) => {
       if (h.failure === 'reject') return Promise.reject(new Error('Synthetic async host failure'));
       if (h.closeOnChange) void h.controller.destroy();
     };
-    h.open = (api: string, locale = 'en', initialFiles?: File[]) => {
+    h.open = (api: string, locale = 'en', initialFiles?: File[], entry?: string) => {
       h.api = api;
       h.abort = new AbortController();
       if (api === 'controller') {
@@ -64,7 +64,7 @@ test.beforeEach(async ({ page }) => {
           onPreferenceChange: (change: any) => h.handle(change, 'controller'),
         });
         h.pending = h.controller
-          .open({ initialFiles, signal: h.abort.signal })
+          .open({ entry, initialFiles, signal: h.abort.signal })
           .then((r: any) => h.results.push(r));
       } else {
         h.root ??= h.createRoot(h.mount);
@@ -82,7 +82,7 @@ test.beforeEach(async ({ page }) => {
                   locale,
                   onPreferenceChange: (change: any) => h.handle(change, handler),
                 },
-                openOptions: { initialFiles, signal: h.abort.signal },
+                openOptions: { entry, initialFiles, signal: h.abort.signal },
                 onResult: (r: any) => h.results.push(r),
                 onError: (e: any) => h.errors.push(e.code),
               }),
@@ -253,12 +253,13 @@ test('invalid select values and duplicate same-turn changes never escape the all
   ]);
 });
 
-test('React callback updates reach the current handler without opening a session or camera again', async ({
+test('React direct-camera callback updates reach the current handler without opening a session or camera again', async ({
   page,
 }) => {
-  await page.evaluate(() => (window as any).preferenceHarness.open('react'));
+  await page.evaluate(() =>
+    (window as any).preferenceHarness.open('react', 'en', undefined, 'camera'),
+  );
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Start camera', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as any).preferenceHarness.requests)).toBe(1);
   await page.evaluate(() => (window as any).preferenceHarness.render(true, 'latest'));
   await dialog.getByRole('combobox', { name: 'Capture mode', exact: true }).selectOption('manual');

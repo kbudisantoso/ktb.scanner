@@ -10,7 +10,9 @@ Local verification: all 44 focused browser cases passed without retries or skips
 
 Frozen install, full library/Next.js/Astro build, 161 native tests, three Vitest checks, four release checks, typecheck, formatting, documentation links, actual 179-file package inspection, delivered notices and diff checks passed. Public declaration checks compile valid discriminated callback uses from both entry points and reject invalid mode/export/page-edit values. Both new integration host examples were separately typechecked against the built public declarations, with a bundler-style CSS module declaration. This is a focused local run, not a new full browser matrix or physical iPhone/Android/assistive-technology acceptance. Hosted PR checks remain separate.
 
-Reproduce after building with `pnpm exec playwright test tests/browser/preferences.spec.ts --workers=4`.
+After integrating the direct-camera entry, the combined preference, entry, React API and lifecycle run passed all 160 cases in the four browser profiles, without skips or retries. This includes direct-camera callback updates without reinitialization and the existing twenty-cycle worker/preview cleanup checks. The two integration APIs and both public type additions were verified together.
+
+Reproduce after building with `pnpm exec playwright test tests/browser/preferences.spec.ts tests/browser/entry.spec.ts tests/browser/react-api.spec.ts tests/browser/lifecycle.spec.ts --workers=4`.
 
 ## Direct camera entry, 26 October 2026
 
