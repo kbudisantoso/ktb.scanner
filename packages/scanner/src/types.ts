@@ -125,6 +125,9 @@ export interface Limits {
   resultBytes: number;
   workingBytes: number;
 }
+/** A changed global UI preference. Reapply through initialMode/imageType on a later open. */
+export type ScannerPreferenceChange =
+  { preference: 'initialMode'; value: CaptureMode } | { preference: 'imageType'; value: ImageMime };
 export interface ScannerOptions {
   mount: HTMLElement;
   assetBaseUrl: string;
@@ -136,6 +139,8 @@ export interface ScannerOptions {
   /** ISO region used only as a weak A4/Letter prior; otherwise the primary browser locale. */
   paperRegion?: string;
   initialMode?: CaptureMode;
+  /** Real UI changes only, including sessions later cancelled. No persistence is performed. */
+  onPreferenceChange?: (change: ScannerPreferenceChange) => void;
   /** Measured stable time before automatic capture. Integer 100..5000 ms; default 1000. */
   autoCaptureStabilityMs?: number;
   defaultProfile?: ScanProfile;

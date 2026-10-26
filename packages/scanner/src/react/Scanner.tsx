@@ -34,7 +34,13 @@ export function Scanner(props: ScannerProps) {
       if (disposed || !mount.current) return;
       setError('');
       try {
-        controller = createScanner({ ...captured.options, mount: mount.current });
+        controller = createScanner({
+          ...captured.options,
+          mount: mount.current,
+          onPreferenceChange: (change) => {
+            if (!disposed) return latest.current.options.onPreferenceChange?.(change);
+          },
+        });
         void controller
           .open(captured.openOptions)
           .then((result) => {

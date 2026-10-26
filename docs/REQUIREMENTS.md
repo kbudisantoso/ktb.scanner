@@ -61,6 +61,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-41 | MUST | Use bounded phone workspaces with fixed actions and focused tools. Previous/Next/Finish exports directly; unreviewed files cannot disappear. Use independently scrollable tiles with minimum readable cover thumbnails. Support fit/100%, steps, pinch/pan, held Before, tool Cancel/Apply, Undo and a detached loupe. Preserve results on return to start; load/render PDF preview on demand. |
 | F-42 | MUST | Allow profile defaults per library configuration and open call, with call > configuration > Auto. A reusable themeable React component and imperative facade share the same encapsulated session/processing implementation. |
 | F-43 | MUST | Offer a typed direct camera entry in both SDK UIs while preserving the default workspace. Nonempty initial files always import without camera access; empty arrays follow the entry. Validate entry before resources. Retain retry/import/cancel after denial and clean abort/destroy/StrictMode/late-stream behavior. |
+| F-44 | MUST | Notify the host of genuine global SDK UI changes to Auto/Manual and JPEG/PNG immediately, including before later cancellation. Report only allowed preference values, never page edits or content/identifiers. No initial/reapply/unchanged/ended-session events; isolate callback failures and use current React callbacks without restarting. Reapply via existing options; durable state stays in the host. |
 
 ## Integration requirements
 

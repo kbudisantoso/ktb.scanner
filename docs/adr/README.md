@@ -28,3 +28,4 @@ Each record separates context, decision, consequences and evidence. Historical v
 - [0023: npm namespace and GitHub release workflow](0023-npm-release-workflow.md)
 
 - [0024: Per-open direct camera entry](0024-direct-camera-entry.md)
+- [0025: Global UI preferences without persistence](0025-ui-preference-notifications.md)

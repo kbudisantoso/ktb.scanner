@@ -300,6 +300,7 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `initialMode` | `auto`; `manual` retains detection but captures only on shutter |
 | `autoCaptureStabilityMs` | 1,000; any integer **100-5,000 ms**, with a per-open override. Demo presets are 400/600/800/1,000/1,200/1,500/2,000 ms |
 | `imageType` | `image/jpeg` at 0.92; `image/png` is also supported |
+| `onPreferenceChange` | Optional notification of real SDK UI changes to `initialMode` / `imageType`, including cancelled sessions; unreleased |
 | `createPdf` | `true`; raster PDF without searchable OCR text |
 | `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no sound/context/request |
 | `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` stays silent. See [custom audio](docs/SOUNDS.md) |
@@ -310,6 +311,8 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `diagnostics` | Omitted/off; opt-in receiver owned by the host |
 
 English is explicit and stable; the library does not silently follow browser language. For German set `locale: 'de'`. `createTranslator('de')` is available from the DOM-free core for a matching host interface. Placeholder values support labels such as `t('Seite {number}', { number: 2 })`. `ImageViewer` also accepts `locale`, `texts`, `image`, optional matching `before`, `alt` and `resetKey`.
+
+The unreleased `onPreferenceChange` option reports real global changes immediately, including before a later cancellation. Its exported `ScannerPreferenceChange` union contains only `{ preference: 'initialMode', value: 'auto' | 'manual' }` or `{ preference: 'imageType', value: 'image/jpeg' | 'image/png' }`. Apply saved values through the existing `initialMode` / `imageType` options on a later opening. Both controller and React `options` use the same callback; React reaches the latest handler without restarting. Initialization, unchanged values and page edits produce no event. Persistence, validation/migration/reset, theme and sound storage belong to the host. See [host preference integration](docs/INTEGRATION.md#global-ui-preferences-unreleased).
 
 Style the reusable UI without duplicating scanner logic:
 

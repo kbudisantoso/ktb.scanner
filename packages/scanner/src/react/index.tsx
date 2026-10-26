@@ -10,4 +10,5 @@ export type {
   ScanProfile,
   OpenOptions,
   ScannerEntry,
+  ScannerPreferenceChange,
 } from '../types.ts';
