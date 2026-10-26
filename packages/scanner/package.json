@@ -52,7 +52,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
-  "description": "Embeddable browser document scanner with React, local image processing and PDF export",
+  "description": "Embeddable document-scanning workflow built on Scanic, with a customizable React UI, reversible image processing and browser-side image/PDF export",
   "repository": {
     "type": "git",
     "url": "https://github.com/kbudisantoso/ktb.scanner.git",

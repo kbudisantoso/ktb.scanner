@@ -1,6 +1,15 @@
 # @ktb/scanner
 
-An embeddable browser library for document capture, image import, review and multi-page raster-PDF export. Originals and results remain in memory. No built-in upload or OCR text layer.
+An embeddable document-scanning workflow for web applications. Built on [Scanic](https://github.com/marquaye/scanic), with a customizable React interface, reversible image processing and browser-side image/PDF export.
+
+Integrate a complete scanner and receive user-confirmed files and structured metadata through one API:
+
+- **Capture workflow:** camera or image import, Auto/Manual capture, stability feedback, independent still-image detection, review, retakes and page management.
+- **Editing:** corner/perspective correction, rotation, output formats and reversible profiles/adjustments with original/before comparison.
+- **Integration:** a framework-independent core, reusable React UI, theme tokens, localization, typed results, cancellation and resource cleanup.
+- **Consistent output:** ordered images, an optional multi-page raster PDF and serializable metadata from the same confirmed page revisions.
+
+Scanic supplies document detection, perspective correction and the corner editor; jsPDF generates PDFs. ktb.scanner combines these libraries with its session, capture, processing and review workflow. Originals and results remain in memory. There is no built-in upload or OCR text layer, and no general detection-quality advantage over Scanic is claimed.
 
 ## Entry points
 
@@ -38,7 +47,7 @@ async function scan(mount: HTMLElement, initialFiles?: File[]) {
 
 `initialFiles` opens review without requesting a camera. `open({ signal })` supports host cancellation and returns `{ status: 'cancelled' }`. Recoverable processing/export errors keep the session open. `destroy()` stops owned tracks and workers and releases preview resources. One session per controller; a destroyed controller cannot reopen. The host owns confirmed image/PDF blobs and serializable metadata.
 
-`locale` defaults to `en`; `de` is built in. Both examples start in German and support English. The standalone `ImageViewer` also accepts `locale`. `createTranslator(locale, texts?)` is exported from the core; existing German message-key overrides and English-text overrides remain supported. Error codes are stable while API messages default to English. See the root [README](../../README.md) for complete demo setup, package installation, asset copying, React/controller integration and result ownership.
+`locale` defaults to `en`; `de` is built in. Both examples default to English, detect a German primary browser language and honor explicit DE/EN selection. The standalone `ImageViewer` also accepts `locale`. `createTranslator(locale, texts?)` is exported from the core; existing German message-key overrides and English-text overrides remain supported. Error codes are stable while API messages default to English. See the root [README](../../README.md) for complete demo setup, package installation, asset copying, React/controller integration and result ownership.
 
 `defaultProfile` accepts `auto`, `photo`, `color`, `grayscale` or `bw`. An `open()` override takes precedence over controller configuration; without either, Auto chooses and applies Photo or Color immediately. Grayscale and soft monochrome remain manual choices. All edits are recalculated from the original. `paperRegion` is a weak regional A4/Letter preference, not a GPS request or a size measurement. Manual paper formats and orientation take precedence; paper axes are separate from 90-degree image rotation.
 

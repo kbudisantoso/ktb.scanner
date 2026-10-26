@@ -1,8 +1,10 @@
 # Implementation contract
 
-Version 0.8, 25 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.8, updated 26 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
+
+The delivery is a complete embeddable scanning workflow covering capture workflow, editing, integration and consistent output (D-039). The package encapsulates the session and review path around Scanic and jsPDF so host developers receive confirmed files and metadata through one integration. Vendor engine responsibilities and ktb.scanner's workflow responsibilities remain explicit; this positioning introduces no additional runtime scope or detection-quality claim.
 
 One TypeScript package provides the DOM-free `@ktb/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
 

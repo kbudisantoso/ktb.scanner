@@ -1,10 +1,12 @@
 # Product requirements
 
-Version 0.8, 25 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
+Version 0.8, updated 26 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
 
 ## Purpose and boundary
 
 People should capture readable document images directly in a host web application, correct them and hand them back without separate scanning software. The scanner is a reusable, themeable library for independent hosts, with a complete Next.js reference and a smaller Astro example. TypeScript/pnpm and explicit adapters follow the established workspace approach; no domain implementation from another application is copied.
+
+The project is positioned as a complete embeddable document-scanning workflow built on Scanic. Its value to host developers covers four areas: capture workflow, editing, integration and consistent output. One integration provides the path from capture/import through review and page management to confirmed images, an optional PDF and structured metadata. Scanic and jsPDF retain their detection/correction and PDF-generation roles; the position does not claim a generally superior detection engine. See D-039 in [decisions](DECISIONS.md).
 
 The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. The host owns authentication, permissions, business records, uploads and subsequent OCR/extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
 

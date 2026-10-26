@@ -1,6 +1,6 @@
 # Initial-version decisions
 
-Updated 25 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
+Updated 26 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
 
 | ID | Decision | Consequences and limits |
 | --- | --- | --- |
@@ -42,6 +42,7 @@ Updated 25 October 2026. These decisions resolve the initial product scope. The 
 | D-036 | Public project preparation follows the established workspace workflow | English public documentation, AGPL source/notices, contribution/security/issue guidance, CI and secret scanning. Local configuration, diagnostics and scratchpad work are excluded. Source publication and npm release are separate; never publish private development history by accident. |
 | D-037 | Configurable measured capture stability | `autoCaptureStabilityMs` is an integer from 100 through 5,000; open call > controller configuration > 1,000 ms. Reference choices: 400/600/800/1,000/1,200/1,500/2,000 ms. Actual fresh observations govern progress and capture, without changing geometry, sharpness or pause thresholds. [ADR 0021](adr/0021-configurable-capture-stability.md). |
 | D-038 | Built-in EN/DE localization | Library and standalone viewer default to English; explicit `locale: 'de'` selects German. Both reference hosts default to English, use German for a German primary browser language, and prioritize explicit `?lang=en` / `?lang=de` selections across reloads. Language, errors, result labels and PDF preview are localized without modifying document blobs. Existing text overrides remain compatible. [ADR 0022](adr/0022-localization-and-library-default.md). |
+| D-039 | Position the project as a complete embeddable scanning workflow | Approved 26 October 2026. Communicate the benefit to host developers in four areas: capture workflow, editing, integration and consistent output. Credit Scanic for detection/correction/editor and jsPDF for PDF generation. The value is the encapsulated path to user-confirmed files and metadata, not a claim of generally superior detection. Keep project/package descriptions and specifications aligned; no additional runtime scope is introduced. |
 
 ## Output and resource defaults
 

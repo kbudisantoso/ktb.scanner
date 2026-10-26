@@ -1,8 +1,21 @@
 # ktb.scanner
 
-A browser document-scanning library with a framework-independent TypeScript core, a themeable React interface and complete Next.js and Astro examples. Capture or import a document, review its edges and appearance, arrange pages, then export images and a multi-page PDF. Processing stays in the browser.
+An embeddable document-scanning workflow for web applications. Built on [Scanic](https://github.com/marquaye/scanic), with a customizable React interface, reversible image processing and browser-side image/PDF export.
+
+Add a complete scanner to your application and receive user-confirmed files and structured metadata through one integration. ktb.scanner handles the capture, review, editing and export workflow, including session state, cancellation and resource cleanup. Processing stays in the browser. A framework-independent TypeScript core, reusable React components and complete Next.js and Astro examples support integration into your own host.
 
 The library defaults to **English** and includes **German**. Both examples default to English and automatically use German when the browser's primary language is German. An explicit DE/EN selection takes precedence. This repository is the open-source library and reference implementation. A separately hosted **KTB Scanner** example will be linked here when available.
+
+## What your application gets
+
+| Area | Benefit |
+| --- | --- |
+| Capture workflow | Camera capture or image import, Auto/Manual modes, stability feedback and independent still-image detection, followed by review, retakes and multi-page management. |
+| Editing | Correct corners, perspective, rotation and output format; apply reversible profiles and image adjustments, with original/before comparison. |
+| Integration | An imperative API and reusable React interface with theme tokens, localization, typed results, cancellation, recoverable errors and resource cleanup. |
+| Consistent output | Ordered image blobs, an optional multi-page PDF and serializable metadata representing the same confirmed page revisions. |
+
+The value is the complete workflow and the integration work it handles for host developers. Detection, automatic format suggestions and image cleanup remain heuristics; no general detection-quality advantage over Scanic is claimed. See [verification and known limits](docs/testing/STATUS.md) for the evidence and outstanding device acceptance.
 
 ## Built on
 
