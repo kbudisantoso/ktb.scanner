@@ -2,6 +2,12 @@
 
 Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Dependency capability review, 26 October 2026
+
+The reported Socket URL, license, dynamic-code, network, installation and React DOM alerts were checked against exact integrity-verified npm archives and the scanner source. The specific React DOM opaque-native-addon allegation is contradicted by the archive: its `static.node.js` entry and implementations are JavaScript, with no `.node` binaries. The remaining capabilities and scope limits are recorded in the [dependency security review](DEPENDENCY-SECURITY.md), including the reported core-js 3.51.0 versus embedded/locked 3.50.0 distinction.
+
+Eight new JPEG/PNG import-to-PDF cases passed in all four browser profiles with external HTTP(S) blocked and no JavaScript `unsafe-eval` permission. Headers apply to worker responses too. No external request was observed in these fixture-driven flows. The PDF itself was downloaded and inspected. Typecheck, formatting and local documentation checks passed. There was no runtime dependency or processing-code change, registry publication or external report submission as part of this review.
+
 ## npm namespace and release workflow, 26 October 2026
 
 D-042 uses the confirmed organization `ktb-tools` and package `@ktb-tools/scanner`. Public imports, both workspace consumers, lockfile, archive inspection and guides use the same name. The release workflow reuses full quality/browser CI and secret scanning for the tagged commit, inspects an actual artifact, and separates candidate building, OIDC publication and GitHub release attachment. The bundled adapter version now follows the package version. See the [first-publication and release procedure](../PUBLISHING.md#registry-release).

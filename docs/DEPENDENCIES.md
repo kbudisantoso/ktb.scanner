@@ -33,6 +33,8 @@ The twelve previous Pixabay downloads and notices are preserved outside versione
 
 ## Security audit
 
+The [dependency capability review](testing/DEPENDENCY-SECURITY.md) explains reported Socket findings, exact upstream sources and a same-origin import/PDF regression test without JavaScript `unsafe-eval`. Capability detection is distinct from behavior in the scanner's actual execution path; the review documents the remaining scope limits.
+
 Next.js was updated from 16.3.8 to pinned 16.4.1 after the 23 October audit reported [SVG optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw), [Server Actions denial of service](https://github.com/advisories/GHSA-p3m5-59mp-jv5r) and [typed-array use-cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) advisories. The repeat production audit on 24 October 2026 reports zero known vulnerabilities in every severity. This describes the resolved tree at that time, not a general security guarantee. Recheck after dependency changes.
 
 The 26 October 2026 audit of the updated complete dependency tree, including development packages, also reported zero known vulnerabilities in every severity. Its scope and accepted licensing policies are recorded in the audit above.
