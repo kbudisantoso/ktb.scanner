@@ -1,6 +1,6 @@
 # Public distribution
 
-Project source is licensed under GNU AGPL version 3 only (`AGPL-3.0-only`), explicitly selected for this project. Full text is in the root and library LICENSE; NOTICE explains third-party boundaries. Workspace and example manifests stay `private: true` to prevent accidental package publication; the library is prepared for public packaging. This does not mean an npm release has occurred.
+Project source is licensed under GNU AGPL version 3 only (`AGPL-3.0-only`), explicitly selected for this project. Full text is in the root and library LICENSE; NOTICE explains third-party boundaries. Workspace and example manifests stay `private: true` to prevent accidental package publication; the library is prepared for public packaging. Version 0.1.0 is published; later source changes are unreleased until a separate versioned release.
 
 Public documentation is English. The library defaults to English with built-in German; both reference applications default to English, detect German browser language and support explicit DE/EN selection. Hosts can override text. Contribution guidance, issue/PR templates, security policy, pinned CI actions, dependency updates and CLI secret scanning follow the established workspace workflow. Application code/infrastructure from other products are not copied.
 
@@ -16,15 +16,15 @@ Create the public repository only after these checks. Enable private vulnerabili
 
 ## Registry release
 
-The confirmed npm organization is **`ktb-tools`**, managed through a personal npm account. The public package is **`@ktb-tools/scanner`**, initially version **0.1.0**. The first registry publication is still pending. GitHub source publication, npm releases and application deployment are separate operations; no workflow deploys a hosted scanner application.
+The confirmed npm organization is **`ktb-tools`**, managed through a personal npm account. The public package is **`@ktb-tools/scanner`**, initially version **0.1.0**. Version 0.1.0 is published from tag `v0.1.0` at `d277d32d6f9df52c6c95dd31e79885ddd3b11793`. Never overwrite that version. GitHub source publication, npm releases and application deployment are separate operations; no workflow deploys a hosted scanner application.
 
 `.github/workflows/publish.yml` publishes when a GitHub release is **published**, not when a draft is saved or a commit is pushed. Tags must exactly match `v<package-version>` and point to a commit on `main`. Stable versions use npm's `latest` channel; semantic prereleases such as `0.2.0-beta.1` must be marked as GitHub prereleases and use `next`. Version numbers are immutable; increase the library version before the next release. Root/example versions do not determine the npm version.
 
 The workflow runs the existing complete quality/browser matrix and secret scan against the tagged commit, builds the archive with pinned pnpm, independently inspects its contents and uploads it with `SHA256SUMS`. A separate job downloads that exact artifact and publishes it using **npm Trusted Publishing (OIDC)**, without dependency installation or lifecycle scripts. Successful publication attaches the archive/checksum to the GitHub release. Repeating a run is accepted only if npm already contains the same SHA-512 archive integrity; a different existing package fails rather than being silently accepted.
 
-### First publication: one-time account setup
+### First publication: historical one-time account setup
 
-npm trusted-publisher configuration requires an existing package. Bootstrap with the real, inspected first release archive; do not publish an empty placeholder or put a publishing token in GitHub.
+The initial 0.1.0 publication is complete. The following records the bootstrap procedure; it is not an instruction to republish 0.1.0. npm trusted-publisher configuration requires an existing package. Bootstrap with the real, inspected first release archive; do not publish an empty placeholder or put a publishing token in GitHub.
 
 1. Enable npm account 2FA and confirm that your account can publish under `ktb-tools`.
 2. Merge/push the reviewed release-workflow and namespace changes to `main`. Ensure `packages/scanner/package.json` contains the intended version and update the changelog with its actual release date when preparing publication.

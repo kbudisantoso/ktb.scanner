@@ -12,6 +12,7 @@ import { errorMessage } from '../errors.ts';
 import type { CaptureMode, Limits, Quad, CaptureHint, LiveDetection, Size } from '../types.ts';
 import type { Translate } from './hooks.ts';
 export function CameraView({
+  signal,
   assetBaseUrl,
   diagnostics,
   limits,
@@ -27,6 +28,7 @@ export function CameraView({
   pageCount,
   t,
 }: {
+  signal: AbortSignal;
   assetBaseUrl: string;
   diagnostics?: DiagnosticOptions;
   limits: Limits;
@@ -68,6 +70,7 @@ export function CameraView({
     [torch, setTorch] = useState(false),
     [torchPending, setTorchPending] = useState(false);
   useEffect(() => {
+    if (signal.aborted) return;
     const abort = new AbortController(),
       engine = createScanicAdapter(assetBaseUrl, diagnostics);
     let timer: ReturnType<typeof setTimeout>,
@@ -310,16 +313,18 @@ export function CameraView({
         setPreviewSize({ width: video.current!.videoWidth, height: video.current!.videoHeight });
         setRunning(true);
         setHasTorch(camera.current.supportsTorch);
-        setDevices(
-          (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput'),
-        );
-        if (active) void tick();
+        const available = await navigator.mediaDevices.enumerateDevices();
+        if (!active) return;
+        setDevices(available.filter((d) => d.kind === 'videoinput'));
+        void tick();
       } catch (err) {
         if (active) setError(errorMessage(err));
       }
     };
     const pause = () => {
       if (document.hidden) {
+        lightRevision.current++;
+        lighting.current = false;
         active = false;
         abort.abort();
         detectionAbort.abort();
@@ -332,10 +337,9 @@ export function CameraView({
         setError(t('Kamera pausiert. Bitte erneut starten.'));
       }
     };
-    document.addEventListener('visibilitychange', pause);
-    void start();
-    return () => {
-      diagnose(diagnostics, 'camera-stop', {});
+    const release = () => {
+      lightRevision.current++;
+      lighting.current = false;
       active = false;
       abort.abort();
       detectionAbort.abort();
@@ -343,6 +347,14 @@ export function CameraView({
       clearInterval(watchdog);
       camera.current.stop();
       engine.destroy();
+    };
+    signal.addEventListener('abort', release, { once: true });
+    document.addEventListener('visibilitychange', pause);
+    void start();
+    return () => {
+      diagnose(diagnostics, 'camera-stop', {});
+      release();
+      signal.removeEventListener('abort', release);
       document.removeEventListener('visibilitychange', pause);
     };
   }, [device, restart]);

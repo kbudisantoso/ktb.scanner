@@ -2,6 +2,16 @@
 
 Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Direct camera entry, 26 October 2026
+
+`OpenOptions.entry` selects the existing workspace (default) or camera in both public UI integrations. Nonempty files take precedence without camera access; empty arrays follow entry. Entry validation, error recovery and session ownership are covered by [ADR 0024](../adr/0024-direct-camera-entry.md). This API is unreleased; npm 0.1.0 remains unchanged.
+
+Local checks passed: library and both production host builds, 161 native tests, three Vitest tests (including core/React SSR), four release tests, public built-entry typechecking, formatting, documentation links, the actual 179-file archive and delivered notices. Independent API/lifecycle review findings were corrected before the final check.
+
+All 56 new entry browser cases passed across Chromium, Firefox, WebKit and mobile WebKit: defaults, Auto/Manual independence, file precedence, invalid entries and EN/DE errors, denied permission/retry/import, confirmed blobs, pre-abort, pending abort/destroy/React close/unmount, StrictMode, late tracks and reentrant cancellation during opening. A broader 220-case run passed 209 cases with ten existing WebKit canvas-stream exceptions; an existing Chromium reopen test exposed a missing wait for the host's closed render. After adding that wait, the reopen test passed all four profiles. The remaining broad cases include the twenty-cycle real-processing worker/URL cleanup checks. Synthetic mobile denial screenshots are attached to the entry tests. Audio output was physically muted by the shared test fixture.
+
+Reproduce after building with `pnpm exec playwright test tests/browser/entry.spec.ts tests/browser/react-api.spec.ts tests/browser/lifecycle.spec.ts tests/browser/i18n.spec.ts tests/browser/camera.spec.ts tests/browser/mobile-camera.spec.ts --workers=4`. These are emulated/browser checks, not physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked on the pull request independently; no release, tag, registry publication or deployment is part of this change.
+
 ## Dependency capability review, 26 October 2026
 
 The reported Socket URL, license, dynamic-code, network, installation and React DOM alerts were checked against exact integrity-verified npm archives and the scanner source. The specific React DOM opaque-native-addon allegation is contradicted by the archive: its `static.node.js` entry and implementations are JavaScript, with no `.node` binaries. The remaining capabilities and scope limits are recorded in the [dependency security review](DEPENDENCY-SECURITY.md), including the reported core-js 3.51.0 versus embedded/locked 3.50.0 distinction.

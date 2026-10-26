@@ -55,6 +55,24 @@ Call `destroy()` on host unmount too. `open({ signal })` and destruction cancel 
 
 The adapter returns `Processed | CropRequired`. A `crop-required` state has source size, proposed corners and `not-detected`/`capture-conflict`, with no image/format. Custom hosts must obtain explicit corner confirmation before issuing a processing request with those corners. Never convert it into a full-original page. The packaged UI handles this; cancelled replacement preserves the existing page. Unexpected missing export geometry fails with `CROP_REQUIRED`, not partial success.
 
+## Direct camera entry (unreleased)
+
+From a host Scan button, call `scanner.open({ entry: 'camera', signal })`. With React:
+
+```tsx
+<Scanner
+  open={open}
+  options={{ assetBaseUrl: '/scanner-assets/', initialMode: 'manual', shutterSound: 'off' }}
+  openOptions={{ entry: 'camera' }}
+  onResult={result => { setOpen(false); onResult(result); }}
+  onError={() => setOpen(false)}
+/>
+```
+
+Use this inside the `ScanButton` component below, with its existing state and result handler. Public `ScannerEntry` is `workspace | camera` and is exported from both core and React entry points. Omitted/explicit `workspace` preserves the selection workspace. `initialMode` remains the separate Auto/Manual default. Nonempty `initialFiles` always win over a valid entry, enter import/review and request no camera. Empty arrays follow the entry. Invalid entries (including null/empty strings from untyped callers) reject `CONFIG_INVALID` before resources, even with files.
+
+The option uses the existing camera, session and cleanup implementation. Browser permission/HTTPS requirements still apply; denial retains Import, Retry and Close. Abort before opening requests nothing; host abort/destroy/React close release owned resources and stop late permission streams. React captures `openOptions` on opening; changing them while open does not reinitialize the camera. Module imports and SSR request no camera. This extension is not in npm 0.1.0; test with a local build until separately released.
+
 ## Language and text overrides
 
 The library defaults to `locale: 'en'`, independent of browser language. Use `locale: 'de'` for German. Both reference hosts use English as the fallback and German for a German primary browser language (`de`, `de-DE`, `de-AT`, `de-CH`, etc.). Choose Sprache / Language or use `?lang=en` / `?lang=de` to override detection; manual choices remain in the URL on reload. Remove `lang` to restore automatic browser selection. The host HTML language and PDF/result labels follow the selection; document/image/PDF bytes do not change.
@@ -110,7 +128,7 @@ export function ScanButton({ onResult }: { onResult: (result: ScanResult) => voi
 }
 ```
 
-`options` is `ScannerOptions` without mount; `openOptions` accepts files, signal and per-open profile. Options are captured when `open` becomes true; close/reopen for a new configuration. Callback updates do not restart sessions. Closing/unmounting cleans up without a late result callback. An explicit user cancellation resolves `cancelled`; then set `open=false`. `onError` handles opening/configuration errors; recoverable processing errors stay in the scanner. Core/React imports are SSR-safe, but invoke `createScanner` client-side. `className`, `theme` variables and `texts` are styling/localization hooks.
+`options` is `ScannerOptions` without mount; `openOptions` accepts entry, files, signal and per-open profile. Options are captured when `open` becomes true; close/reopen for a new configuration. Callback updates do not restart sessions. Closing/unmounting cleans up without a late result callback. An explicit user cancellation resolves `cancelled`; then set `open=false`. `onError` handles opening/configuration errors; recoverable processing errors stay in the scanner. Core/React imports are SSR-safe, but invoke `createScanner` client-side. `className`, `theme` variables and `texts` are styling/localization hooks.
 
 ## Use confirmed results
 

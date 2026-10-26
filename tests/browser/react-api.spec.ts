@@ -233,7 +233,7 @@ test('declarative component survives StrictMode and callback updates, snapshots 
           null,
           h.React.createElement(h.Scanner, {
             open,
-            className: 'host-scanner',
+            className: open ? 'host-scanner host-scanner-open' : 'host-scanner host-scanner-closed',
             options: {
               locale: 'de',
               assetBaseUrl: '/scanner-assets/',
@@ -277,6 +277,8 @@ test('declarative component survives StrictMode and callback updates, snapshots 
   ).toBe(1);
   await page.evaluate(() => (window as any).reactHarness.render(false, 'bw', 'latest'));
   await expect(page.locator('.host-scanner .scanner-backdrop')).toHaveCount(0);
+  // The previous result already removed the backdrop; wait for the host's closed render too.
+  await expect(page.locator('.host-scanner-closed')).toHaveCount(1);
   await page.evaluate(() => (window as any).reactHarness.render(true, 'bw', 'reopened'));
   await tool(page, 'Filter');
   await expect(page.getByRole('button', { name: 'Schwarz-Weiß', exact: true })).toHaveAttribute(

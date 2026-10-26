@@ -71,7 +71,7 @@ export function ScannerView({
   >(null);
   const [mode, setMode] = useState<CaptureMode>(options.initialMode ?? 'auto'),
     [mime, setMime] = useState<ImageMime>(options.imageType ?? 'image/jpeg');
-  const [camera, setCamera] = useState(false),
+  const [camera, setCamera] = useState(initial.entry === 'camera' && !initial.initialFiles?.length),
     [editingCorners, setEditingCorners] = useState(false);
   const repeatFocus = useRef(false);
   const [busy, setBusy] = useState(false),
@@ -223,7 +223,7 @@ export function ScannerView({
     } catch (err) {
       handleError(err);
     } finally {
-      if (source === 'camera' && alive.current) setCamera(false);
+      if (source === 'camera' && alive.current && !signal.aborted) setCamera(false);
       end();
     }
   };
@@ -460,6 +460,7 @@ export function ScannerView({
   };
   useEffect(() => {
     alive.current = true;
+    if (signal.aborted) return;
     if (shutterUrl) (shutter.current ??= new ShutterSound(shutterUrl)).preload();
     root.current?.focus();
     if (initial.initialFiles?.length) startFiles(initial.initialFiles);
@@ -619,6 +620,7 @@ export function ScannerView({
             )}
             {camera && (
               <CameraView
+                signal={signal}
                 assetBaseUrl={options.assetBaseUrl}
                 diagnostics={options.diagnostics}
                 limits={session.limits}

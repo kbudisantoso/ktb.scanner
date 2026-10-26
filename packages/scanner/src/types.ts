@@ -100,7 +100,11 @@ export interface ScanPage {
 export type ScanResult =
   | { status: 'confirmed'; schemaVersion: 1; sessionId: string; pages: ScanPage[]; pdf?: Blob }
   | { status: 'cancelled' };
+/** Initial SDK UI. Nonempty initialFiles always take the import path. */
+export type ScannerEntry = 'workspace' | 'camera';
 export interface OpenOptions {
+  /** Defaults to workspace. Independent of auto/manual initialMode. */
+  entry?: ScannerEntry;
   signal?: AbortSignal;
   initialFiles?: File[];
   defaultProfile?: ScanProfile;

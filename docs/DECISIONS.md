@@ -46,6 +46,7 @@ Updated 26 October 2026. These decisions resolve the initial product scope. The 
 | D-040 | Replace bundled Pixabay sounds with two CC0 recordings | Approved 26 October 2026. Ship roachpowder 170229 as `camera` and AudioSea 645335 as `reflex`, plus `off`. The later roachpowder suggestion replaces the first NoTomorrow12 candidate. Preserve creator/source credits, hashes and full CC0 text. Keep previous downloads/notices only in untracked storage outside build inputs; list source links as custom-sound ideas. `shutterSoundUrl` supports host-owned audio; explicit `off` wins. Do not rewrite public history. The separate jsPDF policy is D-041. [Guide](SOUNDS.md). |
 | D-041 | Rely on jsPDF's upstream MIT declaration | Accepted 26 October 2026. Use jsPDF 4.2.1 under its declared MIT license and preserve supplied notices. Retain the historical MD5 provenance observation as informational accepted uncertainty, without requiring additional clearance or treating it as a publication blocker. This records the project's dependency policy, not an independently verified grant from every historical contributor. |
 | D-042 | Publish the library as `@ktb-tools/scanner` through GitHub releases | Organization `ktb-tools` confirmed 26 October 2026. Matching `v<version>` tags on main, full existing checks, inspected archive, `latest`/`next` channels, OIDC trusted publishing and release attachments. Initial 0.1.0 requires one authenticated bootstrap publication before configuring npm trust. Configuration does not itself publish a package. [ADR 0023](adr/0023-npm-release-workflow.md). |
+| D-043 | Explicit per-open camera entry | `OpenOptions.entry` accepts `workspace` or `camera`, default workspace, in controller and React. Nonempty files win; empty arrays follow entry; invalid entries fail before resources. Reuse camera/session lifecycle and recovery; no host storage/download changes. [ADR 0024](adr/0024-direct-camera-entry.md). |
 
 ## Output and resource defaults
 
@@ -57,7 +58,7 @@ A3/A4/A5/A6 are ratio-ambiguous; A4 is the group default. Letter, postcard 100 x
 
 | Topic | When | Affected delivery |
 | --- | --- | --- |
-| First npm publication and trusted-publisher activation | At the first actual registry release | Organization confirmed; complete bootstrap authentication and npm/GitHub configuration per [release guide](PUBLISHING.md#registry-release) and verify hosted execution. |
+| Next npm release / actual OIDC publication | Separate release authorization | 0.1.0 is published at v0.1.0/d277d32. Source extensions remain unreleased; never reuse that version. Verify trusted publishing on an actual later publication. |
 | TIFF, HEIC/HEIF, PDF import | Separate extension | Decoders, licensing and memory tests |
 | Local OCR, paper flattening, receipt stitching | After initial device/quality acceptance | Models, quality metrics and new recipes |
 | Full camera calibration | Separate calibrated-device work | Intrinsics, tangential terms and device profiles |
