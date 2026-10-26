@@ -226,7 +226,7 @@ Import `CSSProperties` from `react` and `ImageViewer` from `@ktb-tools/scanner/r
 }
 ```
 
-The viewer consumes inherited `--scanner-font`, `--scanner-viewer-background`, `--scanner-viewer-radius`, `--scanner-control-radius`, `--scanner-panel-radius` and `--scanner-spacing`, as well as the original border/surface/text/focus variables. Other variables in the shared object do not acquire new viewer effects. With npm 0.1.0 only, set the host container's actual `font-family` and use the original four color/focus variables; the complete example targets the extended source. Pass an image `Blob`, a changed `resetKey` for a new page/rotation and optionally a geometrically matching `before` blob. The parent owns blobs; the viewer creates and revokes its preview URLs. See [viewer interaction and ownership](INTEGRATION.md#shared-react-image-viewer).
+The viewer consumes inherited `--scanner-font`, `--scanner-viewer-background`, `--scanner-viewer-radius`, `--scanner-control-radius`, `--scanner-control-shadow`, `--scanner-panel-radius` and `--scanner-spacing`, as well as the original border/surface/text/focus variables. Other variables in the shared object do not acquire new viewer effects. With npm 0.1.0 only, set the host container's actual `font-family` and use the original four color/focus variables; the complete example targets the extended source. Pass an image `Blob`, a changed `resetKey` for a new page/rotation and optionally a geometrically matching `before` blob. The parent owns blobs; the viewer creates and revokes its preview URLs. See [viewer interaction and ownership](INTEGRATION.md#shared-react-image-viewer).
 
 ## Contrast, focus and scope
 

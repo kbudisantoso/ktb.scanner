@@ -1,6 +1,6 @@
 # Implementation and verification status
 
-Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 27 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
 ## Public UI styling guide, 27 October 2026
 
@@ -10,7 +10,7 @@ The published 0.1.0 archive was fetched with install scripts disabled. Its origi
 
 Chromium executed 17 rendered example scenarios against the built extended package: actual React `ThemedScanButton` in light/dark and EN/DE at 1280 x 900, 390 x 664 and 844 x 390; mobile camera denial/options, global warnings, standalone viewers and imperative opening/host abort. Checks found zero horizontal overflow and visible keyboard focus, primary/format-control text contrast of at least 4.5:1 and warning contrast of at least 7.79:1. Viewer computed styles confirmed inherited colors and direct font-token consumption, including changing the variable to monospace without setting host `font-family`. Synthetic screenshots of workspace, camera options, warnings and viewers were inspected. Screenshots and temporary verification scripts remain local and untracked.
 
-This documentation's source-consumer inventory, public-declaration example checks, example bundle, formatting, document links and diff checks passed. Runtime build/native/browser/package/notice evidence is recorded with the separate theme-token implementation. The example run synthetically denies camera access and does not establish physical camera/device, actual custom-font-file or assistive-technology acceptance. Hosted PR checks remain separate. No release or publication is performed by this documentation.
+This documentation's source-consumer inventory, public-declaration example checks, example bundle, formatting, document links and diff checks passed. After integrating the extended runtime, full library/Next.js/Astro build, 161 core tests, three Vitest checks, four release tests, typecheck, lint, actual 179-file package archive and delivered notices also passed in the documentation worktree. Runtime browser evidence is recorded with the separate theme-token implementation; this documentation additionally runs the 17 bounded rendered example scenarios above. The example run synthetically denies camera access and does not establish physical camera/device, actual custom-font-file or assistive-technology acceptance. Hosted PR checks remain separate. No release or publication is performed by this documentation.
 
 ## Complete reusable UI theming, 27 October 2026
 
