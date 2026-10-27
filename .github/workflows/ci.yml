@@ -83,6 +83,12 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Establish synthetic fixture font baseline
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends --yes fonts-dejavu-core
+          fc-cache -f
+          test "$(fc-match --format='%{family}' monospace)" = 'DejaVu Sans Mono'
       - name: Verify image-provided browser
         env:
           SCANNER_TEST_ENGINE: ${{ matrix.engine }}
@@ -101,7 +107,6 @@ jobs:
       - name: Provide virtual audio output for Firefox
         if: matrix.engine == 'firefox'
         run: |
-          apt-get update
           apt-get install --no-install-recommends --yes pulseaudio pulseaudio-utils
           scanner_pulse_dir=$(mktemp -d "$RUNNER_TEMP/scanner-pulse.XXXXXX")
           install -d -m 700 "$scanner_pulse_dir/runtime" "$scanner_pulse_dir/state" "$scanner_pulse_dir/config"
