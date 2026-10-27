@@ -16,18 +16,16 @@ A backward-compatible SDK release for direct camera entry, immediate UI preferen
 - Opening/cleanup guards cover reentrant abort/destroy, late camera permission/device responses and pending torch changes. Direct entry adds no second camera/session implementation and preserves retry, import and cancellation after denial.
 - Localize invalid-entry errors in English and German.
 - Keep the selected paper-orientation foreground visible on its accent surface instead of allowing a later selected-button rule to overwrite it.
-- Synchronize existing review-thumbnail/reopen assertions and isolate the corner-boundary test from host hydration without weakening geometry, focus or touch-target checks. Browser CI uses a fixed supported Ubuntu 24.04 baseline with the complete four-profile matrix and existing gates.
 
-### Documentation and verification
+### Documentation
 
 - Complete public [styling guide](docs/UI-THEMING.md): all token defaults/scopes, full light/dark palettes, imperative/React examples, locally served fonts, inheritance, viewer integration, contrast and visible focus. [Integration examples](docs/INTEGRATION.md) align existing completion labels with the host result handler. ([PR #10](https://github.com/kbudisantoso/ktb.scanner/pull/10))
-- Automated API, public-type, SSR, UI and lifecycle regressions cover both integrations and DE/EN. The preceding implementation matrix passed 563 cases with 25 documented skips, and seventeen rendered styling scenarios were checked. Release validation is performed again against the versioned candidate; [verification status](docs/testing/STATUS.md) separates those checks from physical-device acceptance.
 
 ### Upgrading from 0.1.0
 
 Use the matching 0.2.0 package, stylesheet and complete worker/media asset tree together; rebuild the host and recopy all assets. Existing integrations keep their defaults. The new options are optional, and existing confirmed images/PDF blobs and serializable metadata retain their contract. No SDK localStorage/cookies, downloader, filename rules, headless/slot API or private website code is introduced. AGPL and separate third-party notices are unchanged.
 
-Browser camera access still requires a suitable secure context and native permission. Physical iPhone/Android and assistive-technology acceptance remains open; emulation and synthetic tests do not establish it.
+Browser camera access still requires a suitable secure context and native permission.
 
 [Full changes since 0.1.0](https://github.com/kbudisantoso/ktb.scanner/compare/v0.1.0...v0.2.0).
 
@@ -43,4 +41,4 @@ Browser camera access still requires a suitable secure context and native permis
 - Next.js reference application and Astro integration with locally supplied assets.
 - Explicit opt-in diagnostics; camera, geometry, processing, export, mobile layout and lifecycle regression tests.
 
-Published on npm as `@ktb-tools/scanner@0.1.0` from tag `v0.1.0` at `d277d32d6f9df52c6c95dd31e79885ddd3b11793`. Physical iPhone/Android acceptance remains open.
+Published on npm as `@ktb-tools/scanner@0.1.0` from tag `v0.1.0` at `d277d32d6f9df52c6c95dd31e79885ddd3b11793`.
