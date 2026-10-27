@@ -49,7 +49,7 @@ export function metadataFor(
     ...(page.autoOptimization ? { autoOptimization: structuredClone(page.autoOptimization) } : {}),
     ...(page.lensCorrection ? { lensCorrection: structuredClone(page.lensCorrection) } : {}),
     quality: structuredClone(page.quality),
-    engine: { id: 'scanic', version: '1.7.1', adapterVersion: '0.1.0' },
+    engine: { id: 'scanic', version: '1.7.1', adapterVersion: '0.2.0' },
   };
 }
 export class ScanSession {

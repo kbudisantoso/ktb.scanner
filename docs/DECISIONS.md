@@ -1,6 +1,6 @@
 # Initial-version decisions
 
-Updated 26 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
+Updated 27 October 2026. These decisions resolve the initial product scope. The source license is explicitly AGPLv3. Implementation, automated verification and physical-device acceptance remain separate; see [test status](testing/STATUS.md).
 
 | ID | Decision | Consequences and limits |
 | --- | --- | --- |
@@ -48,7 +48,8 @@ Updated 26 October 2026. These decisions resolve the initial product scope. The 
 | D-042 | Publish the library as `@ktb-tools/scanner` through GitHub releases | Organization `ktb-tools` confirmed 26 October 2026. Matching `v<version>` tags on main, full existing checks, inspected archive, `latest`/`next` channels, OIDC trusted publishing and release attachments. Initial 0.1.0 requires one authenticated bootstrap publication before configuring npm trust. Configuration does not itself publish a package. [ADR 0023](adr/0023-npm-release-workflow.md). |
 | D-043 | Explicit per-open camera entry | `OpenOptions.entry` accepts `workspace` or `camera`, default workspace, in controller and React. Nonempty files win; empty arrays follow entry; invalid entries fail before resources. Reuse camera/session lifecycle and recovery; no host storage/download changes. [ADR 0024](adr/0024-direct-camera-entry.md). |
 | D-044 | Global UI preference notifications without SDK persistence | `ScannerOptions.onPreferenceChange` reports validated changed `initialMode` / `imageType` values immediately, even before cancellation. Reapply existing options; no init/same/late/page-edit events, callback failures isolated and React handlers stay current without restarting. Storage/validation/migration/reset remain in the host. [ADR 0025](adr/0025-ui-preference-notifications.md). |
-| D-045 | Close reusable UI theming gaps | Extend actual CSS consumers for backdrop, contrast pairs, mobile camera, shared viewer, chrome radii/spacing and capture chrome; preserve defaults, camera/session logic and both public entry points. No host-selector workaround, new layout API or release. [ADR 0026](adr/0026-complete-ui-theme-tokens.md). |
+| D-045 | Close reusable UI theming gaps | Extend actual CSS consumers for backdrop, contrast pairs, mobile camera, shared viewer, chrome radii/spacing and capture chrome; preserve defaults, camera/session logic and both public entry points. No host-selector workaround or new layout API; release authorization is recorded separately in D-046. [ADR 0026](adr/0026-complete-ui-theme-tokens.md). |
+| D-046 | Release library 0.2.0 through the existing checked workflow | Authorized 27 October 2026: prepare the library version, changelog and release notes for direct camera entry, global preference notifications and complete UI theming. Merge reviewed preparation through a PR, use a matching `v0.2.0` tag on main and the existing GitHub-release/npm workflow, and verify actual registry bytes and hosted results. Stable channel is `latest`. Preserve 0.1.0, AGPL and dependency notices; keep private workspace/host versions, storage, downloads, PWA and deployments outside this release. Source preparation alone is not evidence of publication. |
 
 ## Output and resource defaults
 
@@ -60,7 +61,6 @@ A3/A4/A5/A6 are ratio-ambiguous; A4 is the group default. Letter, postcard 100 x
 
 | Topic | When | Affected delivery |
 | --- | --- | --- |
-| Next npm release / actual OIDC publication | Separate release authorization | 0.1.0 is published at v0.1.0/d277d32. Source extensions remain unreleased; never reuse that version. Verify trusted publishing on an actual later publication. |
 | TIFF, HEIC/HEIF, PDF import | Separate extension | Decoders, licensing and memory tests |
 | Local OCR, paper flattening, receipt stitching | After initial device/quality acceptance | Models, quality metrics and new recipes |
 | Full camera calibration | Separate calibrated-device work | Intrinsics, tangential terms and device profiles |

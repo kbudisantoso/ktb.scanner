@@ -125,7 +125,14 @@ Open `https://192.168.1.20:3443` on the phone and allow camera access. The devel
 
 ### 1. Obtain and install the package
 
-The npm organization is `ktb-tools`; **`@ktb-tools/scanner@0.1.0` is published** (tag `v0.1.0`, commit `d277d32d6f9df52c6c95dd31e79885ddd3b11793`). Install it with `pnpm add @ktb-tools/scanner@0.1.0 react@19 react-dom@19`. The new `OpenOptions.entry` API described below is unreleased; use a locally built archive to try it. Do not overwrite the published version. See the [release guide](docs/PUBLISHING.md#registry-release).
+The npm organization is `ktb-tools`; this guide targets **`@ktb-tools/scanner@0.2.0`**. Direct camera entry, UI preference notifications and the complete theme-token set require 0.2.0. Check that exact version in the registry before installing:
+
+```sh
+npm view @ktb-tools/scanner@0.2.0 version
+pnpm add @ktb-tools/scanner@0.2.0 react@19 react-dom@19
+```
+
+A source checkout can use the built archive below independently of registry availability. The original **0.1.0** release remains immutable at tag `v0.1.0`, commit `d277d32d6f9df52c6c95dd31e79885ddd3b11793`; it does not contain these additions. See the [release guide](docs/PUBLISHING.md#registry-release).
 
 From this repository:
 
@@ -135,12 +142,12 @@ mkdir -p artifacts/local/packages
 pnpm --filter @ktb-tools/scanner pack --pack-destination "$PWD/artifacts/local/packages"
 ```
 
-The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-tools-scanner-0.1.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
+The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-tools-scanner-0.2.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
 
 From your host project, install that archive and the React peers:
 
 ```sh
-pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-tools-scanner-0.1.0.tgz react@19.3.1 react-dom@19.3.1
+pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-tools-scanner-0.2.0.tgz react@19.3.1 react-dom@19.3.1
 ```
 
 The archive is already built and needs no dependency install scripts; `--ignore-scripts` also avoids an unnecessary dependency postinstall prompt in pnpm 11. Use a bundler with ESM, dynamic imports and CSS support, for example Next.js, Astro or Vite. The ready-made UI requires React/React DOM 19 even when the host uses another framework. Core-only consumers do not need to render React. Within this workspace the examples use `workspace:*`; external projects should consume a reproducible package artifact, not an unbuilt sibling directory.
@@ -300,7 +307,7 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `initialMode` | `auto`; `manual` retains detection but captures only on shutter |
 | `autoCaptureStabilityMs` | 1,000; any integer **100-5,000 ms**, with a per-open override. Demo presets are 400/600/800/1,000/1,200/1,500/2,000 ms |
 | `imageType` | `image/jpeg` at 0.92; `image/png` is also supported |
-| `onPreferenceChange` | Optional notification of real SDK UI changes to `initialMode` / `imageType`, including cancelled sessions; unreleased |
+| `onPreferenceChange` | Optional notification of real SDK UI changes to `initialMode` / `imageType`, including cancelled sessions; introduced in 0.2.0 |
 | `createPdf` | `true`; raster PDF without searchable OCR text |
 | `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no sound/context/request |
 | `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` stays silent. See [custom audio](docs/SOUNDS.md) |
@@ -312,7 +319,7 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 
 English is explicit and stable; the library does not silently follow browser language. For German set `locale: 'de'`. `createTranslator('de')` is available from the DOM-free core for a matching host interface. Placeholder values support labels such as `t('Seite {number}', { number: 2 })`. `ImageViewer` also accepts `locale`, `texts`, `image`, optional matching `before`, `alt` and `resetKey`.
 
-The unreleased `onPreferenceChange` option reports real global changes immediately, including before a later cancellation. Its exported `ScannerPreferenceChange` union contains only `{ preference: 'initialMode', value: 'auto' | 'manual' }` or `{ preference: 'imageType', value: 'image/jpeg' | 'image/png' }`. Apply saved values through the existing `initialMode` / `imageType` options on a later opening. Both controller and React `options` use the same callback; React reaches the latest handler without restarting. Initialization, unchanged values and page edits produce no event. Persistence, validation/migration/reset, theme and sound storage belong to the host. See [host preference integration](docs/INTEGRATION.md#global-ui-preferences-unreleased).
+The `onPreferenceChange` option, introduced in 0.2.0, reports real global changes immediately, including before a later cancellation. Its exported `ScannerPreferenceChange` union contains only `{ preference: 'initialMode', value: 'auto' | 'manual' }` or `{ preference: 'imageType', value: 'image/jpeg' | 'image/png' }`. Apply saved values through the existing `initialMode` / `imageType` options on a later opening. Both controller and React `options` use the same callback; React reaches the latest handler without restarting. Initialization, unchanged values and page edits produce no event. Persistence, validation/migration/reset, theme and sound storage belong to the host. See [host preference integration](docs/INTEGRATION.md#global-ui-preferences).
 
 Style the reusable UI without duplicating scanner logic:
 
@@ -326,7 +333,7 @@ const theme = {
 };
 ```
 
-Pass this as `theme` in either API. The unreleased UI-theme extension also applies theme variables to the backdrop, adds primary/warning foregrounds and camera palette/focus tokens, and lets standalone `ImageViewer` consume inherited `--scanner-font` directly. Existing defaults stay unchanged; see the [token contract](docs/adr/0026-complete-ui-theme-tokens.md). See the complete [UI styling guide](docs/UI-THEMING.md) for every token/default, light/dark examples, fonts, inheritance and the standalone viewer. Full [configuration, viewer and lifecycle details](docs/INTEGRATION.md).
+Pass this as `theme` in either API. The UI-theme extension in 0.2.0 also applies theme variables to the backdrop, adds primary/warning foregrounds and camera palette/focus tokens, and lets standalone `ImageViewer` consume inherited `--scanner-font` directly. Existing defaults stay unchanged; see the [token contract](docs/adr/0026-complete-ui-theme-tokens.md). See the complete [UI styling guide](docs/UI-THEMING.md) for every token/default, light/dark examples, fonts, inheritance and the standalone viewer. Full [configuration, viewer and lifecycle details](docs/INTEGRATION.md).
 
 Default limits: **20 pages**, **20 MiB/file**, **24 MP input**, **100 MiB originals**, **8 MP/4,096 px output** without upscaling, **128 MiB retained results**, **384 MiB estimated working buffers**, and one high-resolution page at a time. These are configurable budgets, not a browser RSS guarantee. Extremely long receipts remain limited by source/output resolution.
 

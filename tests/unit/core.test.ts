@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { AutoCapture } from '../../packages/scanner/src/capture.ts';
 import {
   FULL_QUAD,
@@ -59,6 +60,14 @@ export function page(): PageDraft {
     },
   };
 }
+test('export metadata reports the current SDK and engine package versions', () => {
+  const manifest = JSON.parse(
+    readFileSync(new URL('../../packages/scanner/package.json', import.meta.url), 'utf8'),
+  );
+  const metadata = metadataFor(page(), 'image/jpeg');
+  assert.equal(metadata.engine.adapterVersion, manifest.version);
+  assert.equal(metadata.engine.version, manifest.dependencies.scanic);
+});
 function prime(gate: AutoCapture) {
   for (let time = 0; time <= 950; time += 50)
     assert.equal(gate.update(detection(time), time).capture, false);
