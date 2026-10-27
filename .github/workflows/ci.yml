@@ -50,7 +50,9 @@ jobs:
     name: Browser (${{ matrix.project }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    container: ${{ matrix.container }}
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --init --ipc=host
     defaults:
       run:
         shell: bash
@@ -60,20 +62,12 @@ jobs:
         include:
           - project: chromium
             engine: chromium
-            container: ''
           - project: firefox
             engine: firefox
-            container: ''
           - project: webkit
             engine: webkit
-            container:
-              image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
-              options: --init
           - project: mobile-webkit
             engine: webkit
-            container:
-              image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
-              options: --init
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,24 +79,22 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install browser and system dependencies on the VM
-        if: matrix.engine != 'webkit'
-        run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
-      - name: Verify image-provided WebKit
-        if: matrix.engine == 'webkit'
+      - name: Verify image-provided browser
+        env:
+          SCANNER_TEST_ENGINE: ${{ matrix.engine }}
         run: |
           node --input-type=commonjs <<'NODE'
           const { accessSync, constants } = require('node:fs');
-          const { webkit } = require('@playwright/test');
+          const browser = require('@playwright/test')[process.env.SCANNER_TEST_ENGINE];
           const { version } = require('@playwright/test/package.json');
           if (version !== '1.64.1') throw new Error('Update the pinned Playwright image and package together.');
-          accessSync(webkit.executablePath(), constants.X_OK);
+          accessSync(browser.executablePath(), constants.X_OK);
           NODE
       - name: Provide virtual audio output for Firefox
         if: matrix.engine == 'firefox'
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes pulseaudio
+          apt-get update
+          apt-get install --no-install-recommends --yes pulseaudio pulseaudio-utils
           pulseaudio --start --exit-idle-time=-1
           pactl load-module module-null-sink sink_name=scanner_tests
           pactl set-default-sink scanner_tests
