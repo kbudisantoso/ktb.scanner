@@ -1,6 +1,6 @@
 # Product requirements
 
-Version 0.8, updated 26 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
+Version 0.8, updated 27 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
 
 ## Purpose and boundary
 
@@ -10,7 +10,7 @@ The project is positioned as a complete embeddable document-scanning workflow bu
 
 The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. The host owns authentication, permissions, business records, uploads and subsequent OCR/extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
 
-Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. Version 0.1.0 is published; subsequent SDK changes require a separate release. Registry verification remains explicit in the [publishing guide](PUBLISHING.md#registry-release).
+Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. The current requirements include the 0.2.0 SDK additions; the published 0.1.0 release remains immutable. Preparing a source version does not establish registry availability. Registry verification remains explicit in the [publishing guide](PUBLISHING.md#registry-release).
 
 Primary journeys: capture an invoice, collect an expense receipt, import an existing image, correct/replace a page and export a reviewed multi-page result. Cancelling a new page or failing to process/export must preserve previously accepted pages.
 

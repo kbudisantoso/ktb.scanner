@@ -14,4 +14,4 @@ Keep the result/completion API unchanged. Isolate callback throws and rejected p
 
 ## Consequences
 
-The host receives changes before later cancellation, with no content, filenames, identifiers or diagnostics. The host owns reading, validation, migration, writing and reset of durable defaults. Theme/sound are already host choices. There is no SDK localStorage/cookie access, parallel settings/storage abstraction or fully controlled live scanner state. This API is unreleased and absent from npm 0.1.0. T-37 records the expected regression scope; test status records actual execution separately.
+The host receives changes before later cancellation, with no content, filenames, identifiers or diagnostics. The host owns reading, validation, migration, writing and reset of durable defaults. Theme/sound are already host choices. There is no SDK localStorage/cookie access, parallel settings/storage abstraction or fully controlled live scanner state. This API targets 0.2.0 and is absent from 0.1.0. T-37 records the expected regression scope; test status records actual execution separately.

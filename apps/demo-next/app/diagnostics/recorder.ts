@@ -215,7 +215,7 @@ export class DiagnosticRecording {
       manifest: {
         schemaVersion: 2,
         application: 'ktb.scanner/demo-next',
-        versions: { scanner: '0.1.0', scanic: '1.7.1' },
+        versions: { scanner: '0.2.0', scanic: '1.7.1' },
         binaryByteOrder:
           new Uint8Array(new Uint16Array([0x1234]).buffer)[0] === 0x34
             ? 'little-endian'

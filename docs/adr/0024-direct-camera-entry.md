@@ -12,4 +12,4 @@ Add optional `OpenOptions.entry: ScannerEntry`, where `ScannerEntry` is `workspa
 
 ## Consequences
 
-Denial retains retry, import and cancellation. Abort/destroy invalidate pending camera work, stop late tracks and suppress late device enumeration. StrictMode and callback updates keep one session per opening. No new camera implementation, storage, download or completion API. The API is unreleased and is not present in npm 0.1.0. See T-36 and the verification status for actual evidence.
+Denial retains retry, import and cancellation. Abort/destroy invalidate pending camera work, stop late tracks and suppress late device enumeration. StrictMode and callback updates keep one session per opening. No new camera implementation, storage, download or completion API. The API targets 0.2.0 and is not present in 0.1.0. See T-36 and the verification status for actual evidence.

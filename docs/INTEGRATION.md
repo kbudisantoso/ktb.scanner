@@ -1,6 +1,6 @@
 # Integration and local operation
 
-Use Node >=22.13 (Node 24 LTS recommended), pnpm 11.15.1 and Python 3 for independent ZIP checks. The lockfile records the installed workspace resolution. Build the library before using its public entry points.
+Use Node >=22.13 (Node 24 LTS recommended), pnpm 11.15.1 and Python 3 for independent ZIP checks. The lockfile records the installed workspace resolution. This guide targets library 0.2.0. Direct camera entry, preference notifications and the extended theme tokens require 0.2.0; verify exact registry availability or build this source before using its public entry points.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -55,7 +55,7 @@ Call `destroy()` on host unmount too. `open({ signal })` and destruction cancel 
 
 The adapter returns `Processed | CropRequired`. A `crop-required` state has source size, proposed corners and `not-detected`/`capture-conflict`, with no image/format. Custom hosts must obtain explicit corner confirmation before issuing a processing request with those corners. Never convert it into a full-original page. The packaged UI handles this; cancelled replacement preserves the existing page. Unexpected missing export geometry fails with `CROP_REQUIRED`, not partial success.
 
-## Direct camera entry (unreleased)
+## Direct camera entry
 
 From a host Scan button, call `scanner.open({ entry: 'camera', signal })`. With React:
 
@@ -71,7 +71,7 @@ From a host Scan button, call `scanner.open({ entry: 'camera', signal })`. With 
 
 Use this inside the `ScanButton` component below, with its existing state and result handler. Public `ScannerEntry` is `workspace | camera` and is exported from both core and React entry points. Omitted/explicit `workspace` preserves the selection workspace. `initialMode` remains the separate Auto/Manual default. Nonempty `initialFiles` always win over a valid entry, enter import/review and request no camera. Empty arrays follow the entry. Invalid entries (including null/empty strings from untyped callers) reject `CONFIG_INVALID` before resources, even with files.
 
-The option uses the existing camera, session and cleanup implementation. Browser permission/HTTPS requirements still apply; denial retains Import, Retry and Close. Abort before opening requests nothing; host abort/destroy/React close release owned resources and stop late permission streams. React captures `openOptions` on opening; changing them while open does not reinitialize the camera. Module imports and SSR request no camera. This extension is not in npm 0.1.0; test with a local build until separately released.
+The option uses the existing camera, session and cleanup implementation. Browser permission/HTTPS requirements still apply; denial retains Import, Retry and Close. Abort before opening requests nothing; host abort/destroy/React close release owned resources and stop late permission streams. React captures `openOptions` on opening; changing them while open does not reinitialize the camera. Module imports and SSR request no camera. This option was introduced in 0.2.0 and is absent from 0.1.0.
 
 ## Language and text overrides
 
@@ -81,7 +81,7 @@ The library defaults to `locale: 'en'`, independent of browser language. Use `lo
 
 Configuration errors reject unsupported locales before opening resources. Core error codes are stable and API messages default to English; the built-in UI localizes them. Locale is captured on opening: close/reopen to change it. It does not override paper-region inference, image recipes or result metadata.
 
-## Global UI preferences (unreleased)
+## Global UI preferences
 
 `ScannerOptions.onPreferenceChange` receives a public `ScannerPreferenceChange` union:
 
@@ -147,7 +147,7 @@ export function Capture({ onResult }: { onResult: (result: ScanResult) => void }
 }
 ```
 
-React options are captured on opening; callback updates alone reach the current handler without restarting a session or camera. Updating host defaults in the callback applies to a later opening and generates no feedback loop. Closing/unmounting stops future events. There is no additional `onPreferenceChange` prop outside `options`. This extension requires a local source build until a separate release; npm 0.1.0 does not contain it.
+React options are captured on opening; callback updates alone reach the current handler without restarting a session or camera. Updating host defaults in the callback applies to a later opening and generates no feedback loop. Closing/unmounting stops future events. There is no additional `onPreferenceChange` prop outside `options`. This callback was introduced in 0.2.0 and is absent from 0.1.0.
 
 ## Capture stability
 
@@ -262,7 +262,7 @@ Diagnostics are off in both library and reference. Optional `diagnostics: { onEv
 
 `shutterSound` selects `camera` (default), `reflex` or `off` from core `SHUTTER_SOUNDS`/`ShutterSoundId`. The two recordings are CC0-1.0 and ship locally with creator/source notices and the full dedication. `shutterSoundUrl` can override the recording with a host-owned audio URL; `off` always stays silent. Only the selected clip is decoded in advance; playback at secured-frame time never waits for a network request. The reference offers a preview; automated tests physically mute output while exercising native audio. See [capture sounds and custom audio](SOUNDS.md) for configuration, provenance, custom hosting and link-only suggestions. No API key is needed at runtime.
 
-## UI theme extensions (unreleased)
+## UI theme extensions
 
 Pass CSS strings through the existing `theme` option in either integration. For example:
 
@@ -280,7 +280,7 @@ const theme = {
 };
 ```
 
-The controller applies supplied variables to its owned backdrop as well as the scanner root. Root focus explicitly supplied in `theme` also applies to the mobile camera; `--scanner-camera-focus` takes precedence when supplied. General warnings and camera errors both honor `--scanner-warning-text`, so dark warning backgrounds can have an appropriate foreground. Camera backgrounds, controls, text, overlays, selected states and shutter have their own consumed tokens. Control/panel/mobile/viewer radii and a chrome spacing factor are adjustable. Defaults and capture/session behavior remain unchanged; these tokens are unreleased, beyond npm 0.1.0. The [complete fallback contract](adr/0026-complete-ui-theme-tokens.md) lists each supported name, value and scope. The `--scanner-*` type prefix does not make other names functional.
+The controller applies supplied variables to its owned backdrop as well as the scanner root. Root focus explicitly supplied in `theme` also applies to the mobile camera; `--scanner-camera-focus` takes precedence when supplied. General warnings and camera errors both honor `--scanner-warning-text`, so dark warning backgrounds can have an appropriate foreground. Camera backgrounds, controls, text, overlays, selected states and shutter have their own consumed tokens. Control/panel/mobile/viewer radii and a chrome spacing factor are adjustable. Defaults and capture/session behavior remain unchanged; these tokens were introduced in 0.2.0 and are absent from 0.1.0. The [complete fallback contract](adr/0026-complete-ui-theme-tokens.md) lists each supported name, value and scope. The `--scanner-*` type prefix does not make other names functional.
 
 Standalone `ImageViewer` now reads inherited `--scanner-font` itself (falling back to host inheritance), alongside palette/focus/viewer-radius tokens. Give its host container bounded flex space; there is no `theme` prop on the viewer. No internal DOM selector override, headless/slot API or host storage is required.
 

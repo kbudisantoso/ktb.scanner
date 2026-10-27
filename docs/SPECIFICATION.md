@@ -1,6 +1,6 @@
 # Implementation contract
 
-Version 0.8, updated 26 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.8, updated 27 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
@@ -8,7 +8,7 @@ The delivery is a complete embeddable scanning workflow covering capture workflo
 
 One TypeScript package provides the DOM-free `@ktb-tools/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
 
-The npm namespace is `ktb-tools` (D-042). GitHub releases with matching semantic-version tags on main run the existing complete checks before distributing the inspected archive via npm OIDC; the initial 0.1.0 bootstrap is complete. Subsequent source extensions need a separate versioned release. Stable releases use `latest`, prereleases `next`. Package preparation, GitHub source publication, npm availability and app deployment are separate states. See the [release procedure](PUBLISHING.md#registry-release).
+The npm namespace is `ktb-tools` (D-042). GitHub releases with matching semantic-version tags on main run the existing complete checks before distributing the inspected archive via npm OIDC; the initial 0.1.0 bootstrap is complete. This contract targets 0.2.0, including direct camera entry, preference notifications and complete UI themes. Source-version preparation does not establish registry availability. Stable releases use `latest`, prereleases `next`. Package preparation, GitHub source publication, npm availability and app deployment are separate states. See the [release procedure](PUBLISHING.md#registry-release).
 
 Classic Scanic 1.7.1 runs behind an adapter in a module worker. Build-time instrumentation checks the exact version and unique source anchors before exposing existing debug buffers and an optional candidate-selection callback. It fails closed on source drift. The installed vendor package is unchanged. Classic WASM is embedded in the distributed Scanic build; no ML mode or CDN fallback is activated. The corner editor loads on demand. jsPDF creates PDFs in a separate export worker; PDF.js belongs only to the reference preview.
 
@@ -28,7 +28,7 @@ Only accepted pages are exportable. A `CropRequired` processing result has `stat
 
 Optional `ScannerOptions.onPreferenceChange(change: ScannerPreferenceChange)` reports `{ preference: 'initialMode', value: CaptureMode }` or `{ preference: 'imageType', value: ImageMime }` only after genuine global UI changes. Export the union from core and React. Synchronous refs deduplicate events even before a React render. Validate UI values before changing state/gates; no events on initialization/reapplication, unchanged/invalid values, individual page edits or after session abort/end. Changes precede later cancellation and contain no document or session/device data. Callback throws/rejections cannot damage scanning.
 
-Controller and React share the same option. React forwards to the latest handler through its existing props ref, preserving the open/configuration snapshot and camera lifetime. Reapply through `initialMode` and `imageType` on a later opening; do not add live external state control. Validation/migration/storage/reset and any theme/sound defaults belong to the host. No SDK localStorage, cookies or diagnosis-based preference channel. The result/completion contract is unchanged. See [ADR 0025](adr/0025-ui-preference-notifications.md) and [host examples](INTEGRATION.md#global-ui-preferences-unreleased). This source API is unreleased.
+Controller and React share the same option. React forwards to the latest handler through its existing props ref, preserving the open/configuration snapshot and camera lifetime. Reapply through `initialMode` and `imageType` on a later opening; do not add live external state control. Validation/migration/storage/reset and any theme/sound defaults belong to the host. No SDK localStorage, cookies or diagnosis-based preference channel. The result/completion contract is unchanged. See [ADR 0025](adr/0025-ui-preference-notifications.md) and [host examples](INTEGRATION.md#global-ui-preferences). This API was introduced in 0.2.0.
 
 ## Camera and automatic capture
 
@@ -124,7 +124,7 @@ The existing ten root tokens remain supported with unchanged defaults. Additiona
 
 An explicit `theme['--scanner-focus']` also supplies the camera focus unless `--scanner-camera-focus` is supplied. Without either, the existing mobile camera focus is preserved. `--scanner-warning-text` applies to general warnings and camera errors directly. Standalone `ImageViewer` consumes inherited `--scanner-font` via `font-family`, falling back to the host's inherited font; no viewer theme prop is added. Select carets consume an explicit arrow color with the existing muted-color fallback. `--scanner-spacing` scales chrome gaps/padding/margins while preserving dimensions, safe areas and the corner editor's minimum reserved handle space. Options still snapshot when opening; there is no new headless/slot/layout API or runtime preference channel.
 
-These source extensions are unreleased and do not change npm 0.1.0, document bytes, processing, completion or host responsibilities.
+These extensions require 0.2.0. They do not change the immutable 0.1.0 release, document bytes, processing, completion or host responsibilities.
 
 ## Diagnostics
 

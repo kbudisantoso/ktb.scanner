@@ -2,7 +2,7 @@
 
 Both `createScanner()` and React `Scanner` render the same reusable UI from `packages/scanner`. Import `@ktb-tools/scanner/styles.css` once in your global/client entry, then pass `theme` in the scanner options. This guide also covers the standalone `ImageViewer`.
 
-The original ten root variables already exist in published **0.1.0**. The additional tokens and complete palettes below describe **unreleased source changes**; npm 0.1.0 does not support them. Until a separate version is released, use a locally built archive from this source. See [installation and complete asset copying](../README.md#use-the-library-in-your-own-project). Never overwrite npm 0.1.0.
+This guide targets **0.2.0**. The original ten root variables also exist in published **0.1.0**; the forty additional tokens and complete palettes below require 0.2.0. Verify exact registry availability or use a locally built archive from this source. See [installation and complete asset copying](../README.md#use-the-library-in-your-own-project). The published 0.1.0 version remains unchanged.
 
 The published archive was inspected separately. Its original stylesheet has SHA-256 `db3e3e7a2ccc021887880cfaf38ab7c219fade050647f5a9d5d5afa769b9a8bd`; that is a release baseline, not the extended source stylesheet.
 
@@ -25,7 +25,7 @@ The original ten defaults are declared directly on `.scanner`, the dialog root. 
 | `--scanner-radius` | `12px` | Main dialog corners on larger screens; mobile dialog and other UI groups have separate extended tokens. |
 | `--scanner-font` | `system-ui, sans-serif` | Scanner font family. The extended source also lets the standalone viewer consume an inherited variable directly; 0.1.0 needs the host's actual `font-family` set. |
 
-### Shared UI tokens (unreleased)
+### Shared UI tokens
 
 | Variable | Default / fallback | Meaning and scope |
 | --- | --- | --- |
@@ -44,7 +44,7 @@ The original ten defaults are declared directly on `.scanner`, the dialog root. 
 | `--scanner-select-arrow` | `var(--scanner-muted, #52675c)` | Color of the workspace select caret, drawn by CSS gradients. |
 | `--scanner-viewer-background` | Viewer: `var(--scanner-border, #e3e9df)`; other preview area: `#dce2db` | Background behind an image. Separate from the document's own pixels. |
 
-### Camera tokens (unreleased)
+### Camera tokens
 
 The mobile camera presentation applies at `max-width: 700px` or `max-height: 500px`. Its image-preview background is also used on larger screens. Camera errors use the shared warning background/text pair rather than a second competing error palette.
 
@@ -72,7 +72,7 @@ The mobile camera presentation applies at `max-width: 700px` or `max-height: 500
 | `--scanner-camera-bottom-overlay` | `linear-gradient(#10181300, #101813d9 45%, #101813f2)` | Complete background image behind portrait camera controls. |
 | `--scanner-camera-side-overlay` | `linear-gradient(90deg, #10181300, #101813d9)` | Complete background image behind compact landscape camera controls. |
 
-### Capture feedback and corner loupe (unreleased)
+### Capture feedback and corner loupe
 
 | Variable | Default / fallback | Meaning and scope |
 | --- | --- | --- |
@@ -170,7 +170,7 @@ Inside the complete component, `Scanner` receives the theme through `options`, n
 
 The component's options are captured when opening. Changing the theme, locale or other options while open does not restyle/reinitialize that session; close and reopen with the desired options. Use a host color-scheme control or `prefers-color-scheme` in the host to select the next session's theme. Callback updates are handled separately and do not restart a session.
 
-The complete example defines all 50 supported variables for each palette, including camera surfaces/overlays. The dark palette uses a light accent with an explicit dark `--scanner-primary-text`, and a dark warning surface with explicit light `--scanner-warning-text`. That warning pair applies in review and camera errors. No internal-selector overrides are needed. These complete palettes require the unreleased extension; validate the actual states and host combination you ship.
+The complete example defines all 50 supported variables for each palette, including camera surfaces/overlays. The dark palette uses a light accent with an explicit dark `--scanner-primary-text`, and a dark warning surface with explicit light `--scanner-warning-text`. That warning pair applies in review and camera errors. No internal-selector overrides are needed. These complete palettes require 0.2.0; validate the actual states and host combination you ship.
 
 ## CSS inheritance and priority
 
@@ -226,7 +226,7 @@ Import `CSSProperties` from `react` and `ImageViewer` from `@ktb-tools/scanner/r
 }
 ```
 
-The viewer consumes inherited `--scanner-font`, `--scanner-viewer-background`, `--scanner-viewer-radius`, `--scanner-control-radius`, `--scanner-control-shadow`, `--scanner-panel-radius` and `--scanner-spacing`, as well as the original border/surface/text/focus variables. Other variables in the shared object do not acquire new viewer effects. With npm 0.1.0 only, set the host container's actual `font-family` and use the original four color/focus variables; the complete example targets the extended source. Pass an image `Blob`, a changed `resetKey` for a new page/rotation and optionally a geometrically matching `before` blob. The parent owns blobs; the viewer creates and revokes its preview URLs. See [viewer interaction and ownership](INTEGRATION.md#shared-react-image-viewer).
+The viewer consumes inherited `--scanner-font`, `--scanner-viewer-background`, `--scanner-viewer-radius`, `--scanner-control-radius`, `--scanner-control-shadow`, `--scanner-panel-radius` and `--scanner-spacing`, as well as the original border/surface/text/focus variables. Other variables in the shared object do not acquire new viewer effects. With npm 0.1.0 only, set the host container's actual `font-family` and use the original four color/focus variables; the complete example targets 0.2.0. Pass an image `Blob`, a changed `resetKey` for a new page/rotation and optionally a geometrically matching `before` blob. The parent owns blobs; the viewer creates and revokes its preview URLs. See [viewer interaction and ownership](INTEGRATION.md#shared-react-image-viewer).
 
 ## Contrast, focus and scope
 
@@ -240,4 +240,4 @@ Use [existing public reference hosts](INTEGRATION.md) for full result galleries 
 
 ## Verification scope
 
-The original published 0.1.0 stylesheet is the release baseline. Extended-source tokens, public declarations, examples and rendered behavior are checked independently. The complete example is typechecked against the built public package. Rendered verification and the exact automated checks for this documentation are recorded in [verification status](testing/STATUS.md); source inspection alone is not a visual check.
+The original published 0.1.0 stylesheet is the release baseline. The 0.2.0 tokens, public declarations, examples and rendered behavior are checked independently. The complete example is typechecked against the built public package. Rendered verification and the exact automated checks for this documentation are recorded in [verification status](testing/STATUS.md); source inspection alone is not a visual check.
