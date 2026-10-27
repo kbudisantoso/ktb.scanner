@@ -62,6 +62,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-42 | MUST | Allow profile defaults per library configuration and open call, with call > configuration > Auto. A reusable themeable React component and imperative facade share the same encapsulated session/processing implementation. |
 | F-43 | MUST | Offer a typed direct camera entry in both SDK UIs while preserving the default workspace. Nonempty initial files always import without camera access; empty arrays follow the entry. Validate entry before resources. Retain retry/import/cancel after denial and clean abort/destroy/StrictMode/late-stream behavior. |
 | F-44 | MUST | Notify the host of genuine global SDK UI changes to Auto/Manual and JPEG/PNG immediately, including before later cancellation. Report only allowed preference values, never page edits or content/identifiers. No initial/reapply/unchanged/ended-session events; isolate callback failures and use current React callbacks without restarting. Reapply via existing options; durable state stays in the host. |
+| F-45 | MUST | Theme the reusable UI through working CSS variables for backdrop, primary/warning text, mobile camera palette and focus, control/panel radii, chrome spacing, capture chrome and standalone viewer font/palette. Preserve existing tokens/defaults and controller/React parity without host selectors or a new layout API. |
 
 ## Integration requirements
 

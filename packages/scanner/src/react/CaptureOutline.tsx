@@ -24,8 +24,8 @@ export function CaptureOutline({
     >
       <polygon
         points={points(corners)}
-        fill="#24d58a0d"
-        stroke="white"
+        fill="var(--scanner-capture-fill, #24d58a0d)"
+        stroke="var(--scanner-capture-outline, white)"
         strokeWidth="4"
         vectorEffect="non-scaling-stroke"
       />
@@ -33,7 +33,7 @@ export function CaptureOutline({
         <polyline
           points={points(progressOutline(corners, size, progress))}
           fill="none"
-          stroke="#24d58a"
+          stroke="var(--scanner-capture-progress, #24d58a)"
           strokeWidth="5"
           vectorEffect="non-scaling-stroke"
         />

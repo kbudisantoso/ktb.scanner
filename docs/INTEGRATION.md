@@ -258,6 +258,28 @@ Diagnostics are off in both library and reference. Optional `diagnostics: { onEv
 
 `shutterSound` selects `camera` (default), `reflex` or `off` from core `SHUTTER_SOUNDS`/`ShutterSoundId`. The two recordings are CC0-1.0 and ship locally with creator/source notices and the full dedication. `shutterSoundUrl` can override the recording with a host-owned audio URL; `off` always stays silent. Only the selected clip is decoded in advance; playback at secured-frame time never waits for a network request. The reference offers a preview; automated tests physically mute output while exercising native audio. See [capture sounds and custom audio](SOUNDS.md) for configuration, provenance, custom hosting and link-only suggestions. No API key is needed at runtime.
 
+## UI theme extensions (unreleased)
+
+Pass CSS strings through the existing `theme` option in either integration. For example:
+
+```ts
+const theme = {
+  '--scanner-background': '#18212d',
+  '--scanner-surface': '#253447',
+  '--scanner-text': '#edf2f9',
+  '--scanner-accent': '#b9d3ff',
+  '--scanner-primary-text': '#18212d',
+  '--scanner-warning': '#5a3c12',
+  '--scanner-warning-text': '#fff0c4',
+  '--scanner-backdrop': '#09121ce6',
+  '--scanner-focus': '#e5b7ff',
+};
+```
+
+The controller applies supplied variables to its owned backdrop as well as the scanner root. Root focus explicitly supplied in `theme` also applies to the mobile camera; `--scanner-camera-focus` takes precedence when supplied. General warnings and camera errors both honor `--scanner-warning-text`, so dark warning backgrounds can have an appropriate foreground. Camera backgrounds, controls, text, overlays, selected states and shutter have their own consumed tokens. Control/panel/mobile/viewer radii and a chrome spacing factor are adjustable. Defaults and capture/session behavior remain unchanged; these tokens are unreleased, beyond npm 0.1.0. The [complete fallback contract](adr/0026-complete-ui-theme-tokens.md) lists each supported name, value and scope. The `--scanner-*` type prefix does not make other names functional.
+
+Standalone `ImageViewer` now reads inherited `--scanner-font` itself (falling back to host inheritance), alongside palette/focus/viewer-radius tokens. Give its host container bounded flex space; there is no `theme` prop on the viewer. No internal DOM selector override, headless/slot API or host storage is required.
+
 ## Shared React image viewer
 
 `ImageViewer` is exported by `@ktb-tools/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.

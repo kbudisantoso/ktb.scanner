@@ -1,4 +1,10 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect } from './fixtures';
+
+let stylesheet: string;
+test.beforeAll(async () => {
+  stylesheet = await readFile('packages/scanner/dist/styles.css', 'utf8');
+});
 
 for (const [width, height] of [
   [320, 568],
@@ -9,7 +15,22 @@ for (const [width, height] of [
     page,
   }) => {
     await page.setViewportSize({ width, height });
-    await page.goto('/');
+    const errors: string[] = [];
+    const appScripts: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname.startsWith('/_next/')) appScripts.push(request.url());
+    });
+    // This bounds-only fixture must not compete with Next.js hydration for document.body.
+    await page.route('**/corner-targets-fixture', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><html lang="en"><head>
+          <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>${stylesheet}</style></head><body></body></html>`,
+      }),
+    );
+    await page.goto('/corner-targets-fixture');
     await page.evaluate(async () => {
       const assetUrl = '/scanner-assets/scanic.js';
       const { createCornerEditor } = await import(assetUrl);
@@ -95,5 +116,7 @@ for (const [width, height] of [
       await page.evaluate(() => (window as any).boundaryCorners),
     );
     await page.evaluate(() => (window as any).boundaryEditor.destroy());
+    expect(appScripts).toEqual([]);
+    expect(errors).toEqual([]);
   });
 }

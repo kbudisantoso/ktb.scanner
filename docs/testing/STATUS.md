@@ -2,6 +2,16 @@
 
 Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Complete reusable UI theming, 27 October 2026
+
+The existing ten theme variables/defaults remain supported. Forty additional consumed fallback tokens close backdrop/stacking, primary/warning contrast pairs, camera palette/focus/overlays/shutter/flash, chrome radii/spacing/shadows, capture contour/loupe, select caret and standalone viewer gaps. The controller applies theme properties to its owned backdrop; an explicit global focus also reaches the camera unless a camera-specific value is supplied. `ImageViewer` consumes inherited font without an extra host font declaration. A selected paper-orientation cascade conflict was corrected so its primary foreground remains visible on the accent background. [ADR 0026](../adr/0026-complete-ui-theme-tokens.md) records every supported fallback and scope. New tokens are unreleased and do not alter npm 0.1.0.
+
+Local verification passed: complete library/Next.js/Astro build, 161 core tests, three Vitest tests including SSR imports, four release tests, typecheck, formatting, document links, actual 179-file package archive, delivered notices and diff checks. No processing/export/session contract, license, release or host storage/download code changed.
+
+The final targeted run passed 66 cases with two existing WebKit canvas-stream exceptions across Chromium, Firefox, WebKit and mobile WebKit. All 36 new theme cases passed: both public UIs, custom and default backdrop/foreground/spacing/radii/focus, denied mobile-camera/error/options/shutter states, shadow roles, explicit camera-focus precedence, actual SVG contour colors, real corner-loupe canvas pixels, default values, standalone viewer font/inherited fallback and keyboard Tab focus, plus the actual selected Format-panel orientation foreground. Twenty-four existing focused-review cases passed in two themes and three viewport sizes, as did denied-camera recovery in all four profiles. The first run exposed a pre-existing thumbnail test race: cards can render before Blob URL images; the assertion now waits for those images before computing styles. Intermediate new-test selector/import-path errors were corrected before the final run. Audio output was physically muted by the shared fixture; documents were synthetic.
+
+Reproduce with `pnpm exec playwright test tests/browser/theming.spec.ts tests/browser/mobile-camera.spec.ts tests/browser/review-ui.spec.ts --workers=4` after building. Screenshots are attached by the synthetic renderer tests. Rendered/computed-style checks and emulation do not establish physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked independently on the pull request; no tag, release, registry publication or deployment is included.
+
 ## Global UI preference notifications, 26 October 2026
 
 The unreleased `ScannerOptions.onPreferenceChange` API reports validated changed Auto/Manual and JPEG/PNG preferences before a later cancellation. Existing `initialMode` / `imageType` options reapply defaults; persistence, migration/reset and all host storage remain outside the library. See [ADR 0025](../adr/0025-ui-preference-notifications.md).
