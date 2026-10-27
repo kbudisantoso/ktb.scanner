@@ -50,6 +50,12 @@ jobs:
     name: Browser (${{ matrix.project }})
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --init --ipc=host
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +69,10 @@ jobs:
           - project: mobile-webkit
             engine: webkit
     steps:
+      - name: Match ephemeral container home ownership
+        run: |
+          test "$HOME" = /github/home
+          chown "$(id -u):$(id -g)" "$HOME"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -73,13 +83,43 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps ${{ matrix.engine }}
+      - name: Establish synthetic fixture font baseline
+        run: |
+          apt-get update
+          apt-get install --no-install-recommends --yes fonts-dejavu-core
+          fc-cache -f
+          test "$(fc-match --format='%{family}' monospace)" = 'DejaVu Sans Mono'
+      - name: Verify image-provided browser
+        env:
+          SCANNER_TEST_ENGINE: ${{ matrix.engine }}
+        run: |
+          node --input-type=commonjs <<'NODE'
+          const { accessSync, constants } = require('node:fs');
+          const browser = require('@playwright/test')[process.env.SCANNER_TEST_ENGINE];
+          const { version } = require('@playwright/test/package.json');
+          if (version !== '1.64.1') throw new Error('Update the pinned Playwright image and package together.');
+          accessSync(browser.executablePath(), constants.X_OK);
+          browser.launch().then((instance) => instance.close()).catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          NODE
       - name: Provide virtual audio output for Firefox
         if: matrix.engine == 'firefox'
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends --yes pulseaudio
-          pulseaudio --start --exit-idle-time=-1
+          apt-get install --no-install-recommends --yes pulseaudio pulseaudio-utils
+          scanner_pulse_dir=$(mktemp -d "$RUNNER_TEMP/scanner-pulse.XXXXXX")
+          install -d -m 700 "$scanner_pulse_dir/runtime" "$scanner_pulse_dir/state" "$scanner_pulse_dir/config"
+          export PULSE_RUNTIME_PATH="$scanner_pulse_dir/runtime"
+          export PULSE_STATE_PATH="$scanner_pulse_dir/state"
+          export PULSE_CONFIG_PATH="$scanner_pulse_dir/config"
+          export PULSE_COOKIE="$scanner_pulse_dir/state/cookie"
+          pulseaudio --start --exit-idle-time=-1 -n \
+            --load="module-native-protocol-unix socket=$PULSE_RUNTIME_PATH/native auth-cookie=$PULSE_COOKIE"
+          export PULSE_SERVER="unix:$PULSE_RUNTIME_PATH/native"
+          for scanner_pulse_key in PULSE_RUNTIME_PATH PULSE_STATE_PATH PULSE_CONFIG_PATH PULSE_COOKIE PULSE_SERVER; do
+            printf '%s=%s\n' "$scanner_pulse_key" "${!scanner_pulse_key}" >> "$GITHUB_ENV"
+          done
           pactl load-module module-null-sink sink_name=scanner_tests
           pactl set-default-sink scanner_tests
       - run: pnpm build
