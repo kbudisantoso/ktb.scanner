@@ -45,6 +45,10 @@ The full build produces the library, copies assets and builds both hosts. Browse
 
 Headless Firefox on Linux needs an available audio backend for native Web Audio tests. CI starts PulseAudio with a virtual null sink; output stays muted and no hardware speaker is required. Use an equivalent audio backend when reproducing these tests on a headless Linux machine.
 
+The desktop and mobile WebKit CI jobs use the [official Playwright image](https://playwright.dev/docs/docker), pinned to `v1.64.1-noble` and its immutable manifest digest. It already contains WebKit and the required system libraries, so these two jobs perform no browser download or `apt` installation. Keep the image tag/digest and the exact `@playwright/test` version aligned; CI checks the package version and the image-provided WebKit executable before building/testing. A container pull is still required on a fresh runner.
+
+Chromium and Firefox continue directly on the Ubuntu 24.04 VM. Firefox's virtual PulseAudio null sink and the shared physically muted audio fixture are unchanged. All four browser profiles, complete test suites and the `CI Success` gate remain required; switching the WebKit environment does not skip tests or establish physical Safari/iPhone acceptance. The workflow uses explicit Bash shell semantics in both environments and runs no `sudo` setup inside the WebKit container. No custom image is built or published.
+
 `pnpm licenses:inventory` records the resolved production dependencies locally. Preserve third-party license notices, including CC0 audio attribution and the full CC0 dedication. Do not assume the source-code license relicenses media.
 
 ## Community
