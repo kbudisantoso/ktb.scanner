@@ -69,6 +69,10 @@ jobs:
           - project: mobile-webkit
             engine: webkit
     steps:
+      - name: Match ephemeral container home ownership
+        run: |
+          test "$HOME" = /github/home
+          chown "$(id -u):$(id -g)" "$HOME"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -89,6 +93,10 @@ jobs:
           const { version } = require('@playwright/test/package.json');
           if (version !== '1.64.1') throw new Error('Update the pinned Playwright image and package together.');
           accessSync(browser.executablePath(), constants.X_OK);
+          browser.launch().then((instance) => instance.close()).catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
           NODE
       - name: Provide virtual audio output for Firefox
         if: matrix.engine == 'firefox'
