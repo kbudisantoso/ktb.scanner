@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
 import { releaseConfig, registryState } from './release-config.mjs';
+import { checkRegistry } from './registry-check.mjs';
 
 const manifest = {
   name: '@ktb-tools/scanner',
@@ -190,5 +191,151 @@ test('the workflow publish argument resolves a local archive in the real offline
     assert.match(readFileSync(attempts, 'utf8'), /ls-remote.*github\.com\/release\//);
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+function registryFixture(t, responses) {
+  let elapsed = 0;
+  const calls = [],
+    delays = [],
+    timeouts = [];
+  t.mock.method(AbortSignal, 'timeout', (milliseconds) => {
+    timeouts.push(milliseconds);
+    return new AbortController().signal;
+  });
+  return {
+    calls,
+    delays,
+    timeouts,
+    get elapsed() {
+      return elapsed;
+    },
+    options: {
+      now: () => elapsed,
+      sleep: async (milliseconds) => {
+        delays.push(milliseconds);
+        elapsed += milliseconds;
+      },
+      fetch: async (url, { signal }) => {
+        calls.push({ url, signal });
+        const response = responses[Math.min(calls.length - 1, responses.length - 1)];
+        if (response instanceof Error) throw response;
+        elapsed += response.elapsed ?? 0;
+        return new Response(
+          response.body ?? JSON.stringify({ dist: { integrity: 'sha512-expected' } }),
+          { status: response.status },
+        );
+      },
+    },
+  };
+}
+
+test('post-publication 404s wait 5/10 seconds then accept only identical registry bytes', async (t) => {
+  const fixture = registryFixture(t, [{ status: 404 }, { status: 404 }, { status: 200 }]);
+  assert.equal(
+    await checkRegistry('https://registry.example.invalid/package/1.0.0', 'sha512-expected', {
+      ...fixture.options,
+      requirePublished: true,
+    }),
+    'identical',
+  );
+  assert.deepEqual(fixture.delays, [5_000, 10_000]);
+  assert.equal(fixture.calls.length, 3);
+  assert.deepEqual(fixture.timeouts, [30_000, 30_000, 30_000]);
+  assert.equal(fixture.elapsed, 15_000);
+});
+
+test('post-publication 404 polling stops at the overall five-minute deadline', async (t) => {
+  const fixture = registryFixture(t, [{ status: 404 }]);
+  await assert.rejects(
+    checkRegistry('https://registry.example.invalid/package/1.0.0', 'sha512-expected', {
+      ...fixture.options,
+      requirePublished: true,
+    }),
+    /within 5 minutes/,
+  );
+  assert.equal(fixture.elapsed, 300_000);
+  assert.equal(fixture.calls.length, 21);
+  assert.equal(fixture.delays.length, 21);
+  assert.deepEqual(fixture.delays.slice(0, 3), [5_000, 10_000, 15_000]);
+  assert(fixture.delays.slice(2).every((delay) => delay === 15_000));
+  assert(fixture.timeouts.every((timeout) => timeout > 0 && timeout <= 30_000));
+  assert.equal(fixture.timeouts.at(-1), 15_000);
+});
+
+test('fetch and final wait budgets shrink with elapsed request time and never accept late bytes', async (t) => {
+  for (const lastResponse of [
+    { status: 404, elapsed: 3_000 },
+    { status: 200, elapsed: 7_001 },
+  ]) {
+    const fixture = registryFixture(t, [
+      ...Array.from({ length: 7 }, () => ({ status: 404, elapsed: 29_000 })),
+      lastResponse,
+    ]);
+    await assert.rejects(
+      checkRegistry('https://registry.example.invalid/package/1.0.0', 'sha512-expected', {
+        ...fixture.options,
+        requirePublished: true,
+      }),
+      /within 5 minutes/,
+    );
+    assert.deepEqual(fixture.delays, [
+      5_000,
+      10_000,
+      15_000,
+      15_000,
+      15_000,
+      15_000,
+      15_000,
+      ...(lastResponse.status === 404 ? [4_000] : []),
+    ]);
+    assert.deepEqual(
+      fixture.timeouts,
+      [30_000, 30_000, 30_000, 30_000, 30_000, 30_000, 30_000, 7_000],
+    );
+    assert.equal(fixture.calls.length, 8);
+    assert.equal(fixture.elapsed, lastResponse.status === 404 ? 300_000 : 300_001);
+  }
+});
+
+test('pre-publication 404 stays immediately missing without polling', async (t) => {
+  const fixture = registryFixture(t, [{ status: 404 }]);
+  assert.equal(
+    await checkRegistry(
+      'https://registry.example.invalid/package/1.0.0',
+      'sha512-expected',
+      fixture.options,
+    ),
+    'missing',
+  );
+  assert.equal(fixture.calls.length, 1);
+  assert.equal(fixture.elapsed, 0);
+  assert.deepEqual(fixture.delays, []);
+  assert.deepEqual(fixture.timeouts, [30_000]);
+});
+
+test('registry mismatches, authorization, malformed JSON and network failures never retry', async (t) => {
+  for (const response of [
+    { status: 200, body: JSON.stringify({ dist: { integrity: 'sha512-different' } }) },
+    { status: 200, body: '{}' },
+    { status: 200, body: 'invalid JSON' },
+    { status: 401 },
+    { status: 403 },
+    { status: 429 },
+    { status: 500 },
+    new TypeError('Network failure'),
+    new DOMException('Request timed out', 'TimeoutError'),
+  ]) {
+    for (const preceding404 of [false, true]) {
+      const fixture = registryFixture(t, preceding404 ? [{ status: 404 }, response] : [response]);
+      await assert.rejects(
+        checkRegistry('https://registry.example.invalid/package/1.0.0', 'sha512-expected', {
+          ...fixture.options,
+          requirePublished: true,
+        }),
+      );
+      assert.equal(fixture.calls.length, preceding404 ? 2 : 1);
+      assert.deepEqual(fixture.delays, preceding404 ? [5_000] : []);
+    }
   }
 });
