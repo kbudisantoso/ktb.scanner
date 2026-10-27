@@ -1,0 +1,7 @@
+/* This selector belongs to the host, not the SDK's internal DOM. */
+.host-result-viewer {
+  display: flex;
+  height: min(70dvh, 640px);
+  min-height: 240px;
+  min-width: 0;
+}

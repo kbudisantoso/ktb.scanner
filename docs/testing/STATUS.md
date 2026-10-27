@@ -1,6 +1,16 @@
 # Implementation and verification status
 
-Updated 26 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 27 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+
+## Public UI styling guide, 27 October 2026
+
+The [UI styling guide](../UI-THEMING.md) inventories all 50 supported variables with exact defaults/fallbacks and scope. It distinguishes the original ten npm 0.1.0 root variables from the unreleased extended tokens, explains root/ancestor precedence and backdrop propagation, and supplies complete [public-API examples](../examples/ui-theming.tsx) for both integrations and a standalone viewer. The complete light/dark palettes include explicit primary and warning foregrounds plus camera colors, avoiding the former dark-warning/mobile-error foreground conflict without host selectors.
+
+The published 0.1.0 archive was fetched with install scripts disabled. Its original stylesheet SHA-256 is `db3e3e7a2ccc021887880cfaf38ab7c219fade050647f5a9d5d5afa769b9a8bd`; this is the release baseline, not the extended stylesheet. All 50 documented/example names match actual extended CSS/component consumers; the internal camera-height calculation is intentionally excluded. The complete example and the guide's imperative block typecheck against built public declarations, with ordinary host CSS-module declarations, and bundle through the public package exports.
+
+Chromium executed 17 rendered example scenarios against the built extended package: actual React `ThemedScanButton` in light/dark and EN/DE at 1280 x 900, 390 x 664 and 844 x 390; mobile camera denial/options, global warnings, standalone viewers and imperative opening/host abort. Checks found zero horizontal overflow and visible keyboard focus, primary/format-control text contrast of at least 4.5:1 and warning contrast of at least 7.79:1. Viewer computed styles confirmed inherited colors and direct font-token consumption, including changing the variable to monospace without setting host `font-family`. Synthetic screenshots of workspace, camera options, warnings and viewers were inspected. Screenshots and temporary verification scripts remain local and untracked.
+
+This documentation's source-consumer inventory, public-declaration example checks, example bundle, formatting, document links and diff checks passed. After integrating the extended runtime, full library/Next.js/Astro build, 161 core tests, three Vitest checks, four release tests, typecheck, lint, actual 179-file package archive and delivered notices also passed in the documentation worktree. Runtime browser evidence is recorded with the separate theme-token implementation; this documentation additionally runs the 17 bounded rendered example scenarios above. The example run synthetically denies camera access and does not establish physical camera/device, actual custom-font-file or assistive-technology acceptance. Hosted PR checks remain separate. No release or publication is performed by this documentation.
 
 ## Complete reusable UI theming, 27 October 2026
 
@@ -10,7 +20,12 @@ Local verification passed: complete library/Next.js/Astro build, 161 core tests,
 
 The final targeted run passed 66 cases with two existing WebKit canvas-stream exceptions across Chromium, Firefox, WebKit and mobile WebKit. All 36 new theme cases passed: both public UIs, custom and default backdrop/foreground/spacing/radii/focus, denied mobile-camera/error/options/shutter states, shadow roles, explicit camera-focus precedence, actual SVG contour colors, real corner-loupe canvas pixels, default values, standalone viewer font/inherited fallback and keyboard Tab focus, plus the actual selected Format-panel orientation foreground. Twenty-four existing focused-review cases passed in two themes and three viewport sizes, as did denied-camera recovery in all four profiles. The first run exposed a pre-existing thumbnail test race: cards can render before Blob URL images; the assertion now waits for those images before computing styles. Intermediate new-test selector/import-path errors were corrected before the final run. Audio output was physically muted by the shared fixture; documents were synthetic.
 
+The first hosted mobile-WebKit run exposed a separate boundary-test fixture race: Next.js hydration recovered its page after the test replaced `document.body`, removing all corner handles. The trace showed the handles present and the host recovery 38 ms later. The bounds fixture now serves static same-origin HTML with the actual built SDK stylesheet and Scanic asset. It preserves all 48-pixel, focus, drag, gutter, viewport and clipping assertions and additionally rejects framework requests/page errors. All twelve profile/viewport cases passed without skips or retries, and the fixture correction was independently reviewed.
+
+The completed implementation was merged through [PR #9](https://github.com/kbudisantoso/ktb.scanner/pull/9), merge commit `4937653`. Its [final hosted CI](https://github.com/kbudisantoso/ktb.scanner/actions/runs/40422260861) passed all seven checks: Chromium 147 passed; Firefox 146 passed / one known skip; WebKit and mobile WebKit each 135 passed / twelve known skips. Total: 563 passed and 25 known skips out of 588, with no failed cases. The browser runner is pinned to supported Ubuntu 24.04 for a reproducible baseline during the rolling Ubuntu 26 migration; the complete four-profile matrix, dependency installation, virtual audio and success gate are unchanged. Earlier superseded runs and slow Ubuntu-mirror setup jobs are separate from this final successful result. New tokens remain unreleased.
+
 Reproduce with `pnpm exec playwright test tests/browser/theming.spec.ts tests/browser/mobile-camera.spec.ts tests/browser/review-ui.spec.ts --workers=4` after building. Screenshots are attached by the synthetic renderer tests. Rendered/computed-style checks and emulation do not establish physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked independently on the pull request; no tag, release, registry publication or deployment is included.
+
 
 ## Global UI preference notifications, 26 October 2026
 
@@ -22,6 +37,8 @@ Frozen install, full library/Next.js/Astro build, 161 native tests, three Vitest
 
 After integrating the direct-camera entry, the combined preference, entry, React API and lifecycle run passed all 160 cases in the four browser profiles, without skips or retries. This includes direct-camera callback updates without reinitialization and the existing twenty-cycle worker/preview cleanup checks. The two integration APIs and both public type additions were verified together.
 
+The preference extension was subsequently merged through [PR #8](https://github.com/kbudisantoso/ktb.scanner/pull/8), merge commit `ab0866f`. Its [hosted CI run](https://github.com/kbudisantoso/ktb.scanner/actions/runs/40417286657) passed all seven checks: 527 browser cases passed and 25 known cases were skipped, out of 552. One WebKit setup job was cancelled after slow Ubuntu-mirror downloads and rerun on a fresh runner; its full test profile then passed. The successful other jobs were retained. The API remains unreleased.
+
 Reproduce after building with `pnpm exec playwright test tests/browser/preferences.spec.ts tests/browser/entry.spec.ts tests/browser/react-api.spec.ts tests/browser/lifecycle.spec.ts --workers=4`.
 
 ## Direct camera entry, 26 October 2026
@@ -32,7 +49,10 @@ Local checks passed: library and both production host builds, 161 native tests, 
 
 All 56 new entry browser cases passed across Chromium, Firefox, WebKit and mobile WebKit: defaults, Auto/Manual independence, file precedence, invalid entries and EN/DE errors, denied permission/retry/import, confirmed blobs, pre-abort, pending abort/destroy/React close/unmount, StrictMode, late tracks and reentrant cancellation during opening. A broader 220-case run passed 209 cases with ten existing WebKit canvas-stream exceptions; an existing Chromium reopen test exposed a missing wait for the host's closed render. After adding that wait, the reopen test passed all four profiles. The remaining broad cases include the twenty-cycle real-processing worker/URL cleanup checks. Synthetic mobile denial screenshots are attached to the entry tests. Audio output was physically muted by the shared test fixture.
 
+The camera-entry change was subsequently merged through [PR #7](https://github.com/kbudisantoso/ktb.scanner/pull/7), merge commit `b833080`. Its [hosted CI run](https://github.com/kbudisantoso/ktb.scanner/actions/runs/40415973224) passed all seven jobs. The complete browser matrix executed 508 cases: Chromium 127 passed; Firefox 126 passed / one known skip; WebKit and mobile WebKit each 115 passed / twelve known skips. Total: 483 passed and 25 known skips, with no failed cases. The targeted checks above remain the earlier local evidence. The new API remains unreleased.
+
 Reproduce after building with `pnpm exec playwright test tests/browser/entry.spec.ts tests/browser/react-api.spec.ts tests/browser/lifecycle.spec.ts tests/browser/i18n.spec.ts tests/browser/camera.spec.ts tests/browser/mobile-camera.spec.ts --workers=4`. These are emulated/browser checks, not physical iPhone/Android or assistive-technology acceptance. Hosted CI is checked on the pull request independently; no release, tag, registry publication or deployment is part of this change.
+
 
 ## Dependency capability review, 26 October 2026
 

@@ -3,10 +3,11 @@
 | Document | Purpose |
 | --- | --- |
 | [Requirements](REQUIREMENTS.md) | Required product, integration and quality scope |
-| [Implementation contract](SPECIFICATION.md) | Architecture, processing, lifecycle, limits and T-01..T-35 traceability |
+| [Implementation contract](SPECIFICATION.md) | Architecture, processing, lifecycle, limits and T-01..T-38 traceability |
 | [Decisions](DECISIONS.md) | Current defaults and deferred extensions |
 | [Architecture records](adr/README.md) | Dated decisions and superseded historical choices |
 | [Integration](INTEGRATION.md) | API, assets, HTTPS, profiles, result ownership and uploads |
+| [UI styling](UI-THEMING.md) | Public theme variables, complete examples, fonts, viewer inheritance and fixed styling limits |
 | [Dependencies](DEPENDENCIES.md) | Pins, upstream code/media licenses and security audit |
 | [Verification status](testing/STATUS.md) | Actual checks and outstanding acceptance |
 | [Measurements](testing/MEASUREMENTS.md) | Synthetic geometry/quality and desktop timing evidence |
