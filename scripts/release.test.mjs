@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -111,6 +111,83 @@ test('the release entrypoint requires the exact tag and an ancestor of main', ()
       JSON.stringify({ release: { draft: true, prerelease: false } }),
     );
     assert.throws(run);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('the workflow publish argument resolves a local archive in the real offline npm CLI', () => {
+  const workflow = readFileSync(
+    new URL('../.github/workflows/publish.yml', import.meta.url),
+    'utf8',
+  );
+  const argument = workflow.match(/^\s+run: npm publish ("[^"\n]+") --access public /m)?.[1];
+  assert.ok(argument, 'Read the actual npm publish argument from the workflow.');
+  const directory = mkdtempSync(join(tmpdir(), 'scanner-release-archive-test-'));
+  try {
+    mkdirSync(join(directory, 'package'));
+    mkdirSync(join(directory, 'release'));
+    writeFileSync(
+      join(directory, 'package/package.json'),
+      JSON.stringify({
+        name: '@ktb-tools/scanner-release-path-test',
+        version: '0.0.0',
+      }),
+    );
+    writeFileSync(join(directory, 'package/README.md'), 'Synthetic release path fixture.\n');
+    const archive = 'ktb-tools-scanner-release-path-test-0.0.0.tgz';
+    execFileSync('tar', ['-czf', join('release', archive), 'package'], {
+      cwd: directory,
+      env: { ...process.env, COPYFILE_DISABLE: '1' },
+    });
+    const attempts = join(directory, 'git-attempts');
+    const git = join(directory, 'reject-git');
+    writeFileSync(git, `#!/bin/sh\nprintf '%s\\n' "$*" >> "$GIT_ATTEMPT_LOG"\nexit 91\n`, {
+      mode: 0o755,
+    });
+    const userconfig = join(directory, 'npm-user-config');
+    const globalconfig = join(directory, 'npm-global-config');
+    writeFileSync(userconfig, '');
+    writeFileSync(globalconfig, '');
+    const run = (publishArgument) =>
+      spawnSync(
+        'sh',
+        [
+          '-c',
+          `exec npm publish ${publishArgument} "$@"`,
+          'release-path-test',
+          '--dry-run',
+          '--json',
+          '--offline',
+          '--ignore-scripts',
+          '--update-notifier=false',
+          '--registry=http://127.0.0.1:9/',
+        ],
+        {
+          cwd: directory,
+          encoding: 'utf8',
+          timeout: 30_000,
+          env: {
+            PATH: process.env.PATH,
+            RELEASE_ARCHIVE: archive,
+            GIT_ATTEMPT_LOG: attempts,
+            npm_config_git: git,
+            npm_config_cache: join(directory, 'cache'),
+            npm_config_userconfig: userconfig,
+            npm_config_globalconfig: globalconfig,
+          },
+        },
+      );
+    const local = run(argument);
+    assert.equal(local.status, 0, local.stderr || local.error?.message);
+    const report = JSON.parse(local.stdout);
+    const packed = report.id ? report : report['@ktb-tools/scanner-release-path-test'];
+    assert.equal(packed.id, '@ktb-tools/scanner-release-path-test@0.0.0');
+    assert.equal(existsSync(attempts), false, 'A local tarball must not invoke Git.');
+    // Exercise the old spelling too: the Git shim rejects it before any SSH/network access.
+    const shortcut = run(argument.replace('./release/', 'release/'));
+    assert.notEqual(shortcut.status, 0);
+    assert.match(readFileSync(attempts, 'utf8'), /ls-remote.*github\.com\/release\//);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
