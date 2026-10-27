@@ -95,7 +95,18 @@ jobs:
         run: |
           apt-get update
           apt-get install --no-install-recommends --yes pulseaudio pulseaudio-utils
-          pulseaudio --start --exit-idle-time=-1
+          scanner_pulse_dir=$(mktemp -d "$RUNNER_TEMP/scanner-pulse.XXXXXX")
+          install -d -m 700 "$scanner_pulse_dir/runtime" "$scanner_pulse_dir/state" "$scanner_pulse_dir/config"
+          export PULSE_RUNTIME_PATH="$scanner_pulse_dir/runtime"
+          export PULSE_STATE_PATH="$scanner_pulse_dir/state"
+          export PULSE_CONFIG_PATH="$scanner_pulse_dir/config"
+          export PULSE_COOKIE="$scanner_pulse_dir/state/cookie"
+          pulseaudio --start --exit-idle-time=-1 -n \
+            --load="module-native-protocol-unix socket=$PULSE_RUNTIME_PATH/native auth-cookie=$PULSE_COOKIE"
+          export PULSE_SERVER="unix:$PULSE_RUNTIME_PATH/native"
+          for scanner_pulse_key in PULSE_RUNTIME_PATH PULSE_STATE_PATH PULSE_CONFIG_PATH PULSE_COOKIE PULSE_SERVER; do
+            printf '%s=%s\n' "$scanner_pulse_key" "${!scanner_pulse_key}" >> "$GITHUB_ENV"
+          done
           pactl load-module module-null-sink sink_name=scanner_tests
           pactl set-default-sink scanner_tests
       - run: pnpm build
