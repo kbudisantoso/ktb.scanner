@@ -764,6 +764,11 @@ export function CameraView({
               {t('Kamera fortsetzen')}
             </button>
           )}
+          {continuous && pageCount === 0 && (
+            <button disabled={taking} onClick={onCancel}>
+              {t('Zurück zum Import')}
+            </button>
+          )}
         </div>
       )}
     </section>

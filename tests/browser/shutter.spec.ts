@@ -9,6 +9,15 @@ test('silent mode creates no AudioContext and requests no capture sound', async 
   });
   await page.addInitScript(() => {
     Object.assign(window, { silentAudioContexts: 0 });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: async () => {
+          throw new DOMException('Denied', 'NotAllowedError');
+        },
+        enumerateDevices: async () => [],
+      },
+    });
     Object.defineProperty(window, 'AudioContext', {
       value: class {
         constructor() {
@@ -25,8 +34,11 @@ test('silent mode creates no AudioContext and requests no capture sound', async 
   await closeAppPanel(page);
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Berechtigung');
+  await expect(page.getByRole('button', { name: 'Seiten prüfen (0)', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
   await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(requests).toEqual([]);
   expect(await page.evaluate(() => (window as any).silentAudioContexts)).toBe(0);
 });

@@ -219,10 +219,14 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
 
 test('denied camera leaves import accessible', async ({ page }) => {
   await page.addInitScript(() => {
+    Object.assign(window, { deniedCameraRequests: 0 });
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
-        getUserMedia: () => Promise.reject(new DOMException('Denied', 'NotAllowedError')),
+        getUserMedia: () => {
+          (window as any).deniedCameraRequests++;
+          return Promise.reject(new DOMException('Denied', 'NotAllowedError'));
+        },
         enumerateDevices: async () => [],
       },
     });
@@ -237,6 +241,33 @@ test('denied camera leaves import accessible', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Bilder importieren', exact: true }).last(),
   ).toBeEnabled();
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await chooseCaptureWorkflow(page, 'continuous');
+  await page.getByRole('button', { name: /Dokument scannen/ }).click();
+  await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('alert')).toContainText('Berechtigung');
+  await expect(
+    dialog.getByRole('button', { name: 'Seiten prüfen (0)', exact: true }),
+  ).toBeDisabled();
+  const beforeRetry = await page.evaluate(() => (window as any).deniedCameraRequests);
+  await dialog.getByRole('button', { name: 'Kamera fortsetzen', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).deniedCameraRequests))
+    .toBe(beforeRetry + 1);
+  await expect(dialog.getByRole('alert')).toContainText('Berechtigung');
+  const choosing = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: 'Bilder importieren', exact: true }).click();
+  await (await choosing).setFiles([]);
+  await expect(dialog.locator('.scanner-capture')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await expect(
+    dialog.getByRole('button', { name: 'Bilder importieren', exact: true }),
+  ).toBeEnabled();
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 for (const stabilityMs of [400, 1000, 2000])
