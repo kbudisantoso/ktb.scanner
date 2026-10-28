@@ -6,7 +6,7 @@
 
 - Individual brightness, contrast, sharpness and lens reset actions in Adjust preserve unrelated page settings.
 - Optional `captureWorkflow: 'continuous'` keeps the camera open for multiple pages, shows extracted-page feedback and opens sequential review from **Review pages (n)**. The SDK default remains `review-each`; both demos expose the choice. Retake replaces the current page, and every page still requires review or explicit discard before export.
-- Horizontal page swipes at fit in review, plus optional `ImageViewer.onPageSwipe` for host-owned page navigation.
+- Finger-following horizontal page swipes at fit in review: the current page slides out and the neighboring page enters with its own proportions, with short-gesture rebound and reduced-motion support. Optional `ImageViewer.onPageSwipe` continues to report host-owned page navigation.
 - **Find edges** (**Kanten finden**) reruns automatic detection from the original in the corner editor while retaining page settings. Preview the proposed corners before applying them; cancelling the editor preserves the previous crop, and unsuccessful detection keeps the current corner selection.
 
 ### Fixed

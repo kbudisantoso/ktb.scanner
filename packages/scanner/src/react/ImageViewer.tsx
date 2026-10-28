@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createTranslator, type ScanLocale } from '../i18n.ts';
 import { useBlobUrl } from './hooks.ts';
 import { ToolIcon } from './ToolIcon.tsx';
+import { useReviewMotion, type ReviewMotionOptions } from './review-motion.ts';
 
 export interface ImageViewerProps {
   image: Blob;
@@ -19,7 +20,19 @@ type View = { scale: number; x: number; y: number; fit: boolean };
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 /** A bounded image workspace shared by review tools and host result views. */
-export function ImageViewer({
+export function ImageViewer(props: ImageViewerProps) {
+  return <ImageViewerImpl {...props} />;
+}
+
+/** SDK review only; the package entry deliberately does not export this variant. */
+export function ReviewImageViewer({
+  motion,
+  ...props
+}: ImageViewerProps & { motion: ReviewMotionOptions }) {
+  return <ImageViewerImpl {...props} review={motion} />;
+}
+
+function ImageViewerImpl({
   image,
   before,
   alt,
@@ -28,10 +41,14 @@ export function ImageViewer({
   locale,
   className = '',
   onPageSwipe,
-}: ImageViewerProps) {
+  review,
+}: ImageViewerProps & { review?: ReviewMotionOptions }) {
   const t = createTranslator(locale, texts);
-  const url = useBlobUrl(image),
-    beforeUrl = useBlobUrl(before);
+  const [held, setHeld] = useState(false);
+  const ordinaryUrl = useBlobUrl(review ? undefined : image),
+    beforeUrl = useBlobUrl(review && !held ? undefined : before);
+  const mainImage = useRef<HTMLImageElement>(null),
+    neighbourImage = useRef<HTMLImageElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const swipeHandler = useRef(onPageSwipe);
   swipeHandler.current = onPageSwipe;
@@ -40,24 +57,34 @@ export function ImageViewer({
   const [natural, setNatural] = useState({ width: 0, height: 0 });
   const [loaded, setLoaded] = useState('');
   const [view, setView] = useState<View>({ scale: 1, x: 0, y: 0, fit: true });
-  const [held, setHeld] = useState(false);
   const current = useRef(view);
   current.current = view;
   const pointers = useRef(new Map<number, Point>());
   const gesture = useRef<{ point: Point; distance: number; view: View; moved: boolean } | null>(
     null,
   );
-  const ignore = useRef(0),
+  const ignore = useRef(review?.arrival?.ignoreUntil ?? 0),
     lastTap = useRef(-Infinity);
+  const motion = useReviewMotion(image, review, size, { main: mainImage, next: neighbourImage });
+  const url = review ? motion.main?.url : ordinaryUrl;
+  const shownNatural =
+    review && motion.main?.ready
+      ? { width: motion.main.width, height: motion.main.height }
+      : natural;
+  const motionOffset = motion.incoming
+    ? review?.arrival?.direction === 'next'
+      ? size.width
+      : -size.width
+    : motion.offset;
   const fit = Math.min(
     1,
-    Math.max(1, size.width - 24) / (natural.width || 1),
-    Math.max(1, size.height - 24) / (natural.height || 1),
+    Math.max(1, size.width - 24) / (shownNatural.width || 1),
+    Math.max(1, size.height - 24) / (shownNatural.height || 1),
   );
   const bound = (value: View): View => {
     const scale = value.fit ? fit : clamp(value.scale, fit, 4);
-    const w = natural.width * scale,
-      h = natural.height * scale;
+    const w = shownNatural.width * scale,
+      h = shownNatural.height * scale;
     return {
       ...value,
       scale,
@@ -82,6 +109,7 @@ export function ImageViewer({
       : null;
   };
   const scaleTo = (scale: number, anchor = { x: size.width / 2, y: size.height / 2 }) => {
+    if (review) motion.cancel();
     const previous = bound(current.current),
       next = clamp(scale, fit, 4);
     setView(
@@ -129,6 +157,7 @@ export function ImageViewer({
       pointers.current.clear();
       swipe.current = null;
       gesture.current = null;
+      if (review) motion.cancel();
     };
     const key = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter') release();
@@ -171,7 +200,8 @@ export function ImageViewer({
     pointers.current.delete(id);
     if (moved || cancelled) ignore.current = performance.now() + 500;
     start();
-    if (pageDirection) swipeHandler.current?.(pageDirection);
+    if (review) void motion.end(!!pageDirection && !cancelled);
+    else if (pageDirection) swipeHandler.current?.(pageDirection);
   };
   return (
     <div className={`scanner-image-viewer ${className}`} lang={locale ?? 'en'}>
@@ -186,10 +216,12 @@ export function ImageViewer({
             : 'Vergrößerte Ansicht - zum Einpassen tippen',
         )}
         data-zoom={displayed.fit ? 'fit' : Math.round(displayed.scale * 100)}
+        data-page-motion={review ? motion.phase : undefined}
         onContextMenu={(e) => e.preventDefault()}
         onDoubleClick={(e) => e.preventDefault()}
         onClick={(e) => {
           const now = performance.now();
+          if (review && !motion.idle()) return;
           if (now < ignore.current || now - lastTap.current < 500) return;
           lastTap.current = now;
           const rect = e.currentTarget.getBoundingClientRect();
@@ -222,11 +254,16 @@ export function ImageViewer({
         }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
+          if (review && motion.phase !== 'idle' && motion.phase !== 'dragging') return;
+          if (review && pointers.current.size) motion.cancel();
           e.currentTarget.setPointerCapture(e.pointerId);
           const r = e.currentTarget.getBoundingClientRect();
           const point = { x: e.clientX - r.left, y: e.clientY - r.top };
           swipe.current =
-            !pointers.current.size && current.current.fit && !held && swipeHandler.current
+            !pointers.current.size &&
+            current.current.fit &&
+            !held &&
+            (review ? motion.begin() : swipeHandler.current)
               ? point
               : null;
           pointers.current.set(e.pointerId, point);
@@ -254,7 +291,8 @@ export function ImageViewer({
             const dx = now.point.x - g.point.x,
               dy = now.point.y - g.point.y;
             if (Math.hypot(dx, dy) > 6) g.moved = true;
-            if (g.moved) setView(bound({ ...g.view, x: g.view.x + dx, y: g.view.y + dy }));
+            if (review && swipe.current && g.view.fit && g.moved) motion.move(dx, dy);
+            else if (g.moved) setView(bound({ ...g.view, x: g.view.x + dx, y: g.view.y + dy }));
           }
         }}
         onPointerUp={(e) => finishPointer(e.pointerId)}
@@ -263,8 +301,10 @@ export function ImageViewer({
       >
         {url && (
           <img
+            ref={mainImage}
             src={url}
             alt={alt}
+            data-motion-layer={review ? 'current' : undefined}
             draggable={false}
             onLoad={(e) => {
               setNatural({
@@ -272,13 +312,54 @@ export function ImageViewer({
                 height: e.currentTarget.naturalHeight,
               });
               setLoaded(url);
+              if (review)
+                motion.loaded(url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight);
+            }}
+            onError={() => {
+              if (review) motion.failed(url);
             }}
             style={{
-              width: natural.width,
-              height: natural.height,
+              width: shownNatural.width,
+              height: shownNatural.height,
               transform: `translate(${displayed.x}px, ${displayed.y}px) scale(${displayed.scale})`,
-              visibility: loaded === url ? 'visible' : 'hidden',
+              visibility: (review ? motion.main?.ready : loaded === url) ? 'visible' : 'hidden',
+              translate: review ? `${motionOffset}px 0` : undefined,
             }}
+          />
+        )}
+        {review && motion.next && (
+          <img
+            ref={neighbourImage}
+            src={motion.next.url}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            data-motion-layer="neighbour"
+            onLoad={(event) =>
+              motion.loaded(
+                motion.next!.url,
+                event.currentTarget.naturalWidth,
+                event.currentTarget.naturalHeight,
+              )
+            }
+            onError={() => {
+              if (motion.next) motion.failed(motion.next.url);
+            }}
+            style={(() => {
+              const n = motion.next!;
+              const scale = Math.min(
+                1,
+                Math.max(1, size.width - 24) / (n.width || 1),
+                Math.max(1, size.height - 24) / (n.height || 1),
+              );
+              return {
+                width: n.width,
+                height: n.height,
+                transform: `translate(${(size.width - n.width * scale) / 2}px, ${(size.height - n.height * scale) / 2}px) scale(${scale})`,
+                translate: `${motion.nextOffset}px 0`,
+                visibility: n.ready ? 'visible' : 'hidden',
+              };
+            })()}
           />
         )}
         {held && beforeUrl && (
@@ -288,13 +369,13 @@ export function ImageViewer({
             alt={t('Unoptimierter Zuschnitt')}
             draggable={false}
             style={{
-              width: natural.width,
-              height: natural.height,
+              width: shownNatural.width,
+              height: shownNatural.height,
               transform: `translate(${displayed.x}px, ${displayed.y}px) scale(${displayed.scale})`,
             }}
           />
         )}
-        {loaded !== url && (
+        {(review ? !!motion.main && !motion.main.ready : loaded !== url) && (
           <span className="scanner-image-loading" role="status">
             {t('Vorschau wird geladen')}
           </span>
@@ -310,6 +391,7 @@ export function ImageViewer({
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               e.preventDefault();
+              if (review) motion.cancel();
               e.currentTarget.setPointerCapture(e.pointerId);
               setHeld(true);
             }}
@@ -320,6 +402,7 @@ export function ImageViewer({
             onKeyDown={(e) => {
               if (e.key === ' ' || e.key === 'Enter') {
                 e.preventDefault();
+                if (review) motion.cancel();
                 setHeld(true);
               }
             }}

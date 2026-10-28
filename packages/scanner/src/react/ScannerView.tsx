@@ -1,7 +1,13 @@
 import { diagnose } from '../diagnostics.ts';
 import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { ReviewTools, REVIEW_TITLES, type ReviewPanel } from './ReviewTools.tsx';
-import { ImageViewer } from './ImageViewer.tsx';
+import { ReviewImageViewer } from './ImageViewer.tsx';
+import type {
+  PageDirection,
+  ReviewArrival,
+  ReviewNavigation,
+  ReviewTarget,
+} from './review-motion.ts';
 import { ToolIcon } from './ToolIcon.tsx';
 import { initialProfile, profileRecipe } from '../profiles.ts';
 import { resolveAutoCaptureStabilityMs } from '../capture.ts';
@@ -92,6 +98,16 @@ export function ScannerView({
   const readOnlyPanel = reviewPanel === 'quality' || reviewPanel === 'original';
   const [pageGrid, setPageGrid] = useState(false);
   const [history, setHistory] = useState<Edit[]>([]);
+  const [swipeArrival, setSwipeArrival] = useState<(ReviewArrival & { fromId: string }) | null>(
+    null,
+  );
+  const motionGeneration = useRef(0);
+  const [motionCancelKey, setMotionCancelKey] = useState(0);
+  const invalidateMotion = () => {
+    motionGeneration.current++;
+    setMotionCancelKey((value) => value + 1);
+    setSwipeArrival(null);
+  };
   const restoredHistory = useRef<Edit[] | null>(null);
   const panelSnapshot = useRef<Edit | null>(null);
   const panelHistory = useRef<Edit[]>([]);
@@ -213,10 +229,12 @@ export function ScannerView({
     (shutter.current ??= new ShutterSound(shutterUrl)).prepare();
   };
   const startCamera = () => {
+    invalidateMotion();
     prepareSound();
     setCamera(true);
   };
   const repeatCapture = (trigger: HTMLElement) => {
+    invalidateMotion();
     if (guard.current || signal.aborted || !alive.current) return;
     repeatFocus.current = true;
     if ((pendingCrop ?? draft)?.source === 'file') chooseFileReplacement(undefined, trigger);
@@ -541,12 +559,12 @@ export function ScannerView({
       reviewQueued();
     } else void processInput(files[0], 'file', undefined, true);
   };
-  const reviewQueued = () => {
+  const reviewQueued = async (): Promise<CaptureOutcome> => {
     if (guard.current || signal.aborted || !alive.current) return;
     const next = queue.current[0];
     if (!next) return;
     replaceId.current = undefined;
-    if (next.kind === 'file') void processInput(next.file, 'file', undefined, true);
+    if (next.kind === 'file') return processInput(next.file, 'file', undefined, true);
     else {
       queue.current.shift();
       setError('');
@@ -561,9 +579,11 @@ export function ScannerView({
         setDraft(next.candidate);
       }
       syncPages();
+      return 'status' in next.candidate ? { needsCrop: true } : { preview: next.candidate.preview };
     }
   };
   const reviewPages = () => {
+    invalidateMotion();
     if (guard.current) return;
     setCamera(false);
     if (queue.current.length) reviewQueued();
@@ -755,7 +775,8 @@ export function ScannerView({
       handleError(err);
     }
   };
-  const editPage = (page: PageDraft) => {
+  const editPage = (page: PageDraft, preserveMotion = false) => {
+    if (!preserveMotion) invalidateMotion();
     if (continuous) setError('');
     replaceId.current = page.id;
     setActivePageId(page.id);
@@ -767,6 +788,7 @@ export function ScannerView({
     setDraft(copy);
   };
   const navigate = (delta: number) => {
+    invalidateMotion();
     const saved = saveDraft();
     if (!saved) return;
     const items = session.pages,
@@ -780,12 +802,92 @@ export function ScannerView({
       reviewQueued();
     }
   };
+  const motionKey = (page: PageDraft) => `${page.id}:${page.revision}`;
+  const reviewDestination = (
+    direction: PageDirection,
+  ): { target: ReviewTarget; page?: PageDraft } | undefined => {
+    const current = draftRef.current;
+    if (!current) return;
+    const stored = retainedPages.current.findIndex(
+      (page) => page.id === (replaceId.current ?? current.id),
+    );
+    const index = stored >= 0 ? stored : retainedPages.current.length;
+    const page = retainedPages.current[index + (direction === 'next' ? 1 : -1)];
+    if (page) return { page, target: { key: motionKey(page), image: page.preview } };
+    const queued = direction === 'next' ? queue.current[0] : undefined;
+    if (queued?.kind === 'file') return { target: { key: queued.file } };
+    if (queued?.kind === 'capture')
+      return {
+        target: {
+          key:
+            'status' in queued.candidate
+              ? `${queued.candidate.id}:crop`
+              : motionKey(queued.candidate),
+          image: 'preview' in queued.candidate ? queued.candidate.preview : undefined,
+        },
+      };
+  };
+  const navigateSwipe: ReviewNavigation['navigate'] = async (
+    direction,
+    expected,
+    leave,
+    visualSignal,
+  ) => {
+    if (
+      guard.current ||
+      signal.aborted ||
+      visualSignal.aborted ||
+      !alive.current ||
+      reviewPanel ||
+      editingCorners
+    )
+      return false;
+    const destination = reviewDestination(direction);
+    if (!destination || destination.target.key !== expected.key) return false;
+    const generation = ++motionGeneration.current;
+    const saved = saveDraft();
+    if (!saved) return false;
+    const savedKey = motionKey(saved);
+    const disposition = await leave(savedKey);
+    if (
+      !disposition ||
+      visualSignal.aborted ||
+      signal.aborted ||
+      !alive.current ||
+      generation !== motionGeneration.current ||
+      !draftRef.current ||
+      motionKey(draftRef.current) !== savedKey
+    )
+      return false;
+    if (destination.page) editPage(destination.page, true);
+    else {
+      if (!expected.image)
+        setSwipeArrival({
+          token: generation,
+          direction,
+          fromId: saved.id,
+          animate: disposition === 'animate',
+          ignoreUntil: performance.now() + 500,
+        });
+      replaceId.current = undefined;
+      setDraft(null);
+      setPageGrid(true);
+      const outcome = await reviewQueued();
+      if (!alive.current || signal.aborted) return false;
+      if (!outcome?.preview)
+        setSwipeArrival((current) => (current?.token === generation ? null : current));
+    }
+    const actual = draftRef.current;
+    return actual ? { key: motionKey(actual), image: actual.preview } : false;
+  };
   const showPages = () => {
+    invalidateMotion();
     if (draft && !saveDraft()) return;
     setPageGrid(true);
     setPageActions(false);
   };
   const openPanel = (panel: ReviewPanel | null) => {
+    invalidateMotion();
     if (guard.current) return;
     if (panel && draft) {
       panelSnapshot.current = editOf(draft);
@@ -815,6 +917,7 @@ export function ScannerView({
     });
   };
   const discardDraft = () => {
+    invalidateMotion();
     if (guard.current) return;
     setDraft(null);
     setPageGrid(false);
@@ -825,6 +928,7 @@ export function ScannerView({
     else setPageGrid(true);
   };
   const cancelPendingCrop = () => {
+    invalidateMotion();
     if (guard.current) return;
     if (restoreFileReplacement() || restoreCameraReplacement()) return;
     setPendingCrop(null);
@@ -903,6 +1007,7 @@ export function ScannerView({
     };
   }, []);
   const close = () => {
+    invalidateMotion();
     if (pages.length || queue.current.length || draft || pendingCrop || busy) setDiscard(true);
     else finish({ status: 'cancelled' });
   };
@@ -1135,26 +1240,30 @@ export function ScannerView({
                 />
               ) : (
                 <div className={`scanner-review${reviewPanel ? ' scanner-detail' : ''}`}>
-                  <ImageViewer
+                  <ReviewImageViewer
+                    motion={{
+                      cancelKey: motionCancelKey,
+                      key:
+                        reviewPanel === 'original'
+                          ? `${motionKey(draft)}:original`
+                          : motionKey(draft),
+                      signal,
+                      navigation:
+                        !busy && !reviewPanel && !editingCorners
+                          ? {
+                              previous: reviewDestination('previous')?.target,
+                              next: reviewDestination('next')?.target,
+                              navigate: navigateSwipe,
+                            }
+                          : undefined,
+                      arrival:
+                        swipeArrival && swipeArrival.fromId !== draft.id ? swipeArrival : undefined,
+                      arrived: (token) => {
+                        if (alive.current && !signal.aborted)
+                          setSwipeArrival((current) => (current?.token === token ? null : current));
+                      },
+                    }}
                     image={reviewPanel === 'original' ? draft.original : draft.preview}
-                    onPageSwipe={
-                      !busy && !reviewPanel && !editingCorners
-                        ? (direction) => {
-                            if (
-                              direction === 'previous' &&
-                              (replaceId.current ? activePageIndex === 0 : !pages.length)
-                            )
-                              return;
-                            if (
-                              direction === 'next' &&
-                              !queue.current.length &&
-                              (!replaceId.current || activePageIndex >= pages.length - 1)
-                            )
-                              return;
-                            navigate(direction === 'next' ? 1 : -1);
-                          }
-                        : undefined
-                    }
                     before={reviewPanel === 'original' ? undefined : draft.unoptimizedPreview}
                     resetKey={`${draft.id}:${draft.rotation}:${reviewPanel === 'original' ? 'original' : 'crop'}`}
                     alt={
