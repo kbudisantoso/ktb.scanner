@@ -5,6 +5,7 @@
 ### Fixed
 
 - Imported images now offer **Replace image** (**Bild tauschen**) with a direct single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the previous candidate/page and remaining imports.
+- Keep observed complete document boundaries instead of replacing them with stronger internal fold panels that share both opposite paper sides.
 
 ## 0.2.0 - 2026-10-27
 
