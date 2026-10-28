@@ -1,5 +1,5 @@
 import { chooseAutoProfile } from './auto-profile.ts';
-import { scanDocument, extractDocument } from 'scanic';
+import { extractDocument } from 'scanic';
 import type { CornerPoints } from 'scanic';
 import type {
   AutoOptimization,
@@ -26,6 +26,7 @@ import { normalizePaperLighting } from './paper-cleanup.ts';
 import { applyAdjustments, autoPaperContrast, validRecipe } from './adjustments.ts';
 import { refineEdges } from './refine.ts';
 import { recoverTopPaperEdge } from './top-edge.ts';
+import { createDetectionJob } from './detection.ts';
 import { correctLens, estimateLens } from './lens.ts';
 import { grayscale, blackAndWhite } from './color-profiles.ts';
 import { WorkerTrace } from './diagnostics.worker.ts';
@@ -80,21 +81,20 @@ async function detect(
       Math.abs(Math.log(aspect / liveTarget.aspect)) < 0.01
         ? liveTarget.corners
         : null;
-    const result = await scanDocument(data, {
-      mode: 'detect',
-      detector: 'classical',
-      maxProcessingDimension: 800,
-      debug: engineBuffers,
-      output: 'imagedata',
-      selectCandidate: (
-        candidates: DocumentCandidate[],
-        size: { width: number; height: number },
-      ) => {
-        const selected = selectDocumentCandidate(candidates, size, previous);
-        trace?.event('candidate-selection', { phase: 'live', ...selected, candidate: undefined });
-        return selected.candidate;
+    const result = await createDetectionJob().scan(
+      data,
+      {
+        mode: 'detect',
+        detector: 'classical',
+        maxProcessingDimension: 800,
+        debug: engineBuffers,
+        output: 'imagedata',
       },
-    } as Parameters<typeof scanDocument>[1]);
+      (candidates, size) => selectDocumentCandidate(candidates, size, previous),
+      (_candidates, _size, selected) => {
+        trace?.event('candidate-selection', { phase: 'live', ...selected, candidate: undefined });
+      },
+    );
     const corners = normalized(result.corners, small.width, small.height);
     if (corners) liveTarget = { corners, timestamp, aspect };
     const sharpness = corners ? assessQuality(data, corners, 0).sharpness : 'unknown';
@@ -209,6 +209,7 @@ async function process(
     let corners = request.corners,
       edgesUncertain = false;
     if (!corners) {
+      const detection = createDetectionJob();
       const pool: DocumentCandidate[] = [];
       let sourcePixels: ImageData | undefined;
       const getPixels = () =>
@@ -223,30 +224,29 @@ async function process(
             bound === 1000
               ? data
               : pass.getContext('2d')!.getImageData(0, 0, pass.width, pass.height);
-          const detected = await scanDocument(passData, {
-            mode: 'detect',
-            detector: 'classical',
-            maxProcessingDimension: bound,
-            debug: engineBuffers,
-            output: 'imagedata',
-            selectCandidate: (
-              candidates: DocumentCandidate[],
-              size: { width: number; height: number },
-            ) => {
+          const detected = await detection.scan(
+            passData,
+            {
+              mode: 'detect',
+              detector: 'classical',
+              maxProcessingDimension: bound,
+              debug: engineBuffers,
+              output: 'imagedata',
+            },
+            selectDocumentCandidate,
+            (candidates, size, selected) => {
               for (const candidate of candidates) {
                 const q = candidateQuad(candidate, size);
                 if (q) pool.push({ ...candidate, corners: pixels(q, small.width, small.height) });
               }
-              const selected = selectDocumentCandidate(candidates, size);
               trace?.event('candidate-selection', {
                 phase: 'still',
                 passMaxDimension: bound,
                 ...selected,
                 candidate: undefined,
               });
-              return selected.candidate;
             },
-          } as Parameters<typeof scanDocument>[1]);
+          );
           trace?.event('still-detection', {
             corners: detected.corners,
             confidence: detected.confidence,
@@ -283,16 +283,17 @@ async function process(
           context.rotate(theta);
           context.drawImage(small, -small.width / 2, -small.height / 2);
           try {
-            await scanDocument(rotated, {
-              mode: 'detect',
-              detector: 'classical',
-              maxProcessingDimension: 1000,
-              debug: engineBuffers,
-              output: 'imagedata',
-              selectCandidate: (
-                candidates: DocumentCandidate[],
-                size: { width: number; height: number },
-              ) => {
+            await detection.scan(
+              rotated,
+              {
+                mode: 'detect',
+                detector: 'classical',
+                maxProcessingDimension: 1000,
+                debug: engineBuffers,
+                output: 'imagedata',
+              },
+              selectDocumentCandidate,
+              (candidates, size) => {
                 for (const candidate of candidates) {
                   const q = candidateQuad(candidate, size);
                   if (!q) continue;
@@ -319,9 +320,8 @@ async function process(
                       corners: pixels(ordered, small.width, small.height),
                     });
                 }
-                return selectDocumentCandidate(candidates, size).candidate;
               },
-            } as Parameters<typeof scanDocument>[1]);
+            );
             trace?.event('still-orientation-retry', { degrees, hypotheses: pool.length });
           } finally {
             rotated.width = rotated.height = 1;
