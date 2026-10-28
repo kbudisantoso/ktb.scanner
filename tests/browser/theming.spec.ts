@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 import type { Locator } from '@playwright/test';
+import { expectReviewControls, previewHash, waitForPreview } from './helpers';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -28,12 +29,26 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => {
     const h = (window as any).themeHarness;
     h.mount = document.body.appendChild(document.createElement('div'));
-    h.open = (api: string, theme?: Record<string, string>, camera = false) => {
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        this.addEventListener('message', ({ data }) => {
+          // Keep native image processing while controlling only the warning UI fixture.
+          if (h.hintFixture && data.result?.quality) {
+            data.result.quality.reasons = h.hintFixture.reasons;
+            data.result.edgesUncertain = h.hintFixture.edges;
+          }
+        });
+      }
+    };
+    h.open = (api: string, theme?: Record<string, string>, camera = false, locale = 'en') => {
       const options = {
         assetBaseUrl: '/scanner-assets/',
         shutterSound: 'off',
         createPdf: false,
         theme,
+        locale,
       };
       if (api === 'controller') {
         h.controller = h.createScanner({ ...options, mount: h.mount });
@@ -110,7 +125,7 @@ const custom = {
 for (const api of ['controller', 'react']) {
   test(`${api}: theme reaches backdrop, workspace controls and focus without host selectors`, async ({
     page,
-  }) => {
+  }, info) => {
     await page.evaluate(({ api, custom }) => (window as any).themeHarness.open(api, custom), {
       api,
       custom,
@@ -151,6 +166,83 @@ for (const api of ['controller', 'react']) {
     expect(await select.evaluate((e) => getComputedStyle(e).backgroundImage)).toContain(
       'rgb(234, 240, 250)',
     );
+    await test.step('Zero and positive hints keep the zoom centered, preserve Before and restore focus in both languages', async () => {
+      await page.setViewportSize({ width: 390, height: 664 });
+      const data = await page.evaluate(fixtureInBrowser, fixtures[1]);
+      for (const locale of ['en', 'de']) {
+        if (locale === 'de')
+          await page.evaluate(
+            async ({ api, custom, locale }) => {
+              const h = (window as any).themeHarness;
+              if (api === 'controller') {
+                await h.controller.destroy();
+                await h.pending;
+              } else h.root.unmount();
+              h.open(api, custom, false, locale);
+            },
+            { api, custom, locale },
+          );
+        await page.evaluate(() => {
+          (window as any).themeHarness.hintFixture = { reasons: [], edges: false };
+        });
+        const file = {
+          name: 'synthetic-hints.png',
+          mimeType: 'image/png',
+          buffer: Buffer.from(data.split(',')[1], 'base64'),
+        };
+        await dialog.locator('input[type=file][multiple]').setInputFiles(file);
+        await waitForPreview(page);
+        const hash = await previewHash(page);
+        await expect(dialog.locator('.scanner-hints')).toHaveCount(0);
+        await expectReviewControls(page);
+        if (locale === 'de' && ['chromium', 'mobile-webkit'].includes(info.project.name))
+          await info.attach('review-0-hints-390.png', {
+            contentType: 'image/png',
+            body: await page.screenshot(),
+          });
+        await page.evaluate(() => {
+          (window as any).themeHarness.hintFixture = { reasons: ['blur', 'exposure'], edges: true };
+        });
+        const previous = await (await waitForPreview(page)).getAttribute('src');
+        const choosing = page.waitForEvent('filechooser');
+        await dialog.getByRole('button', { name: /^(Replace image|Bild tauschen)$/ }).click();
+        await (await choosing).setFiles(file);
+        await waitForPreview(page, previous);
+        expect(await previewHash(page)).toBe(hash);
+        const hints = dialog.getByRole('button', {
+          name: `${locale === 'de' ? 'Hinweise' : 'Hints'}: 3`,
+          exact: true,
+        });
+        await expect(hints).toHaveText('3');
+        await expect(hints.locator('svg')).toHaveCount(1);
+        await expectReviewControls(page);
+        if (locale === 'de' && ['chromium', 'mobile-webkit'].includes(info.project.name))
+          await info.attach('review-3-hints-390.png', {
+            contentType: 'image/png',
+            body: await page.screenshot(),
+          });
+        await hints.click();
+        await expect(dialog.locator('.scanner-quality li')).toHaveCount(3);
+        await expect(dialog.getByRole('button', { name: /^(Close|Schließen)$/ })).toHaveCount(0);
+        await expect(dialog.getByRole('button', { name: /^(Undo|Rückgängig)$/ })).toHaveCount(0);
+        await dialog.getByRole('button', { name: 'OK', exact: true }).click();
+        await expect(hints).toBeFocused();
+        await hints.click();
+        await dialog.focus();
+        await page.keyboard.press('Escape');
+        await expect(hints).toBeFocused();
+        const before = dialog.getByRole('button', {
+          name: /^(Hold to view before|Vorher anzeigen - gedrückt halten)$/,
+        });
+        await before.focus();
+        await page.keyboard.down('Space');
+        await expect(
+          dialog.getByRole('img', { name: /^(Unoptimized crop|Unoptimierter Zuschnitt)$/ }),
+        ).toBeVisible();
+        await page.keyboard.up('Space');
+        await expect(before).toHaveAttribute('aria-pressed', 'false');
+      }
+    });
   });
 
   test(`${api}: mobile camera uses explicit palette and inherited root focus, including denied errors`, async ({

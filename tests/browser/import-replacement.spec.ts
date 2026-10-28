@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
-import { previewHash as imageHash } from './helpers';
+import { previewHash as imageHash, readCornerOriginal } from './helpers';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 let harness: string;
@@ -525,13 +525,8 @@ for (const budget of ['originalBytes', 'workingBytes', 'resultBytes']) {
     await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Replace image', exact: true })).toBeEnabled();
     expect(await imageHash(page)).toBe(before);
-    await page.getByRole('button', { name: 'Compare original', exact: true }).click();
-    const original = await page
-      .getByRole('img', { name: 'Original capture', exact: true })
-      .evaluate(async (image: HTMLImageElement) =>
-        Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())),
-      );
-    expect(original).toEqual(Array.from((await file(page, 0)).buffer));
+    const original = await readCornerOriginal(page);
+    expect(original.bytes).toEqual(Array.from((await file(page, 0)).buffer));
     await page.evaluate(() => (window as any).replacementHarness.controller.destroy());
     const finished = await result(page);
     expect(finished.status).toBe('cancelled');

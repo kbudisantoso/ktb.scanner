@@ -95,7 +95,9 @@ export function ScannerView({
   const [activePageId, setActivePageId] = useState<string>();
   const [pageActions, setPageActions] = useState(false);
   const [reviewPanel, setReviewPanel] = useState<ReviewPanel | null>(null);
-  const readOnlyPanel = reviewPanel === 'quality' || reviewPanel === 'original';
+  const readOnlyPanel = reviewPanel === 'quality';
+  const hintsButton = useRef<HTMLButtonElement>(null);
+  const hintsReturnFocus = useRef(false);
   const [pageGrid, setPageGrid] = useState(false);
   const [history, setHistory] = useState<Edit[]>([]);
   const [swipeArrival, setSwipeArrival] = useState<(ReviewArrival & { fromId: string }) | null>(
@@ -131,6 +133,12 @@ export function ScannerView({
     setHistory(restoredHistory.current ?? []);
     restoredHistory.current = null;
   }, [draft?.id]);
+  useEffect(() => {
+    if (!reviewPanel && !busy && alive.current && !signal.aborted && hintsReturnFocus.current) {
+      hintsButton.current?.focus();
+      hintsReturnFocus.current = false;
+    }
+  }, [reviewPanel, busy, signal]);
   const activePageIndex = Math.max(
     0,
     pages.findIndex((p) => p.id === activePageId),
@@ -684,6 +692,36 @@ export function ScannerView({
       end();
     }
   };
+  const changeLayout = (format: FormatSelection) => {
+    const current = draftRef.current;
+    if (
+      !current ||
+      current.format.kind !== 'receipt' ||
+      format.kind !== 'receipt' ||
+      guard.current ||
+      !alive.current ||
+      signal.aborted ||
+      JSON.stringify(current.format) === JSON.stringify(format)
+    )
+      return;
+    setHistory((previous) => [...previous.slice(-11), editOf(current)]);
+    setDraft({ ...current, format });
+  };
+  const restoreEdit = (previous: Edit): Promise<boolean | undefined> => {
+    const current = draftRef.current;
+    if (!current || guard.current || !alive.current || signal.aborted)
+      return Promise.resolve(false);
+    if (
+      current.format.kind === 'receipt' &&
+      previous.format.kind === 'receipt' &&
+      JSON.stringify({ ...editOf(current), format: previous.format }) === JSON.stringify(previous)
+    ) {
+      if (!begin()) return Promise.resolve(false);
+      setDraft({ ...current, format: previous.format });
+      return Promise.resolve(true).finally(end);
+    }
+    return reprocess(previous, false);
+  };
   const findEdges = async (
     page: Pick<PageDraft, 'original' | 'id' | 'source' | 'recipe' | 'revision'> &
       Partial<Pick<PageDraft, 'rotation' | 'format'>>,
@@ -889,14 +927,19 @@ export function ScannerView({
   const openPanel = (panel: ReviewPanel | null) => {
     invalidateMotion();
     if (guard.current) return;
-    if (panel && draft) {
+    if (panel && panel !== 'quality' && draft) {
       panelSnapshot.current = editOf(draft);
       panelHistory.current = history.slice();
+      setHistory([]);
     }
     setReviewPanel(panel);
   };
   const cancelPanel = () => {
     if (guard.current) return;
+    if (reviewPanel === 'quality') {
+      setReviewPanel(null);
+      return;
+    }
     const previous = panelSnapshot.current;
     const restore = () => {
       setReviewPanel(null);
@@ -904,16 +947,17 @@ export function ScannerView({
       setHistory(panelHistory.current);
     };
     if (previous && draft && JSON.stringify(previous) !== JSON.stringify(editOf(draft))) {
-      void reprocess(previous, false).then((success) => {
-        if (success) restore();
+      void restoreEdit(previous).then((success) => {
+        if (success && alive.current && !signal.aborted) restore();
       });
     } else restore();
   };
   const undo = () => {
-    if (!history.length || guard.current) return;
+    if (!reviewPanel || reviewPanel === 'quality' || !history.length || guard.current) return;
     const previous = history.at(-1)!;
-    void reprocess(previous, false).then((success) => {
-      if (success && !guard.current) setHistory((items) => items.slice(0, -1));
+    void restoreEdit(previous).then((success) => {
+      if (success && alive.current && !signal.aborted && !guard.current)
+        setHistory((items) => items.slice(0, -1));
     });
   };
   const discardDraft = () => {
@@ -1243,10 +1287,7 @@ export function ScannerView({
                   <ReviewImageViewer
                     motion={{
                       cancelKey: motionCancelKey,
-                      key:
-                        reviewPanel === 'original'
-                          ? `${motionKey(draft)}:original`
-                          : motionKey(draft),
+                      key: motionKey(draft),
                       signal,
                       navigation:
                         !busy && !reviewPanel && !editingCorners
@@ -1263,12 +1304,26 @@ export function ScannerView({
                           setSwipeArrival((current) => (current?.token === token ? null : current));
                       },
                     }}
-                    image={reviewPanel === 'original' ? draft.original : draft.preview}
-                    before={reviewPanel === 'original' ? undefined : draft.unoptimizedPreview}
-                    resetKey={`${draft.id}:${draft.rotation}:${reviewPanel === 'original' ? 'original' : 'crop'}`}
-                    alt={
-                      reviewPanel === 'original' ? t('Originalaufnahme') : t('Bearbeitete Seite')
+                    hints={
+                      !reviewPanel
+                        ? {
+                            count:
+                              draft.quality.reasons.filter((reason) => reason !== 'edges').length +
+                              Number(!!draft.edgesUncertain),
+                            disabled: busy,
+                            buttonRef: hintsButton,
+                            open: () => {
+                              if (guard.current || signal.aborted || !alive.current) return;
+                              hintsReturnFocus.current = true;
+                              openPanel('quality');
+                            },
+                          }
+                        : undefined
                     }
+                    image={draft.preview}
+                    before={draft.unoptimizedPreview}
+                    resetKey={`${draft.id}:${draft.rotation}:crop`}
+                    alt={t('Bearbeitete Seite')}
                     texts={options.texts}
                     locale={options.locale}
                   />
@@ -1280,14 +1335,12 @@ export function ScannerView({
                     setPanel={openPanel}
                     t={t}
                     change={(patch) => void reprocess(patch)}
-                    layout={(format) => setDraft((current) => current && { ...current, format })}
+                    layout={changeLayout}
                     corners={() => {
                       cornerReturnFocus.current = true;
                       setReviewPanel(null);
                       setEditingCorners(true);
                     }}
-                    undo={undo}
-                    canUndo={!!history.length}
                     discard={discardDraft}
                     repeat={repeatCapture}
                     add={() => {
@@ -1496,9 +1549,14 @@ export function ScannerView({
         (reviewPanel ? (
           <footer className="scanner-footer scanner-detail-footer">
             {!readOnlyPanel && (
-              <button disabled={busy} onClick={cancelPanel}>
-                {t('Abbrechen')}
-              </button>
+              <>
+                <button disabled={busy} onClick={cancelPanel}>
+                  {t('Abbrechen')}
+                </button>
+                <button disabled={busy || !history.length} onClick={undo}>
+                  {t('Rückgängig')}
+                </button>
+              </>
             )}
             <button
               disabled={busy}

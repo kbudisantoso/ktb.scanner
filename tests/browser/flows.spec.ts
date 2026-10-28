@@ -1,4 +1,4 @@
-import { discardDraft, previewHash } from './helpers';
+import { discardDraft, previewHash, readCornerOriginal } from './helpers';
 import { acceptPage, chooseFormat, discardResult, closeTool } from './helpers';
 import { closeAppPanel } from './helpers';
 import { openOptions, pageActions, showPdf, tool } from './helpers';
@@ -198,17 +198,11 @@ test('all acceptance fixtures pass through the real engine without losing the so
       await confirmCrop.click();
     }
     await expect(preview).toBeVisible();
-    await page.getByRole('button', { name: 'Original vergleichen' }).click();
-    await expect
-      .poll(() =>
-        page.getByRole('img', { name: 'Originalaufnahme' }).evaluate((img: HTMLImageElement) => ({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        })),
-      )
-      .toEqual({ width: fixture.width, height: fixture.height });
+    const original = await readCornerOriginal(page);
+    expect([original.width, original.height]).toEqual([fixture.width, fixture.height]);
+    expect(original.bytes).toEqual(Array.from(Buffer.from(data.split(',')[1], 'base64')));
     await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
-    await page.getByRole('button', { name: 'OK', exact: true }).click();
+    await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await page.getByRole('button', { name: 'Schließen', exact: true }).click();
     await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
   }
@@ -317,22 +311,10 @@ test('EXIF orientation is normalized once and original bytes remain unchanged', 
     await expect(preview.or(confirm)).toBeVisible();
     if (await confirm.isVisible()) await confirm.click();
     await expect(preview).toBeVisible();
-    await page.getByRole('button', { name: 'Original vergleichen' }).click();
-    await expect
-      .poll(() =>
-        page
-          .getByRole('img', { name: 'Originalaufnahme' })
-          .evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]),
-      )
-      .toEqual(orientation === 2 ? [900, 600] : [600, 900]);
-    const source = await page
-      .getByRole('img', { name: 'Originalaufnahme' })
-      .evaluate(async (img: HTMLImageElement) => ({
-        size: [img.naturalWidth, img.naturalHeight],
-        bytes: Array.from(new Uint8Array(await (await fetch(img.src)).arrayBuffer())),
-      }));
-    expect(source.size).toEqual(orientation === 2 ? [900, 600] : [600, 900]);
+    const source = await readCornerOriginal(page);
+    expect([source.width, source.height]).toEqual(orientation === 2 ? [900, 600] : [600, 900]);
     expect(source.bytes).toEqual(Array.from(bytes));
+    await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
     await acceptPage(page);
     await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
     await showPdf(page, 1);

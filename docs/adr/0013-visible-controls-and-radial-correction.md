@@ -2,6 +2,8 @@
 
 Date: 2026-10-18. Status: accepted; later decisions supersede historical defaults as noted below.
 
+Unreleased UI update: D-056 in [decisions](../DECISIONS.md) removes the aggregate Filter reset described below. Existing Auto/profile selection remains; individual neutral-reset icons sit beside adjustment sliders. Processing algorithms and host profile precedence are unchanged.
+
 ## Context
 
 An obscure profile alone did not expose useful optimization or manual adjustment. A lack of full device calibration does not prevent a limited, evidence-tested estimate from several straight document edges.

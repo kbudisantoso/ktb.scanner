@@ -2,6 +2,8 @@
 
 Date: 2026-10-19. Status: accepted; later decisions supersede historical defaults as noted below.
 
+Unreleased UI update: D-056 in [decisions](../DECISIONS.md) removes the aggregate Filter reset described below. Existing Auto/profile selection remains; individual neutral-reset icons sit beside adjustment sliders. Processing algorithms and host profile precedence are unchanged.
+
 ## Context
 
 A fixed manual default and extra Auto click prevent the expected immediate automatic choice/adjustment. Hosts still need explicit overrides and one library implementation.
