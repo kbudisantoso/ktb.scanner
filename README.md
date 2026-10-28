@@ -54,6 +54,8 @@ There is no built-in upload, account, document persistence, service worker, OCR 
 
 Unreleased source offers **Replace image** (**Bild tauschen**) for imported images through a direct picker and retains **Retake** (**Wiederholen**) for camera captures. The corner editor also offers **Find edges** (**Kanten finden**), preserving page settings until explicit Apply; Cancel/Undo retain the prior crop. Review places replacement, direct discard and Add page beneath the document, with equally sized mobile actions. Individual adjustment resets preserve other settings; tool views keep local Cancel/Apply instead of the session-close X. These changes are not in npm 0.2.0. See [integration](docs/INTEGRATION.md).
 
+Unreleased source also supports `captureWorkflow: 'continuous'`: capture a batch while the camera stays open, then review the pages in order. The library default remains `review-each`; both reference hosts select continuous capture and expose the choice. Review supports horizontal page swipes at fit, alongside the existing buttons. See [multi-page capture and review](docs/INTEGRATION.md#multi-page-capture-and-review) for both SDK entry points and limits. These additions are not in npm 0.2.0.
+
 The unreleased source improves folded-paper contour selection: when a supported complete outer boundary is present, stronger internal panels sharing both opposite sides no longer displace it. This does not reconstruct missing boundaries or flatten paper and is not included in npm 0.2.0.
 
 ## Run the demo applications
@@ -72,7 +74,7 @@ Open **http://localhost:3000**. `pnpm dev` builds the library and copies its wor
 In the workshop:
 
 1. Choose **Scan document** to open the scanner, **Import images** for existing files, or the sample-documents button for synthetic examples.
-2. Capture/import, confirm uncertain corners and review the result. Use **Retake** for a camera capture or **Replace image** to select another imported image. Add more pages or choose **Finish** to export.
+2. Capture several pages, then choose **Review pages (n)** to open the first unreviewed page. Confirm uncertain corners and review with Previous/Next or horizontal swipes at fit. **Retake** replaces the current camera page; **Replace image** selects another imported image. Add more pages or choose **Finish** after reviewing them. Options also offers review after each capture.
 3. Inspect actual page images and the generated PDF, then download them deliberately. Returning to the start keeps the result; discarding is explicit.
 4. Open **Options** to change language, initial profile, theme, output image format, capture cue and stabilization duration. Use **Sprache / Language** to switch DE/EN, or use `?lang=en` / `?lang=de` to override browser detection. Manual selections remain explicit in the URL when reloading.
 5. Diagnostics start **off**. Enable them explicitly if required; recorded document bytes remain local to that page session. Reloading loses in-memory scans and diagnostics.

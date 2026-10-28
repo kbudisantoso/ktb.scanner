@@ -1,3 +1,4 @@
+import { chooseCaptureWorkflow } from './helpers';
 import { test, expect } from './fixtures';
 
 test('mobile camera prioritizes the preview, reachable controls, options and direct import', async ({
@@ -55,6 +56,7 @@ test('mobile camera prioritizes the preview, reachable controls, options and dir
     });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -132,6 +134,7 @@ test('mobile denied camera keeps clear exit, import and restart actions', async 
     }),
   );
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
   const dialog = page.getByRole('dialog');

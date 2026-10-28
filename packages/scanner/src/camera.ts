@@ -124,19 +124,24 @@ export class Camera {
     } catch {
       /* Feedback cannot invalidate the secured pixels. */
     }
-    const blob = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(
-        (result) =>
-          result
-            ? resolve(result)
-            : reject(new ScannerError('PROCESSING_FAILED', 'Aufnahme fehlgeschlagen.')),
-        'image/jpeg',
-        0.98,
-      ),
-    );
-    canvas.width = canvas.height = 1;
-    aborted(signal);
-    onDetails?.(details);
-    return blob;
+    try {
+      aborted(signal);
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (result) =>
+            result
+              ? resolve(result)
+              : reject(new ScannerError('PROCESSING_FAILED', 'Aufnahme fehlgeschlagen.')),
+          'image/jpeg',
+          0.98,
+        ),
+      );
+      aborted(signal);
+      onDetails?.(details);
+      aborted(signal);
+      return blob;
+    } finally {
+      canvas.width = canvas.height = 1;
+    }
   }
 }

@@ -34,8 +34,8 @@ The original ten defaults are declared directly on `.scanner`, the dialog root. 
 | `--scanner-primary-text` | `#fff` | Foreground on accent-filled primary controls and capture page badge. Allows a light accent with a dark foreground. |
 | `--scanner-warning-text` | General warning: `var(--scanner-text)`; camera: inherited text, or `#292518` in the mobile error panel | Foreground on warnings and camera errors. Set this explicitly with a custom warning background to keep every state consistent. |
 | `--scanner-warning-border` | `#a37318` | Warning panel's leading edge. |
-| `--scanner-control-radius` | `6px` general controls; `8px` viewer controls; `24px` mobile pills; `5px` page label | Radius of ordinary controls and small labels. Circular camera buttons/handles retain their shapes. |
-| `--scanner-panel-shadow` | Existing per-consumer shadows: dialog `0 20px 90px #0003`; preview `0 3px 16px #0002`; processing `0 8px 28px #14281f26, inset 0 0 0 1px #ffffff60`; camera options `0 16px 48px #0005`; loupe `0 3px 16px #0004`; status `0 4px 16px #14281f20` | Complete CSS box-shadow for panels. One supplied shadow replaces the contextual fallbacks; use `none` to remove them. |
+| `--scanner-control-radius` | `6px` general controls; `8px` viewer controls; `24px` mobile pills; `5px` page label; unreleased capture-feedback message and review shortcut `12px` | Radius of ordinary controls and small labels. Circular camera buttons/handles retain their shapes. |
+| `--scanner-panel-shadow` | Existing per-consumer shadows: dialog `0 20px 90px #0003`; preview `0 3px 16px #0002`; processing `0 8px 28px #14281f26, inset 0 0 0 1px #ffffff60`; camera options `0 16px 48px #0005`; loupe `0 3px 16px #0004`; status `0 4px 16px #14281f20`; unreleased extracted-page feedback `0 8px 30px #0005` | Complete CSS box-shadow for panels. One supplied shadow replaces the contextual fallbacks; use `none` to remove them. |
 | `--scanner-control-shadow` | `none` for ordinary/viewer controls; mobile shutter `0 2px 18px #0003` | Complete CSS box-shadow for controls; selected-state rings remain state feedback. |
 | `--scanner-panel-radius` | Existing per-panel `8px`, `10px`, `12px` or `16px` | Shared panel, menu, loupe and grouped-control corners. One supplied value replaces those per-consumer fallbacks. |
 | `--scanner-viewer-radius` | `10px` | ImageViewer workspace corners. |
@@ -46,7 +46,7 @@ The original ten defaults are declared directly on `.scanner`, the dialog root. 
 
 ### Camera tokens
 
-The mobile camera presentation applies at `max-width: 700px` or `max-height: 500px`. Its image-preview background is also used on larger screens. Camera errors use the shared warning background/text pair rather than a second competing error palette.
+The mobile camera presentation applies at `max-width: 700px` or `max-height: 500px`. Its image-preview background is also used on larger screens. Camera errors use the shared warning background/text pair rather than a second competing error palette. Unreleased continuous-capture feedback also consumes `--scanner-camera-text` and `--scanner-camera-control` at all viewport sizes, plus the shared radius/shadow tokens listed above. This feedback and the review shortcut are not in npm 0.2.0; they add no token names.
 
 | Variable | Default / fallback | Meaning and scope |
 | --- | --- | --- |

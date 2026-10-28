@@ -1,5 +1,5 @@
 import { diagnose } from '../diagnostics.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type SetStateAction } from 'react';
 import { ReviewTools, REVIEW_TITLES, type ReviewPanel } from './ReviewTools.tsx';
 import { ImageViewer } from './ImageViewer.tsx';
 import { ToolIcon } from './ToolIcon.tsx';
@@ -19,7 +19,6 @@ import type {
   ScanResult,
   FormatSelection,
   PaperPreference,
-  CropRequired,
   Recipe,
 } from '../types.ts';
 import { ScanSession, resolveLimits } from '../session.ts';
@@ -30,16 +29,15 @@ import { useBlobUrl } from './hooks.ts';
 import { CornerEditor, type CornerEditorHandle } from './CornerEditor.tsx';
 import { CameraView } from './CameraView.tsx';
 import { ShutterSound } from '../shutter-sound.ts';
+import {
+  retainedCaptureLimits,
+  type PendingCrop,
+  type CaptureCandidate,
+  type CaptureOutcome,
+  type UnreviewedPage,
+} from './capture-queue.ts';
 import { resolveShutterSoundUrl } from '../sounds.ts';
 type Edit = Pick<PageDraft, 'recipe' | 'format' | 'rotation' | 'corners' | 'edgesUncertain'>;
-type PendingCrop = CropRequired & {
-  original: Blob;
-  source: 'camera' | 'file';
-  id: string;
-  revision: number;
-  recipe: Recipe;
-  format?: FormatSelection;
-};
 const editOf = ({ recipe, format, rotation, corners, edgesUncertain }: PageDraft): Edit =>
   structuredClone({ recipe, format, rotation, corners, edgesUncertain });
 function PageImage({ blob, alt, t }: { blob: Blob; alt: string; t: Translate }) {
@@ -64,10 +62,21 @@ export function ScannerView({
   finish: (result: ScanResult) => void;
 }) {
   const t = createTranslator(options.locale, options.texts);
+  const continuous = options.captureWorkflow === 'continuous';
   const [session] = useState(() => new ScanSession(resolveLimits(options.limits)));
   const [pages, setPages] = useState<readonly PageDraft[]>([]),
-    [draft, setDraft] = useState<PageDraft | null>(null);
-  const [pendingCrop, setPendingCrop] = useState<PendingCrop | null>(null);
+    [draft, setDraftState] = useState<PageDraft | null>(null);
+  const [pendingCrop, setPendingCropState] = useState<PendingCrop | null>(null);
+  const draftRef = useRef<PageDraft | null>(null),
+    pendingCropRef = useRef<PendingCrop | null>(null);
+  const setDraft = (value: SetStateAction<PageDraft | null>) => {
+    draftRef.current = typeof value === 'function' ? value(draftRef.current) : value;
+    setDraftState(draftRef.current);
+  };
+  const setPendingCrop = (value: PendingCrop | null) => {
+    pendingCropRef.current = value;
+    setPendingCropState(value);
+  };
   const [mode, setMode] = useState<CaptureMode>(options.initialMode ?? 'auto'),
     [mime, setMime] = useState<ImageMime>(options.imageType ?? 'image/jpeg');
   const [camera, setCamera] = useState(initial.entry === 'camera' && !initial.initialFiles?.length),
@@ -114,11 +123,12 @@ export function ScannerView({
   const engine = useRef<EngineAdapter | null>(null),
     guard = useRef(false),
     replaceId = useRef<string | undefined>(undefined);
-  const queue = useRef<File[]>([]),
+  const queue = useRef<UnreviewedPage[]>([]),
     input = useRef<HTMLInputElement>(null),
     replacementInput = useRef<HTMLInputElement>(null),
     root = useRef<HTMLElement>(null);
   const acceptedBlobs = useRef(new WeakSet<Blob>());
+  const originalOwners = useRef(new WeakMap<Blob, Blob>());
   const fileIntent = useRef<{
     pageId?: string;
     candidateId?: string;
@@ -131,6 +141,14 @@ export function ScannerView({
     pageGrid: boolean;
     history: Edit[];
   } | null>(null);
+  const cameraReplacement = useRef<{
+    draft: PageDraft | null;
+    pendingCrop: PendingCrop | null;
+    replaceId?: string;
+    pageGrid: boolean;
+    history: Edit[];
+  } | null>(null);
+  const retainedPages = useRef<readonly PageDraft[]>([]);
   const alive = useRef(true);
   useEffect(() => {
     if (
@@ -202,7 +220,16 @@ export function ScannerView({
     if (guard.current || signal.aborted || !alive.current) return;
     repeatFocus.current = true;
     if ((pendingCrop ?? draft)?.source === 'file') chooseFileReplacement(undefined, trigger);
-    else startCamera();
+    else {
+      cameraReplacement.current ??= {
+        draft,
+        pendingCrop,
+        replaceId: replaceId.current,
+        pageGrid,
+        history,
+      };
+      startCamera();
+    }
   };
   const focusFileTrigger = () => {
     if (!alive.current || signal.aborted || guard.current) return;
@@ -234,7 +261,64 @@ export function ScannerView({
     setPageGrid(previous.pageGrid);
     return true;
   };
-  const replacementLimits = (original: Blob) => {
+  const candidateCount = () => {
+    const candidate = draftRef.current ?? pendingCropRef.current;
+    return (
+      retainedPages.current.length +
+      queue.current.length +
+      (candidate &&
+      !replaceId.current &&
+      !retainedPages.current.some((page) => page.id === candidate.id)
+        ? 1
+        : 0)
+    );
+  };
+  const restoreCameraReplacement = () => {
+    const previous = cameraReplacement.current;
+    cameraReplacement.current = null;
+    if (!previous || !alive.current || signal.aborted) return false;
+    replaceId.current = previous.replaceId;
+    restoredHistory.current = previous.draft?.id !== draft?.id ? previous.history : null;
+    setHistory(previous.history);
+    setDraft(previous.draft);
+    setPendingCrop(previous.pendingCrop);
+    setPageGrid(previous.pageGrid);
+    repeatFocus.current = true;
+    return true;
+  };
+  const replacementLimits = (original: Blob, pageCount = candidateCount()) => {
+    if (continuous) {
+      const retained: CaptureCandidate[] = [...retainedPages.current];
+      const files: Blob[] = [],
+        extraPreviews: Blob[] = [];
+      for (const item of queue.current) {
+        if (item.kind === 'file') files.push(item.file);
+        else retained.push(item.candidate);
+      }
+      for (const page of [
+        draftRef.current ?? pendingCropRef.current,
+        fileReplacement.current?.draft ?? fileReplacement.current?.pendingCrop,
+        cameraReplacement.current?.draft ?? cameraReplacement.current?.pendingCrop,
+      ]) {
+        if (!page) continue;
+        // Accepted copies share owned source/preview bytes with their session page.
+        if (!acceptedBlobs.current.has(page.original)) retained.push(page);
+        else if ('preview' in page) {
+          for (const blob of [page.preview, page.thumbnail, page.unoptimizedPreview])
+            if (blob && !acceptedBlobs.current.has(blob)) extraPreviews.push(blob);
+        }
+      }
+      return retainedCaptureLimits(
+        session.limits,
+        retained,
+        files,
+        originalOwners.current.get(original) ?? original,
+        pageCount,
+        extraPreviews,
+        camera ? 4_000_000 : 0,
+      );
+    }
+
     if (!fileReplacement.current) return session.limits;
     const originals = new Set<Blob>(),
       previews = new Set<Blob>();
@@ -279,6 +363,10 @@ export function ScannerView({
     return limits;
   };
   const markAccepted = (page: PageDraft) => {
+    originalOwners.current.set(
+      page.original,
+      retainedPages.current.find((owned) => owned.id === page.id)?.original ?? page.original,
+    );
     for (const blob of [page.original, page.preview, page.thumbnail, page.unoptimizedPreview])
       if (blob) acceptedBlobs.current.add(blob);
   };
@@ -294,7 +382,15 @@ export function ScannerView({
       button.focus();
     }
   }, [camera, busy, discard, draft, pendingCrop]);
-  const syncPages = () => setPages(session.pages);
+  const syncPages = () => {
+    const previous = new Map(retainedPages.current.map((page) => [page.id, page]));
+    const next = session.pages.map((page) => {
+      const owned = previous.get(page.id);
+      return owned?.revision === page.revision ? owned : page;
+    });
+    retainedPages.current = next;
+    setPages(next);
+  };
   const getEngine = () =>
     (engine.current ??= createScanicAdapter(options.assetBaseUrl, options.diagnostics));
   const begin = (): boolean => {
@@ -312,6 +408,7 @@ export function ScannerView({
     }
   };
   const handleError = (err: unknown) => {
+    if (signal.aborted || !alive.current) return;
     diagnose(options.diagnostics, 'session-error', { message: errorMessage(err) });
     if (!signal.aborted && alive.current) setError(t(errorMessage(err)));
   };
@@ -320,14 +417,18 @@ export function ScannerView({
     source: 'camera' | 'file',
     captureHint?: CaptureHint,
     queued = false,
-  ) => {
+  ): Promise<CaptureOutcome> => {
     if (!begin()) return;
+    const collect =
+      continuous && source === 'camera' && !cameraReplacement.current && !replaceId.current;
     if (source !== 'camera') setCamera(false);
     setStatus(t('Dokument wird aufbereitet...'));
     try {
       diagnose(options.diagnostics, 'source', { source, replaceId: replaceId.current });
+      aborted(signal);
       session.checkImport(original, replaceId.current);
-      const old = session.pages.find((p) => p.id === replaceId.current);
+      const old =
+        session.pages.find((p) => p.id === replaceId.current) ?? cameraReplacement.current?.draft;
       const revision = old ? old.revision + 1 : 1;
       const id = old?.id ?? crypto.randomUUID();
       const recipe = profileRecipe(initialProfile(options.defaultProfile, initial.defaultProfile));
@@ -336,7 +437,11 @@ export function ScannerView({
           original,
           captureHint,
           diagnosticContext: { pageId: id, source, operation: 'initial' },
-          limits: replacementLimits(original),
+          limits: replacementLimits(
+            original,
+            candidateCount() +
+              (!queued && !cameraReplacement.current && !replaceId.current ? 1 : 0),
+          ),
           rotation: 0,
           recipe,
           revision,
@@ -347,11 +452,11 @@ export function ScannerView({
         signal,
       );
       aborted(signal);
-      if (queued && queue.current[0] === original) queue.current.shift();
+      if (queued && queue.current[0]?.kind === 'file' && queue.current[0].file === original)
+        queue.current.shift();
       setPageGrid(false);
       if ('status' in result) {
-        setDraft(null);
-        setPendingCrop({
+        const candidate: PendingCrop = {
           ...result,
           original,
           source,
@@ -359,8 +464,15 @@ export function ScannerView({
           revision,
           recipe,
           format: old?.format.origin === 'user' ? old.format : undefined,
-        });
-        return;
+        };
+        if (collect) {
+          queue.current.push({ kind: 'capture', candidate });
+          syncPages();
+        } else {
+          setDraft(null);
+          setPendingCrop(candidate);
+        }
+        return { needsCrop: true };
       }
       const format =
         old?.format.origin === 'user'
@@ -371,10 +483,7 @@ export function ScannerView({
               preferredPaper: paperPreference,
               geometryUncertain: result.edgesUncertain,
             }));
-      setPendingCrop(null);
-      fileReplacement.current = null;
-      setHistory([]);
-      setDraft({
+      const candidate: PageDraft = {
         ...result,
         id,
         revision,
@@ -383,27 +492,83 @@ export function ScannerView({
         rotation: 0,
         recipe,
         format,
-      });
+      };
+      if (collect) {
+        queue.current.push({ kind: 'capture', candidate });
+        syncPages();
+      } else {
+        setPendingCrop(null);
+        fileReplacement.current = null;
+        cameraReplacement.current = null;
+        setHistory([]);
+        setDraft(candidate);
+      }
+      return { preview: result.preview };
     } catch (err) {
-      if (source === 'file') restoreFileReplacement();
+      if (source === 'file') {
+        if (!restoreFileReplacement()) restoreCameraReplacement();
+      } else if (cameraReplacement.current) restoreCameraReplacement();
       handleError(err);
     } finally {
-      if (source === 'camera' && alive.current && !signal.aborted) setCamera(false);
+      if (source === 'camera' && !collect && alive.current && !signal.aborted) setCamera(false);
       end();
     }
   };
   const startFiles = (files: File[]) => {
     if (guard.current || !files.length) return;
-    if (queue.current.length) {
+    if (queue.current.length && !continuous) {
       setError(t('Bitte verbleibende Importe zuerst prüfen oder verwerfen.'));
       return;
     }
-    if (replaceId.current && files.length > 1) {
+    if ((replaceId.current || cameraReplacement.current) && files.length > 1) {
       setError(t('Zum Ersetzen bitte genau ein Bild auswählen.'));
       return;
     }
-    queue.current = files;
-    void processInput(files[0], 'file', undefined, true);
+    if (continuous && (replaceId.current || cameraReplacement.current)) {
+      void processInput(files[0], 'file');
+      return;
+    }
+    const previous = queue.current;
+    queue.current = [...previous, ...files.map((file): UnreviewedPage => ({ kind: 'file', file }))];
+    if (continuous) {
+      try {
+        replacementLimits(files[0], candidateCount());
+      } catch (err) {
+        queue.current = previous;
+        handleError(err);
+        return;
+      }
+      reviewQueued();
+    } else void processInput(files[0], 'file', undefined, true);
+  };
+  const reviewQueued = () => {
+    if (guard.current || signal.aborted || !alive.current) return;
+    const next = queue.current[0];
+    if (!next) return;
+    replaceId.current = undefined;
+    if (next.kind === 'file') void processInput(next.file, 'file', undefined, true);
+    else {
+      queue.current.shift();
+      setError('');
+      setCamera(false);
+      setPageGrid(false);
+      setReviewPanel(null);
+      if ('status' in next.candidate) {
+        setDraft(null);
+        setPendingCrop(next.candidate);
+      } else {
+        setPendingCrop(null);
+        setDraft(next.candidate);
+      }
+      syncPages();
+    }
+  };
+  const reviewPages = () => {
+    if (guard.current) return;
+    setCamera(false);
+    if (queue.current.length) reviewQueued();
+    else if (session.pages[0]) editPage(session.pages[0]);
+    else setPageGrid(true);
   };
   const replaceFile = (files: File[]) => {
     const intent = fileIntent.current;
@@ -445,7 +610,7 @@ export function ScannerView({
         {
           original: next.original,
           diagnosticContext: { pageId: next.id, source: next.source, operation: 'edit' },
-          limits: session.limits,
+          limits: continuous ? replacementLimits(next.original) : session.limits,
           corners: next.corners,
           format:
             changes.corners && !changes.format && next.format.origin !== 'user'
@@ -469,6 +634,7 @@ export function ScannerView({
         format: result.format ?? next.format,
         recipe: next.recipe,
       });
+      aborted(signal);
       if (recordHistory) setHistory((previous) => [...previous.slice(-11), editOf(draft)]);
       setDraft({
         ...next,
@@ -557,6 +723,7 @@ export function ScannerView({
       });
       setPendingCrop(null);
       fileReplacement.current = null;
+      cameraReplacement.current = null;
       diagnose(options.diagnostics, 'crop-confirmed', { pageId: pending.id, corners });
     } catch (err) {
       handleError(err);
@@ -577,6 +744,7 @@ export function ScannerView({
           ({ original, preview, unoptimizedPreview, thumbnail, ...page }) => page,
         ),
       });
+      if (signal.aborted || !alive.current) return;
       syncPages();
       setActivePageId(saved.id);
       replaceId.current = saved.id;
@@ -588,6 +756,7 @@ export function ScannerView({
     }
   };
   const editPage = (page: PageDraft) => {
+    if (continuous) setError('');
     replaceId.current = page.id;
     setActivePageId(page.id);
     setPageActions(false);
@@ -608,7 +777,7 @@ export function ScannerView({
       replaceId.current = undefined;
       setDraft(null);
       setPageGrid(true);
-      void processInput(queue.current[0], 'file', undefined, true);
+      reviewQueued();
     }
   };
   const showPages = () => {
@@ -652,18 +821,30 @@ export function ScannerView({
     setEditingCorners(false);
     replaceId.current = undefined;
     setError('');
-    if (queue.current.length) void processInput(queue.current[0], 'file', undefined, true);
+    if (queue.current.length) reviewQueued();
     else setPageGrid(true);
   };
   const cancelPendingCrop = () => {
     if (guard.current) return;
-    if (restoreFileReplacement()) return;
+    if (restoreFileReplacement() || restoreCameraReplacement()) return;
     setPendingCrop(null);
     setPageGrid(true);
     replaceId.current = undefined;
-    if (queue.current.length) void processInput(queue.current[0], 'file', undefined, true);
+    if (queue.current.length) reviewQueued();
   };
   const exportAll = async () => {
+    const current = draftRef.current;
+    if (
+      queue.current.length ||
+      pendingCropRef.current ||
+      (current &&
+        !retainedPages.current.some(
+          (page) => page.id === current.id && page.revision === current.revision,
+        ))
+    ) {
+      setError(t('Bitte alle Seiten zuerst prüfen oder verwerfen.'));
+      return;
+    }
     if (!begin()) return;
     setStatus(t('Bilder und PDF werden erstellt...'));
     try {
@@ -711,15 +892,18 @@ export function ScannerView({
       session.clear();
       queue.current = [];
       fileReplacement.current = null;
+      cameraReplacement.current = null;
+      retainedPages.current = [];
       fileIntent.current = null;
       acceptedBlobs.current = new WeakSet();
+      originalOwners.current = new WeakMap();
       repeatTarget.current = null;
       window.removeEventListener('focus', focusFileTrigger);
       picker?.removeEventListener('cancel', cancelPicker);
     };
   }, []);
   const close = () => {
-    if (pages.length || draft || pendingCrop || busy) setDiscard(true);
+    if (pages.length || queue.current.length || draft || pendingCrop || busy) setDiscard(true);
     else finish({ status: 'cancelled' });
   };
   const keyboard = (event: React.KeyboardEvent) => {
@@ -823,7 +1007,7 @@ export function ScannerView({
             <>
               <button
                 disabled={busy}
-                aria-label={`${t('Seitenübersicht')} (${pages.length + (replaceId.current ? 0 : 1)})`}
+                aria-label={`${t('Seitenübersicht')} (${continuous ? candidateCount() : pages.length + (replaceId.current ? 0 : 1)})`}
                 onClick={showPages}
               >
                 <ToolIcon name="grid" />
@@ -877,11 +1061,34 @@ export function ScannerView({
                 setMode={changeMode}
                 onShutter={() => shutter.current?.play() ?? false}
                 onPrepareSound={prepareSound}
-                onCapture={(blob, hint) => void processInput(blob, 'camera', hint)}
-                onCancel={() => setCamera(false)}
+                continuous={continuous && !cameraReplacement.current && !replaceId.current}
+                canCapture={
+                  !!cameraReplacement.current ||
+                  !!replaceId.current ||
+                  candidateCount() < session.limits.pages
+                }
+                onCapture={(blob, hint) => processInput(blob, 'camera', hint)}
+                onReview={reviewPages}
+                beforeCapture={(size) => {
+                  if (!continuous) return;
+                  const remaining = replacementLimits(
+                    new Blob(),
+                    candidateCount() + (!cameraReplacement.current && !replaceId.current ? 1 : 0),
+                  );
+                  // Reserve the complete frame canvas and encoding peak before copying pixels.
+                  if (size.width * size.height * 8 > remaining.workingBytes)
+                    throw new ScannerError(
+                      'LIMIT_EXCEEDED',
+                      'Datei- oder Sitzungslimit erreicht. Vorhandene Seiten bleiben erhalten.',
+                    );
+                }}
+                onCancel={() => {
+                  restoreCameraReplacement();
+                  setCamera(false);
+                }}
                 onClose={close}
                 onImport={() => input.current?.click()}
-                pageCount={pages.length}
+                pageCount={candidateCount()}
                 t={t}
               />
             )}
@@ -930,6 +1137,24 @@ export function ScannerView({
                 <div className={`scanner-review${reviewPanel ? ' scanner-detail' : ''}`}>
                   <ImageViewer
                     image={reviewPanel === 'original' ? draft.original : draft.preview}
+                    onPageSwipe={
+                      !busy && !reviewPanel && !editingCorners
+                        ? (direction) => {
+                            if (
+                              direction === 'previous' &&
+                              (replaceId.current ? activePageIndex === 0 : !pages.length)
+                            )
+                              return;
+                            if (
+                              direction === 'next' &&
+                              !queue.current.length &&
+                              (!replaceId.current || activePageIndex >= pages.length - 1)
+                            )
+                              return;
+                            navigate(direction === 'next' ? 1 : -1);
+                          }
+                        : undefined
+                    }
                     before={reviewPanel === 'original' ? undefined : draft.unoptimizedPreview}
                     resetKey={`${draft.id}:${draft.rotation}:${reviewPanel === 'original' ? 'original' : 'crop'}`}
                     alt={
@@ -991,7 +1216,7 @@ export function ScannerView({
                       onClick={() => {
                         replaceId.current = undefined;
                         setDraft(null);
-                        queue.current = [];
+                        if (!continuous) queue.current = [];
                         setError('');
                         syncPages();
                       }}
@@ -1039,6 +1264,13 @@ export function ScannerView({
                               chooseFileReplacement(page.id, event.currentTarget);
                             else {
                               replaceId.current = page.id;
+                              cameraReplacement.current = {
+                                draft: page,
+                                pendingCrop: null,
+                                replaceId: page.id,
+                                pageGrid,
+                                history: [],
+                              };
                               setDraft(null);
                               startCamera();
                             }
@@ -1092,10 +1324,11 @@ export function ScannerView({
                     disabled={busy}
                     onClick={() => {
                       replaceId.current = undefined;
-                      void processInput(queue.current[0], 'file', undefined, true);
+                      reviewQueued();
                     }}
                   >
-                    {t('Nächste Importseite prüfen')} ({queue.current.length})
+                    {t(continuous ? 'Nächste Seite prüfen' : 'Nächste Importseite prüfen')} (
+                    {queue.current.length})
                   </button>
                 )}
                 {!!queue.current.length && (
@@ -1107,7 +1340,11 @@ export function ScannerView({
                       setError('');
                     }}
                   >
-                    {t('Verbleibende Importe verwerfen')}
+                    {t(
+                      continuous
+                        ? 'Verbleibende Seiten verwerfen'
+                        : 'Verbleibende Importe verwerfen',
+                    )}
                   </button>
                 )}
                 <div className="scanner-actions">

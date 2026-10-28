@@ -1,4 +1,8 @@
-export function CameraIcon({ name }: { name: 'close' | 'more' | 'gallery' | 'back' | 'light' }) {
+export function CameraIcon({
+  name,
+}: {
+  name: 'close' | 'more' | 'gallery' | 'back' | 'forward' | 'light';
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -27,6 +31,7 @@ export function CameraIcon({ name }: { name: 'close' | 'more' | 'gallery' | 'bac
         </>
       )}
       {name === 'back' && <path d="m14 5-7 7 7 7" />}
+      {name === 'forward' && <path d="m10 5 7 7-7 7" />}
       {name === 'light' && <path d="m14 2-9 12h6l-1 8 9-12h-6z" />}
     </svg>
   );

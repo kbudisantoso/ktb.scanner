@@ -1,3 +1,4 @@
+import { chooseCaptureWorkflow } from './helpers';
 import { closeAppPanel, openOptions } from './helpers';
 import { diagnostics } from './helpers';
 import { test, expect } from './fixtures';
@@ -55,6 +56,7 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
     Object.defineProperty(window, 'ImageCapture', { configurable: true, value: undefined });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await diagnostics(page);
   await page.getByLabel('Diagnose aufzeichnen', { exact: true }).check();
   await closeAppPanel(page);
@@ -159,19 +161,78 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
       .some((artifact: any) => artifact.stage === 'live-input'),
   ).toBe(true);
   expect(manifest.events.at(-1).data.status).toBe('cancelled');
+  // Exercise a native canvas MediaStream in addition to the cross-engine camera facade.
+  if (browserName === 'chromium') {
+    await closeAppPanel(page);
+    await chooseCaptureWorkflow(page, 'continuous');
+    const before = await page.evaluate(() => {
+      const state = (window as any).cameraTest;
+      return { requests: state.requests, stops: state.stops };
+    });
+    await page.getByRole('button', { name: /Dokument scannen/ }).click();
+    await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+    await page.getByLabel('Aufnahmemodus').selectOption('manual');
+    await expect(page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true })).toBeEnabled();
+    await page.evaluate(() => {
+      const video = document.querySelector<HTMLVideoElement>('.scanner-camera video')!;
+      (window as any).cameraTest.continuousStream = video.srcObject;
+    });
+    for (const count of [1, 2]) {
+      await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
+      await expect(
+        page.getByRole('img', { name: 'Aufgenommene Seite', exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(() => {
+          const video = document.querySelector<HTMLVideoElement>('.scanner-camera video')!;
+          const state = (window as any).cameraTest;
+          return {
+            paused: video.paused,
+            sameStream: video.srcObject === state.continuousStream,
+            state: state.continuousStream.getVideoTracks()[0].readyState,
+            requests: state.requests,
+            stops: state.stops,
+          };
+        }),
+      ).toEqual({
+        paused: false,
+        sameStream: true,
+        state: 'live',
+        requests: before.requests + 1,
+        stops: before.stops,
+      });
+      await expect(
+        page.getByRole('button', { name: `Seiten prüfen (${count})`, exact: true }),
+      ).toBeEnabled();
+    }
+    await page.getByRole('button', { name: 'Seiten prüfen (2)', exact: true }).click();
+    await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => (window as any).cameraTest.continuousStream.getVideoTracks()[0].readyState,
+      ),
+    ).toBe('ended');
+    await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
+  }
 });
 
 test('denied camera leaves import accessible', async ({ page }) => {
   await page.addInitScript(() => {
+    Object.assign(window, { deniedCameraRequests: 0 });
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
-        getUserMedia: () => Promise.reject(new DOMException('Denied', 'NotAllowedError')),
+        getUserMedia: () => {
+          (window as any).deniedCameraRequests++;
+          return Promise.reject(new DOMException('Denied', 'NotAllowedError'));
+        },
         enumerateDevices: async () => [],
       },
     });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await closeAppPanel(page);
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
@@ -180,6 +241,33 @@ test('denied camera leaves import accessible', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: 'Bilder importieren', exact: true }).last(),
   ).toBeEnabled();
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  await chooseCaptureWorkflow(page, 'continuous');
+  await page.getByRole('button', { name: /Dokument scannen/ }).click();
+  await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('alert')).toContainText('Berechtigung');
+  await expect(
+    dialog.getByRole('button', { name: 'Seiten prüfen (0)', exact: true }),
+  ).toBeDisabled();
+  const beforeRetry = await page.evaluate(() => (window as any).deniedCameraRequests);
+  await dialog.getByRole('button', { name: 'Kamera fortsetzen', exact: true }).click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).deniedCameraRequests))
+    .toBe(beforeRetry + 1);
+  await expect(dialog.getByRole('alert')).toContainText('Berechtigung');
+  const choosing = page.waitForEvent('filechooser');
+  await dialog.getByRole('button', { name: 'Bilder importieren', exact: true }).click();
+  await (await choosing).setFiles([]);
+  await expect(dialog.locator('.scanner-capture')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await expect(
+    dialog.getByRole('button', { name: 'Bilder importieren', exact: true }),
+  ).toBeEnabled();
+  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 });
 
 for (const stabilityMs of [400, 1000, 2000])
@@ -287,6 +375,7 @@ for (const stabilityMs of [400, 1000, 2000])
       });
     });
     await page.goto('/');
+    await chooseCaptureWorkflow(page, 'review-each');
     await openOptions(page);
     await page
       .getByLabel('Stabilisierungsdauer', { exact: true })

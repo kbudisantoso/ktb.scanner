@@ -239,3 +239,61 @@ test('stopping diagnostic detail recording never changes the selected detector p
   await pending;
   adapter.destroy();
 });
+
+test('capture callback cancellation rejects the secured frame and always releases its canvas', async (context) => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  context.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'document', previous);
+    else delete (globalThis as any).document;
+  });
+  for (const cancelAt of ['shutter', 'details'] as const) {
+    const abort = new AbortController();
+    let encodings = 0,
+      details = 0;
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext: () => ({ drawImage: () => {} }),
+      toBlob: (done: (blob: Blob) => void) => {
+        encodings++;
+        done(new Blob(['encoded-frame']));
+      },
+    };
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => canvas },
+    });
+    const track = { readyState: 'live', stop: () => {} };
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {
+        mediaDevices: {
+          getUserMedia: async () => ({ getVideoTracks: () => [track], getTracks: () => [track] }),
+        },
+      },
+    });
+    const camera = new Camera(),
+      video = { videoWidth: 600, videoHeight: 800, play: async () => {} } as HTMLVideoElement;
+    await camera.start(video, abort.signal);
+    await assert.rejects(
+      camera.capture(
+        video,
+        { inputPixels: 1_000_000 } as any,
+        abort.signal,
+        () => {
+          details++;
+          if (cancelAt === 'details') abort.abort();
+        },
+        () => {
+          if (cancelAt === 'shutter') abort.abort();
+        },
+      ),
+      { name: 'AbortError' },
+    );
+    assert.equal(encodings, cancelAt === 'shutter' ? 0 : 1);
+    assert.equal(details, cancelAt === 'shutter' ? 0 : 1);
+    assert.equal(canvas.width, 1);
+    assert.equal(canvas.height, 1);
+    camera.stop();
+  }
+});

@@ -2,11 +2,22 @@ import { acceptPage } from './helpers';
 import { closeAppPanel } from './helpers';
 import { diagnostics, showPdf } from './helpers';
 import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+
+async function discardFailedImport(page: Page) {
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await expect(
+    dialog.getByRole('heading', { name: 'Scans verwerfen?', exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 test('explicitly enabled diagnostics export originals, intermediate images and the actual final artifacts', async ({
   page,
@@ -105,7 +116,7 @@ test('processing failure and cancellation preserve partial diagnostic evidence',
     buffer: Buffer.from('broken image'),
   });
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
-  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await discardFailedImport(page);
   await diagnostics(page);
   await page.getByRole('button', { name: 'Diagnose-ZIP erstellen', exact: true }).click();
   await expect(
@@ -127,7 +138,7 @@ test('multiple sessions accumulate, download shortens retention, and new evidenc
       buffer: Buffer.from('broken image'),
     });
     await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
-    await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    await discardFailedImport(page);
   };
   await cancelledImport();
   await cancelledImport();
@@ -303,7 +314,7 @@ test('reference diagnostics stay off by default through a successful scan and ca
     .locator('main > input[type=file]')
     .setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('invalid') });
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
-  await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+  await discardFailedImport(page);
   await diagnostics(page);
   await expect(
     page.getByRole('button', { name: 'Diagnose-ZIP erstellen', exact: true }),

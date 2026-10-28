@@ -21,6 +21,8 @@ export function createScanner(options: ScannerOptions): ScannerController {
     !options.assetBaseUrl ||
     (options.imageType && !['image/jpeg', 'image/png'].includes(options.imageType)) ||
     (options.initialMode && !['auto', 'manual'].includes(options.initialMode)) ||
+    (options.captureWorkflow !== undefined &&
+      !['review-each', 'continuous'].includes(options.captureWorkflow)) ||
     (options.paperRegion !== undefined && !/^[a-z]{2}$/i.test(options.paperRegion))
   )
     throw new ScannerError(

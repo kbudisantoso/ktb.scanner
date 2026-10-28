@@ -102,6 +102,8 @@ export type ScanResult =
   | { status: 'cancelled' };
 /** Initial SDK UI. Nonempty initialFiles always take the import path. */
 export type ScannerEntry = 'workspace' | 'camera';
+/** Review after each capture, or collect camera pages before reviewing them. */
+export type CaptureWorkflow = 'review-each' | 'continuous';
 export interface OpenOptions {
   /** Defaults to workspace. Independent of auto/manual initialMode. */
   entry?: ScannerEntry;
@@ -139,6 +141,8 @@ export interface ScannerOptions {
   /** ISO region used only as a weak A4/Letter prior; otherwise the primary browser locale. */
   paperRegion?: string;
   initialMode?: CaptureMode;
+  /** Defaults to review-each. Continuous capture still requires review before export. */
+  captureWorkflow?: CaptureWorkflow;
   /** Real UI changes only, including sessions later cancelled. No persistence is performed. */
   onPreferenceChange?: (change: ScannerPreferenceChange) => void;
   /** Measured stable time before automatic capture. Integer 100..5000 ms; default 1000. */

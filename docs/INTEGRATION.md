@@ -76,6 +76,47 @@ Use this inside the `ScanButton` component below, with its existing state and re
 
 The option uses the existing camera, session and cleanup implementation. Browser permission/HTTPS requirements still apply; denial retains Import, Retry and Close. Abort before opening requests nothing; host abort/destroy/React close release owned resources and stop late permission streams. React captures `openOptions` on opening; changing them while open does not reinitialize the camera. Module imports and SSR request no camera. This option was introduced in 0.2.0 and is absent from 0.1.0.
 
+## Multi-page capture and review
+
+These additions require building the unreleased source; they are not in npm 0.2.0. `ScannerOptions.captureWorkflow` accepts the public `CaptureWorkflow` type, exported from both core and React: `review-each` (default) or `continuous`. It is independent of `initialMode` (Auto/Manual) and per-open `entry` (workspace/camera). There is no additional `openOptions.captureWorkflow`; invalid values reject `CONFIG_INVALID` before resources open. React snapshots this option when opening.
+
+Imperative integration, called from a host button after its mount exists:
+
+```ts
+import type { ScanResult } from '@ktb-tools/scanner';
+import '@ktb-tools/scanner/styles.css';
+
+export async function scanBatch(mount: HTMLElement): Promise<ScanResult> {
+  const { createScanner } = await import('@ktb-tools/scanner/react');
+  const scanner = createScanner({
+    mount, assetBaseUrl: '/scanner-assets/', locale: 'en',
+    captureWorkflow: 'continuous', initialMode: 'auto', shutterSound: 'off',
+    createPdf: true,
+  });
+  try { return await scanner.open({ entry: 'camera' }); }
+  finally { await scanner.destroy(); }
+}
+```
+
+For the React `ScanButton` example below, use the same configuration in `options`:
+
+```tsx
+<Scanner open={open}
+  options={{ assetBaseUrl: '/scanner-assets/', captureWorkflow: 'continuous',
+    initialMode: 'auto', locale: 'en', shutterSound: 'off', createPdf: true }}
+  openOptions={{ entry: 'camera' }}
+  onResult={result => { setOpen(false); onResult(result); }}
+  onError={() => setOpen(false)} />
+```
+
+Continuous capture keeps the existing video stream running between shots. After original-based processing, the extracted page briefly overlays the camera and moves towards **Review pages (n)** on the right; reduced motion uses static feedback. Image import is on the left. The review button opens the first unreviewed candidate, including required corner confirmation, or the first accepted page if all pages were reviewed. Next/Previous and horizontal swipes on the fitted document navigate review. Swipe does not replace zoom/pan/pinch, held Before or editing gestures, and buttons remain available. This navigation also works with imports and the default review-each workflow.
+
+**Retake** in review takes one replacement for the current page and returns to that page's review, even in continuous mode. **Replace image** selects one file directly. Cancelling/failing replacement preserves the current page and other queued pages. Continuous capture never silently accepts a page: Finish requires every queued capture/import to be reviewed or explicitly discarded and exports the existing confirmed result contract. UI Close also asks for discard confirmation while entries remain queued, including a failed import kept for retry; confirm discarding before returning to the host. Nonempty `initialFiles` still import without camera access.
+
+Page/original/result/working limits include queued candidates, previews and replacement rollback resources. Reaching a limit preserves the existing batch. Auto waits for persistent scene-change evidence before starting the normal stability window for another shot; an unchanged sheet and a known camera-light change do not authorize duplicate capture. Similar-looking pages may require the manual shutter, which remains available. Scene change is a heuristic, not document identity or OCR. Abort, close and destroy invalidate processing/feedback and release owned streams, workers and preview URLs.
+
+Both reference hosts choose continuous capture by default. Next.js offers **Capture workflow** in Options; Astro places it beside the language control. The SDK default remains review-each. Confirmed blobs, host result handling and ownership are unchanged; this option adds no storage or download behavior.
+
 ## Language and text overrides
 
 The library defaults to `locale: 'en'`, independent of browser language. Use `locale: 'de'` for German. Both reference hosts use English as the fallback and German for a German primary browser language (`de`, `de-DE`, `de-AT`, `de-CH`, etc.). Choose Sprache / Language or use `?lang=en` / `?lang=de` to override detection; manual choices remain in the URL on reload. Remove `lang` to restore automatic browser selection. The host HTML language and PDF/result labels follow the selection; document/image/PDF bytes do not change.
@@ -289,7 +330,7 @@ Standalone `ImageViewer` now reads inherited `--scanner-font` itself (falling ba
 
 ## Shared React image viewer
 
-`ImageViewer` is exported by `@ktb-tools/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
+`ImageViewer` is exported by `@ktb-tools/scanner/react` and styled by the same stylesheet/tokens. Props: `image: Blob`, optional `before: Blob`, `alt: string`, `resetKey: string`, optional `locale`, `texts` and `className`. Unreleased source also offers `onPageSwipe?: (direction: 'previous' | 'next') => void`: opt into horizontal one-pointer gestures at fit and update the host page/reset key in the handler. It does not manage pages itself and is inactive during zoom/pan/pinch or held Before; it is absent from npm 0.2.0. Give its container a bounded height with available flex space. A changed reset key resets fit; source updates alone retain zoom. Supply a matching unoptimized crop as Before. The component owns/revokes object URLs; the parent owns blobs.
 
 Tap/double tap switches fit/100%, magnifiers step zoom, pinch anchors at the midpoint and enlarged images can pan. Enter/Space toggles, +/- zooms and arrows pan. Hold Before to compare; pointer/keyboard release, cancellation, blur and visibility changes restore the result. Focused tools support local Cancel/Apply and labelled recipe undo. In unreleased source the session-close X is hidden inside tools, and review exposes replacement, direct discard and Add page beneath the document. Individual adjustment resets affect only the chosen tone or lens mode; they are distinct from the full optimization reset. Unreleased source also offers Find edges/Kanten finden in the corner editor: it proposes corners from the unchanged original, retains page settings and leaves Apply/Cancel/Undo in control. Unsuccessful detection keeps the current selection; no new host API is required. This action is not in npm 0.2.0. Finish accepts the confirmed current draft and exports directly; remaining imports require review or explicit discard. Tile cover crops are display-only.
 

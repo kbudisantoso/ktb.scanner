@@ -1,3 +1,4 @@
+import { chooseCaptureWorkflow } from './helpers';
 import { acceptPage, closeTool } from './helpers';
 import { chooseProfile, showPdf } from './helpers';
 import { test, expect } from './fixtures';
@@ -37,6 +38,7 @@ test('blank paper explains unavailable auto sharpness and keeps manual capture a
     });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
   await expect(page.getByRole('status')).toContainText(

@@ -38,6 +38,8 @@ export default function Page() {
   const [request, setRequest] = useState<Request | null>(null),
     [panel, setPanel] = useState<'options' | 'diagnostics' | null>(null),
     [profile, setProfile] = useState<ScanProfile>('auto'),
+    [captureWorkflow, setCaptureWorkflow] =
+      useState<NonNullable<ScannerOptions['captureWorkflow']>>('continuous'),
     [stabilityMs, setStabilityMs] = useState(DEFAULT_AUTO_CAPTURE_STABILITY_MS);
   const panelTrigger = useRef<HTMLButtonElement | null>(null);
   const closePanel = () => {
@@ -149,6 +151,7 @@ export default function Page() {
         imageType: mime,
         shutterSound,
         autoCaptureStabilityMs: stabilityMs,
+        captureWorkflow,
         createPdf: true,
         diagnostics: diagnosticOptions,
         ...(profile === 'auto' ? {} : { defaultProfile: profile }),
@@ -304,6 +307,22 @@ export default function Page() {
                   {duration === DEFAULT_AUTO_CAPTURE_STABILITY_MS ? ` (${t('Standard')})` : ''}
                 </option>
               ))}
+            </select>
+          </label>
+          <label>
+            {t('Aufnahmeablauf')}
+            <select
+              aria-label={t('Aufnahmeablauf')}
+              value={captureWorkflow}
+              disabled={busy}
+              onChange={(event) =>
+                setCaptureWorkflow(
+                  event.target.value as NonNullable<ScannerOptions['captureWorkflow']>,
+                )
+              }
+            >
+              <option value="continuous">{t('Mehrere Seiten aufnehmen')}</option>
+              <option value="review-each">{t('Nach jeder Aufnahme prüfen')}</option>
             </select>
           </label>
           <label>
