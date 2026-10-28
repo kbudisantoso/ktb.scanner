@@ -949,7 +949,16 @@ test('page swipes are single-pointer fit gestures and never replace zoom, pan, h
         contentType: 'image/png',
         body: await page.screenshot(),
       });
+      await page.evaluate(() => {
+        window.addEventListener(
+          'pointerup',
+          () => ((window as any).continuousHarness.swipeReleasedAt = performance.now()),
+          { once: true },
+        );
+      });
       await page.mouse.up();
+      // Mouse up generates the release click; it must keep both pages fitted.
+      await expect(surface).toHaveAttribute('data-zoom', 'fit');
       await idle();
       expect(await previewHash(page)).toBe(direction === 'next' ? second! : first);
       expect(await accepted()).toBe(beforeAccepted + 1);
@@ -957,7 +966,16 @@ test('page swipes are single-pointer fit gestures and never replace zoom, pan, h
       await expect
         .poll(() => page.evaluate(() => (window as any).continuousHarness.urls.size))
         .toBe(urlCount);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => performance.now() - (window as any).continuousHarness.swipeReleasedAt,
+          ),
+        )
+        .toBeGreaterThanOrEqual(500);
       await surface.dispatchEvent('click', { detail: 1 });
+      await expect(surface).toHaveAttribute('data-zoom', '100');
+      await page.getByRole('button', { name: 'Fit image', exact: true }).click();
       await expect(surface).toHaveAttribute('data-zoom', 'fit');
     }
   });
