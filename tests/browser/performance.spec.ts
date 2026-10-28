@@ -37,7 +37,7 @@ test('record desktop 12-megapixel timings and responsive reference views', async
   const durations = [];
   for (let run = 0; run < 6; run++) {
     const start = performance.now();
-    await page.locator('.scanner input[type=file]').setInputFiles({
+    await page.locator('.scanner input[type=file][multiple]').setInputFiles({
       name: '12mp.png',
       mimeType: 'image/png',
       buffer: Buffer.from(data.split(',')[1], 'base64'),

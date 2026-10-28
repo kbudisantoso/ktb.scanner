@@ -125,9 +125,8 @@ test('missing crop blocks acceptance and export until confirmation; cancelled re
   await expect(dialog.getByRole('img', { name: 'Bearbeitete Seite' })).toBeVisible();
   await acceptPage(page);
   await pageActions(page);
-  await dialog.getByRole('button', { name: 'Ersetzen', exact: true }).click();
   const choosing = page.waitForEvent('filechooser');
-  await dialog.getByRole('button', { name: 'Bilder importieren', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Ersetzen', exact: true }).click();
   const blank = await page.evaluate(async () =>
     Array.from(new Uint8Array(await (window as any).cropHarness.file.arrayBuffer())),
   );

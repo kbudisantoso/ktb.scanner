@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Imported images now offer **Replace image** (**Bild tauschen**) with a direct single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the previous candidate/page and remaining imports.
+
 ## 0.2.0 - 2026-10-27
 
 A backward-compatible SDK release for direct camera entry, immediate UI preference notifications and complete light/dark styling of the reusable scanner UI. The existing confirmed-blob completion contract and host ownership of storage, filenames, downloads and PWA behavior are unchanged.

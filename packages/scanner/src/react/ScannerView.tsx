@@ -25,13 +25,21 @@ import type {
 import { ScanSession, resolveLimits } from '../session.ts';
 import { suggestFormat } from '../geometry.ts';
 import { createScanicAdapter } from '../scanic.ts';
-import { aborted, errorMessage } from '../errors.ts';
+import { aborted, errorMessage, ScannerError } from '../errors.ts';
 import { useBlobUrl } from './hooks.ts';
 import { CornerEditor } from './CornerEditor.tsx';
 import { CameraView } from './CameraView.tsx';
 import { ShutterSound } from '../shutter-sound.ts';
 import { resolveShutterSoundUrl } from '../sounds.ts';
 type Edit = Pick<PageDraft, 'recipe' | 'format' | 'rotation' | 'corners' | 'edgesUncertain'>;
+type PendingCrop = CropRequired & {
+  original: Blob;
+  source: 'camera' | 'file';
+  id: string;
+  revision: number;
+  recipe: Recipe;
+  format?: FormatSelection;
+};
 const editOf = ({ recipe, format, rotation, corners, edgesUncertain }: PageDraft): Edit =>
   structuredClone({ recipe, format, rotation, corners, edgesUncertain });
 function PageImage({ blob, alt, t }: { blob: Blob; alt: string; t: Translate }) {
@@ -59,22 +67,13 @@ export function ScannerView({
   const [session] = useState(() => new ScanSession(resolveLimits(options.limits)));
   const [pages, setPages] = useState<readonly PageDraft[]>([]),
     [draft, setDraft] = useState<PageDraft | null>(null);
-  const [pendingCrop, setPendingCrop] = useState<
-    | (CropRequired & {
-        original: Blob;
-        source: 'camera' | 'file';
-        id: string;
-        revision: number;
-        recipe: Recipe;
-        format?: FormatSelection;
-      })
-    | null
-  >(null);
+  const [pendingCrop, setPendingCrop] = useState<PendingCrop | null>(null);
   const [mode, setMode] = useState<CaptureMode>(options.initialMode ?? 'auto'),
     [mime, setMime] = useState<ImageMime>(options.imageType ?? 'image/jpeg');
   const [camera, setCamera] = useState(initial.entry === 'camera' && !initial.initialFiles?.length),
     [editingCorners, setEditingCorners] = useState(false);
   const repeatFocus = useRef(false);
+  const repeatTarget = useRef<HTMLElement | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [discard, setDiscard] = useState(false);
@@ -84,11 +83,13 @@ export function ScannerView({
   const readOnlyPanel = reviewPanel === 'quality' || reviewPanel === 'original';
   const [pageGrid, setPageGrid] = useState(false);
   const [history, setHistory] = useState<Edit[]>([]);
+  const restoredHistory = useRef<Edit[] | null>(null);
   const panelSnapshot = useRef<Edit | null>(null);
   const panelHistory = useRef<Edit[]>([]);
   useEffect(() => {
     setReviewPanel(null);
-    setHistory([]);
+    setHistory(restoredHistory.current ?? []);
+    restoredHistory.current = null;
   }, [draft?.id]);
   const activePageIndex = Math.max(
     0,
@@ -100,7 +101,21 @@ export function ScannerView({
     replaceId = useRef<string | undefined>(undefined);
   const queue = useRef<File[]>([]),
     input = useRef<HTMLInputElement>(null),
+    replacementInput = useRef<HTMLInputElement>(null),
     root = useRef<HTMLElement>(null);
+  const acceptedBlobs = useRef(new WeakSet<Blob>());
+  const fileIntent = useRef<{
+    pageId?: string;
+    candidateId?: string;
+    focus: HTMLElement | null;
+  } | null>(null);
+  const fileReplacement = useRef<{
+    draft: PageDraft | null;
+    pendingCrop: PendingCrop | null;
+    replaceId?: string;
+    pageGrid: boolean;
+    history: Edit[];
+  } | null>(null);
   const alive = useRef(true);
   // Update synchronously: repeated input events can arrive before React renders again.
   const preferences = useRef({ initialMode: mode, imageType: mime });
@@ -154,16 +169,99 @@ export function ScannerView({
     prepareSound();
     setCamera(true);
   };
-  const repeatCapture = () => {
-    if (guard.current) return;
+  const repeatCapture = (trigger: HTMLElement) => {
+    if (guard.current || signal.aborted || !alive.current) return;
     repeatFocus.current = true;
-    startCamera();
+    if ((pendingCrop ?? draft)?.source === 'file') chooseFileReplacement(undefined, trigger);
+    else startCamera();
+  };
+  const focusFileTrigger = () => {
+    if (!alive.current || signal.aborted || guard.current) return;
+    const target = fileIntent.current?.focus;
+    if (target?.isConnected) {
+      repeatFocus.current = false;
+      target.focus();
+    }
+  };
+  const chooseFileReplacement = (pageId: string | undefined, trigger: HTMLElement) => {
+    if (guard.current || signal.aborted || !alive.current) return;
+    fileIntent.current = {
+      pageId,
+      candidateId: pageId ? undefined : (pendingCrop ?? draft)?.id,
+      focus: trigger,
+    };
+    replacementInput.current?.click();
+  };
+  const restoreFileReplacement = () => {
+    const previous = fileReplacement.current;
+    fileReplacement.current = null;
+    if (!previous || !alive.current || signal.aborted) return false;
+    replaceId.current = previous.replaceId;
+    repeatFocus.current = true;
+    restoredHistory.current = previous.draft?.id !== draft?.id ? previous.history : null;
+    setHistory(previous.history);
+    setDraft(previous.draft);
+    setPendingCrop(previous.pendingCrop);
+    setPageGrid(previous.pageGrid);
+    return true;
+  };
+  const replacementLimits = (original: Blob) => {
+    if (!fileReplacement.current) return session.limits;
+    const originals = new Set<Blob>(),
+      previews = new Set<Blob>();
+    for (const candidate of [
+      fileReplacement.current.draft ?? fileReplacement.current.pendingCrop,
+      draft ?? pendingCrop,
+    ]) {
+      if (!candidate) continue;
+      if (candidate.original !== original && !acceptedBlobs.current.has(candidate.original))
+        originals.add(candidate.original);
+      if ('preview' in candidate)
+        for (const key of ['preview', 'thumbnail', 'unoptimizedPreview'] as const) {
+          const blob = candidate[key];
+          if (blob && !acceptedBlobs.current.has(blob)) previews.add(blob);
+        }
+    }
+    const originalBytes = [...originals].reduce((total, blob) => total + blob.size, 0),
+      previewBytes = [...previews].reduce((total, blob) => total + blob.size, 0),
+      retained = session.pages;
+    const limits = {
+      ...session.limits,
+      resultBytes:
+        session.limits.resultBytes -
+        previewBytes -
+        retained.reduce(
+          (total, page) =>
+            total + page.preview.size + page.thumbnail.size + (page.unoptimizedPreview?.size ?? 0),
+          0,
+        ),
+      workingBytes: session.limits.workingBytes - originalBytes - previewBytes,
+    };
+    if (
+      retained.reduce((total, page) => total + page.original.size, original.size + originalBytes) >
+        session.limits.originalBytes ||
+      limits.resultBytes <= 0 ||
+      limits.workingBytes <= 0
+    )
+      throw new ScannerError(
+        'LIMIT_EXCEEDED',
+        'Datei- oder Sitzungslimit erreicht. Vorhandene Seiten bleiben erhalten.',
+      );
+    return limits;
+  };
+  const markAccepted = (page: PageDraft) => {
+    for (const blob of [page.original, page.preview, page.thumbnail, page.unoptimizedPreview])
+      if (blob) acceptedBlobs.current.add(blob);
   };
   useEffect(() => {
     if (camera || busy || discard || !repeatFocus.current) return;
-    const button = root.current?.querySelector<HTMLButtonElement>('.scanner-repeat');
+    const button =
+      root.current?.querySelector<HTMLButtonElement>(
+        '.scanner-repeat, .scanner-pages article[data-selected="true"] .scanner-page-actions button',
+      ) ?? (repeatTarget.current?.isConnected ? repeatTarget.current : null);
     if (button) {
       repeatFocus.current = false;
+      repeatTarget.current = null;
       button.focus();
     }
   }, [camera, busy, discard, draft, pendingCrop]);
@@ -209,7 +307,7 @@ export function ScannerView({
           original,
           captureHint,
           diagnosticContext: { pageId: id, source, operation: 'initial' },
-          limits: session.limits,
+          limits: replacementLimits(original),
           rotation: 0,
           recipe,
           revision,
@@ -245,6 +343,8 @@ export function ScannerView({
               geometryUncertain: result.edgesUncertain,
             }));
       setPendingCrop(null);
+      fileReplacement.current = null;
+      setHistory([]);
       setDraft({
         ...result,
         id,
@@ -256,6 +356,7 @@ export function ScannerView({
         format,
       });
     } catch (err) {
+      if (source === 'file') restoreFileReplacement();
       handleError(err);
     } finally {
       if (source === 'camera' && alive.current && !signal.aborted) setCamera(false);
@@ -274,6 +375,37 @@ export function ScannerView({
     }
     queue.current = files;
     void processInput(files[0], 'file', undefined, true);
+  };
+  const replaceFile = (files: File[]) => {
+    const intent = fileIntent.current;
+    focusFileTrigger();
+    fileIntent.current = null;
+    if (!intent || !files.length || guard.current || signal.aborted || !alive.current) return;
+    if (files.length !== 1) {
+      setError(t('Zum Ersetzen bitte genau ein Bild auswählen.'));
+      return;
+    }
+    const page = intent.pageId
+      ? session.pages.find((page) => page.id === intent.pageId)
+      : undefined;
+    if (
+      intent.pageId
+        ? !page || page.source !== 'file'
+        : (pendingCrop ?? draft)?.id !== intent.candidateId ||
+          (pendingCrop ?? draft)?.source !== 'file'
+    )
+      return;
+    fileReplacement.current ??= {
+      draft,
+      pendingCrop,
+      replaceId: replaceId.current,
+      pageGrid,
+      history,
+    };
+    repeatFocus.current = true;
+    repeatTarget.current = intent.focus;
+    if (page) replaceId.current = page.id;
+    void processInput(files[0], 'file');
   };
   const reprocess = async (changes: Partial<PageDraft>, recordHistory = true) => {
     if (!draft || !begin()) return;
@@ -346,7 +478,7 @@ export function ScannerView({
         {
           original: pending.original,
           diagnosticContext: { pageId: pending.id, source: pending.source, operation: 'edit' },
-          limits: session.limits,
+          limits: replacementLimits(pending.original),
           corners,
           format: pending.format,
           preferredPaper: paperPreference,
@@ -371,6 +503,7 @@ export function ScannerView({
           result.format ?? suggestFormat(result.size, { corners, preferredPaper: paperPreference }),
       });
       setPendingCrop(null);
+      fileReplacement.current = null;
       diagnose(options.diagnostics, 'crop-confirmed', { pageId: pending.id, corners });
     } catch (err) {
       handleError(err);
@@ -394,6 +527,7 @@ export function ScannerView({
       syncPages();
       setActivePageId(saved.id);
       replaceId.current = saved.id;
+      markAccepted(saved);
       setDraft(saved);
       return saved;
     } catch (err) {
@@ -406,7 +540,9 @@ export function ScannerView({
     setPageActions(false);
     setPageGrid(false);
     setReviewPanel(null);
-    setDraft(structuredClone(page));
+    const copy = structuredClone(page);
+    markAccepted(copy);
+    setDraft(copy);
   };
   const navigate = (delta: number) => {
     const saved = saveDraft();
@@ -499,12 +635,26 @@ export function ScannerView({
     if (shutterUrl) (shutter.current ??= new ShutterSound(shutterUrl)).preload();
     root.current?.focus();
     if (initial.initialFiles?.length) startFiles(initial.initialFiles);
+    // Some native pickers return focus without emitting a file-input cancel event.
+    window.addEventListener('focus', focusFileTrigger);
+    const picker = replacementInput.current;
+    const cancelPicker = () => {
+      focusFileTrigger();
+      fileIntent.current = null;
+    };
+    picker?.addEventListener('cancel', cancelPicker);
     return () => {
       alive.current = false;
       engine.current?.destroy();
       shutter.current?.destroy();
       session.clear();
       queue.current = [];
+      fileReplacement.current = null;
+      fileIntent.current = null;
+      acceptedBlobs.current = new WeakSet();
+      repeatTarget.current = null;
+      window.removeEventListener('focus', focusFileTrigger);
+      picker?.removeEventListener('cancel', cancelPicker);
     };
   }, []);
   const close = () => {
@@ -685,8 +835,12 @@ export function ScannerView({
               <>
                 <div className="scanner-crop-guidance">
                   <p className="scanner-warning">{t('Bitte die vier Blattecken bestätigen.')}</p>
-                  <button className="scanner-repeat" disabled={busy} onClick={repeatCapture}>
-                    {t('Wiederholen')}
+                  <button
+                    className="scanner-repeat"
+                    disabled={busy}
+                    onClick={(event) => repeatCapture(event.currentTarget)}
+                  >
+                    {t(pendingCrop.source === 'file' ? 'Bild tauschen' : 'Wiederholen')}
                   </button>
                 </div>
                 <CornerEditor
@@ -696,6 +850,7 @@ export function ScannerView({
                   onApply={(corners) => void applyPendingCrop(corners)}
                   onCancel={() => {
                     if (!guard.current) {
+                      if (restoreFileReplacement()) return;
                       setPendingCrop(null);
                       setPageGrid(true);
                       replaceId.current = undefined;
@@ -818,10 +973,14 @@ export function ScannerView({
                       >
                         <button
                           disabled={busy}
-                          onClick={() => {
-                            replaceId.current = page.id;
-                            setDraft(null);
-                            startCamera();
+                          onClick={(event) => {
+                            if (page.source === 'file')
+                              chooseFileReplacement(page.id, event.currentTarget);
+                            else {
+                              replaceId.current = page.id;
+                              setDraft(null);
+                              startCamera();
+                            }
                           }}
                         >
                           {t('Ersetzen')}
@@ -1012,6 +1171,16 @@ export function ScannerView({
           </button>
         </footer>
       )}
+      <input
+        ref={replacementInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        hidden
+        onChange={(event) => {
+          replaceFile(Array.from(event.target.files ?? []));
+          event.target.value = '';
+        }}
+      />
       <input
         ref={input}
         type="file"

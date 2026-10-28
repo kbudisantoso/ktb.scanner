@@ -2,11 +2,12 @@ import { closeAppPanel, openOptions } from './helpers';
 import { diagnostics } from './helpers';
 import { test, expect } from './fixtures';
 import { execFileSync } from 'node:child_process';
+import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 test('manual capture uses a full synthetic video frame and releases its tracks', async ({
   page,
   browserName,
-}) => {
+}, info) => {
   test.skip(
     browserName === 'webkit',
     'Canvas captureStream support is checked separately on physical Safari devices.',
@@ -65,6 +66,27 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite' })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const repeat = page.getByRole('button', { name: 'Wiederholen', exact: true });
+  await expect(repeat).toBeVisible();
+  const screenshot = info.outputPath('mobile-camera-retake.png');
+  await page.screenshot({ path: screenshot });
+  await info.attach('mobile-camera-retake', {
+    path: screenshot,
+    contentType: 'image/png',
+  });
+  const preview = () =>
+    page
+      .getByRole('img', { name: 'Bearbeitete Seite' })
+      .evaluate(async (image: HTMLImageElement) =>
+        Array.from(new Uint8Array(await (await fetch(image.src)).arrayBuffer())),
+      );
+  const before = await preview();
+  await repeat.click();
+  await expect(page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await expect(repeat).toBeFocused();
+  expect(await preview()).toEqual(before);
   await page.getByRole('button', { name: 'Original vergleichen' }).click();
   await expect
     .poll(() =>
@@ -74,6 +96,27 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
     )
     .toEqual([1280, 960]);
   expect(await page.evaluate(() => (window as any).cameraTest.stops)).toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'OK', exact: true }).click();
+  await page.getByRole('button', { name: /^Seitenübersicht/ }).click();
+  await page.getByRole('button', { name: 'Seite 1: Bearbeiten', exact: true }).click();
+  await repeat.click();
+  const replacement = await page.evaluate(fixtureInBrowser, fixtures[1]);
+  const choosing = page.waitForEvent('filechooser');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Bilder importieren', exact: true })
+    .click();
+  await (
+    await choosing
+  ).setFiles({
+    name: 'imported-replacement.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(replacement.split(',')[1], 'base64'),
+  });
+  await expect(page.getByRole('button', { name: 'Bild tauschen', exact: true })).toBeVisible();
+  await expect(repeat).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).cameraTest.requests)).toBe(3);
+  await page.getByRole('button', { name: /^Seitenübersicht/ }).click();
   await page.getByRole('button', { name: 'Schließen', exact: true }).click();
   await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
   await diagnostics(page);
@@ -92,6 +135,10 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
       { maxBuffer: 10 * 1024 ** 2 },
     ).toString(),
   );
+  const accepted = manifest.events.filter((event: any) => event.type === 'page-accepted');
+  expect(accepted.map((event: any) => event.data.pages[0].source)).toEqual(['camera', 'file']);
+  expect(accepted[1].data.pageId).toBe(accepted[0].data.pageId);
+  expect(accepted.map((event: any) => event.data.pages[0].revision)).toEqual([1, 2]);
   for (const type of [
     'camera-start',
     'live-detection',

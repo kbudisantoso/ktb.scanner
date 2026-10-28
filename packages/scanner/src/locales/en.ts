@@ -38,6 +38,7 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
     'Image looks blurry - hold still or capture manually.',
   Bilder: 'Images',
   'Bilder importieren': 'Import images',
+  'Bild tauschen': 'Replace image',
   'Bilder und PDF werden erstellt...': 'Creating images and PDF...',
   Bildexport: 'Image export',
   Bildformat: 'Image format',

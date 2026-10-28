@@ -10,7 +10,7 @@ async function acceptExamples(page: import('@playwright/test').Page) {
   await acceptPage(page);
   await acceptPage(page);
 }
-test('visible repeat preserves a cancelled scan and replaces an unaccepted capture without adding a page', async ({
+test('visible image replacement replaces an unaccepted import without camera access or adding a page', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
@@ -40,22 +40,14 @@ test('visible repeat preserves a cancelled scan and replaces an unaccepted captu
     mimeType: 'image/png',
     buffer: Buffer.from(blank, 'base64'),
   });
-  const repeat = page.getByRole('button', { name: 'Wiederholen', exact: true });
+  const repeat = page.getByRole('button', { name: 'Bild tauschen', exact: true });
   await expect(
     page.getByRole('heading', { name: 'Dokumentecken festlegen', exact: true }),
   ).toBeVisible();
-  await repeat.click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Berechtigung');
-  await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
-  await expect(repeat).toBeFocused();
   const importRetake = async (index: number) => {
-    await repeat.click();
     const replacement = await page.evaluate(fixtureInBrowser, fixtures[index]);
     const choosing = page.waitForEvent('filechooser');
-    await page
-      .getByRole('dialog')
-      .getByRole('button', { name: 'Bilder importieren', exact: true })
-      .click();
+    await repeat.click();
     await (
       await choosing
     ).setFiles({
@@ -76,9 +68,9 @@ test('visible repeat preserves a cancelled scan and replaces an unaccepted captu
       ).join(','),
     );
   const before = await hash();
+  const cancelled = page.waitForEvent('filechooser');
   await repeat.click();
-  await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Berechtigung');
-  await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
+  await (await cancelled).setFiles([]);
   await expect(repeat).toBeFocused();
   expect(await hash()).toBe(before);
   await importRetake(3);
@@ -141,14 +133,17 @@ test('corrupt input is recoverable and original pages survive a failed replaceme
   await page.goto('/');
   await acceptExamples(page);
   await pageActions(page);
+  const choosing = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Ersetzen', exact: true }).click();
-  await page.getByRole('button', { name: 'Zurück zum Import' }).click();
-  await page
-    .locator('.scanner input[type=file]')
-    .setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('not a PNG') });
+  await (
+    await choosing
+  ).setFiles({
+    name: 'broken.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('not a PNG'),
+  });
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
   await expect(page.locator('.scanner-pages article')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Ersetzen abbrechen', exact: true }).click();
   await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
   await showPdf(page, 2);
 });
