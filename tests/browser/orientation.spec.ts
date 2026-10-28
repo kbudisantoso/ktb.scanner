@@ -1,4 +1,4 @@
-import { acceptPage, chooseFormat, closeTool } from './helpers';
+import { acceptPage, chooseFormat, closeTool, waitForPreview } from './helpers';
 import { chooseProfile, showPdf, tool } from './helpers';
 import { test, expect } from './fixtures';
 
@@ -26,27 +26,6 @@ test('paper orientation corrects axes without turning the image and survives edi
     buffer: Buffer.from(data.split(',')[1], 'base64'),
   });
   const preview = page.getByRole('img', { name: 'Bearbeitete Seite' });
-  const waitForPreview = async (previousSrc: string | null = null) => {
-    await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
-    await expect(preview).toBeVisible();
-    await expect
-      .poll(() =>
-        preview.evaluate((img: HTMLImageElement, previousSrc) => {
-          const src = img.getAttribute('src');
-          return (
-            !!src &&
-            src.startsWith('blob:') &&
-            src !== previousSrc &&
-            img.currentSrc === src &&
-            img.complete &&
-            img.naturalWidth > 0 &&
-            img.naturalHeight > 0
-          );
-        }, previousSrc),
-      )
-      .toBe(true);
-    await preview.evaluate((img: HTMLImageElement) => img.decode());
-  };
   const confirm = page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true });
   await expect(preview.or(confirm)).toBeVisible();
   if (await confirm.isVisible()) await confirm.click();
@@ -56,7 +35,7 @@ test('paper orientation corrects axes without turning the image and survives edi
   await tool(page, 'Format');
   const portrait = page.getByRole('button', { name: 'Hochformat', exact: true });
   const landscape = page.getByRole('button', { name: 'Querformat', exact: true });
-  await waitForPreview();
+  await waitForPreview(page);
   let marker: { x: number; y: number } | undefined;
   for (const orientation of ['portrait', 'landscape', 'portrait']) {
     const target = orientation === 'portrait' ? portrait : landscape;
@@ -66,7 +45,7 @@ test('paper orientation corrects axes without turning the image and survives edi
         : await preview.getAttribute('src');
     await target.click();
     await expect(target).toHaveAttribute('aria-pressed', 'true');
-    await waitForPreview(previousSrc);
+    await waitForPreview(page, previousSrc);
     await expect
       .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight))
       .toBeCloseTo(orientation === 'portrait' ? 210 / 297 : 297 / 210, 2);
@@ -98,12 +77,12 @@ test('paper orientation corrects axes without turning the image and survives edi
   await closeTool(page);
   const beforeRotation = await preview.getAttribute('src');
   await page.getByRole('button', { name: '90° drehen', exact: true }).click();
-  await waitForPreview(beforeRotation);
+  await waitForPreview(page, beforeRotation);
   await tool(page, 'Format');
   await expect(landscape).toHaveAttribute('aria-pressed', 'true');
   const beforePortrait = await preview.getAttribute('src');
   await portrait.click();
-  await waitForPreview(beforePortrait);
+  await waitForPreview(page, beforePortrait);
   await expect
     .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight))
     .toBeCloseTo(210 / 297, 2);
