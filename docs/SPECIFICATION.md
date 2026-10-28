@@ -57,6 +57,8 @@ The built-in sound catalog contains only `off`, `camera` (roachpowder, Freesound
 7. If the normal fit leaves a weak top edge, test coherent outward bright lines over 64 positions and up to six percent of the long source axis. Require old evidence <0.4; new evidence >=0.6 and >0.15 better; >=47 supported samples and >=9 per quarter; >=85 percent bright neutral inner band; corner drift <=0.065 and area factor 1.0025..1.2. Preserve bottom corners and require new side continuation support. Manual corners and existing strong edges remain unchanged. Keep the uncertainty warning.
 8. Apply optional radial correction, Scanic perspective extraction, chosen paper axes, separate 90-degree rotation and image profile. Recompute all edits/export from the original rather than repeatedly filtering compressed previews. Limit output without upscaling. Export encoding drops original location/device metadata.
 
+For F-31, classify a contained panel before greedy duplicate suppression when its area is below 82 percent of a plausible complete outer candidate and two opposite panel sides follow the corresponding observed outer lines (pixel tolerance: max 4 px or 0.5 percent of the shorter source axis). The outer candidate must independently meet the existing supported-contour bounds: confidence >=0.35, edge support >=0.5 and contour-fit ratio 0.65..1.4. Keep the original candidate corners; do not grow a missing sheet. This affects shared candidate selection, including the white tracked camera outline, without changing temporal thresholds or the green progress clock. See [ADR 0005](adr/0005-paper-shape-and-live-continuity.md).
+
 The candidate-specific overlap thresholds and failure reasons are specified in [ADR 0005](adr/0005-paper-shape-and-live-continuity.md). A plausible rectangle or estimated paper ratio does not establish correct document edges. No full-image fallback is allowed.
 
 ## Profiles, tones, quality and lens correction
@@ -165,7 +167,7 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-23 | Decoded images, PDF pages/order/sizes and PDF.js pixel comparison | F-27, F-28 |
 | T-24 | Both built hosts and actual file downloads | F-29, I-01, I-06 |
 | T-25 | Opt-in diagnostics, independent ZIP reading, final bytes, limits/errors/abort | F-30, N-02, N-04 |
-| T-26 | Multi-sheet completeness/middle/left and independent still despite delayed live job | F-06, F-24, F-31, N-03 |
+| T-26 | Multi-sheet completeness/middle/left, observed outer boundaries versus fold panels, negative absent/clipped/weak wrappers and independent still despite delayed live job | F-06, F-24, F-31, N-03 |
 | T-27 | Paper scores, outliers, confirmed changes and paused evidence, no stale trigger | F-19, F-23, F-26, F-32 |
 | T-28 | Frozen pixels before encoding, cue timing, proportional frozen image and reduced motion | F-24, F-26, F-33, N-05 |
 | T-29 | Rotated known corners, dual resolutions, bounded sharpening and optional autofocus | F-06, F-08, F-24, F-34, N-01 |

@@ -54,6 +54,8 @@ There is no built-in upload, account, document persistence, service worker, OCR 
 
 Unreleased source uses **Replace image** (**Bild tauschen**) to choose another imported image directly, without camera access; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the current candidate and remaining imports. This change is not in npm 0.2.0. See [integration](docs/INTEGRATION.md#imperative-integration).
 
+The unreleased source improves folded-paper contour selection: when a supported complete outer boundary is present, stronger internal panels sharing both opposite sides no longer displace it. This does not reconstruct missing boundaries or flatten paper and is not included in npm 0.2.0.
+
 ## Run the demo applications
 
 Requirements: Node **>=22.13.0** (Node 24 LTS recommended), **pnpm 11.15.1**, and Python 3 for independent archive checks. No API key, `.env`, backend or external scanner service is required.

@@ -35,6 +35,43 @@ function contains(outer: Quad, inner: Quad): boolean {
     }),
   );
 }
+function supportedContour(candidate: DocumentCandidate): boolean {
+  return (
+    candidate.confidence >= 0.35 &&
+    (candidate.edgeSupport ?? 0) >= 0.5 &&
+    (candidate.contourFitRatio ?? 0) >= 0.65 &&
+    (candidate.contourFitRatio ?? Infinity) <= 1.4
+  );
+}
+/** Compare opposite boundaries in source pixels without forcing a paper aspect ratio. */
+function sharesOppositeSides(outer: Quad, inner: Quad, size: Size): boolean {
+  const pixels = (quad: Quad) =>
+    quad.map((point) => ({ x: point.x * (size.width - 1), y: point.y * (size.height - 1) }));
+  const outside = pixels(outer),
+    inside = pixels(inner),
+    // Cascade contours can differ by four source pixels around the same side.
+    tolerance = Math.max(4, Math.min(size.width, size.height) * 0.005);
+  const onLine = (point: Point, edge: number) => {
+    const a = outside[edge],
+      b = outside[(edge + 1) % 4];
+    return (
+      Math.abs((b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x)) /
+        Math.hypot(b.x - a.x, b.y - a.y) <=
+      tolerance
+    );
+  };
+  for (let first = 0; first < 2; first++)
+    for (let shift = 0; shift < 4; shift++)
+      if (
+        [0, 2].every((opposite) => {
+          const edge = (first + opposite) % 4,
+            outerEdge = (edge + shift) % 4;
+          return onLine(inside[edge], outerEdge) && onLine(inside[(edge + 1) % 4], outerEdge);
+        })
+      )
+        return true;
+  return false;
+}
 /** Fraction of the smaller contour covered by the other convex contour. */
 function overlapCoverage(a: Quad, b: Quad): number {
   let polygon: Point[] = a;
@@ -119,11 +156,7 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
     const plausible =
       !!corners &&
       Number.isFinite(candidate.confidence) &&
-      (candidate.isValid ||
-        (candidate.confidence >= 0.35 &&
-          (candidate.edgeSupport ?? 0) >= 0.5 &&
-          (candidate.contourFitRatio ?? 0) >= 0.65 &&
-          (candidate.contourFitRatio ?? Infinity) <= 1.4));
+      (candidate.isValid || supportedContour(candidate));
     const clearance = corners
       ? Math.min(...corners.flatMap((p) => [p.x, p.y, 1 - p.x, 1 - p.y]))
       : 0;
@@ -153,6 +186,22 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
   for (const item of assessed
     .filter((item) => item.plausible)
     .sort((a, b) => Number(b.full) - Number(a.full) || b.score - a.score || b.area - a.area)) {
+    // Resolve observed outer/inner alternatives before greedy deduplication can
+    // discard the outer sheet. Strong creases can bound high-confidence panels.
+    const panel = assessed.some(
+      (outer) =>
+        outer !== item &&
+        outer.plausible &&
+        outer.full &&
+        supportedContour(outer.candidate) &&
+        item.area < outer.area * 0.82 &&
+        contains(outer.corners!, item.corners!) &&
+        sharesOppositeSides(outer.corners!, item.corners!, size),
+    );
+    if (panel) {
+      item.excluded = 'inside-another-sheet';
+      continue;
+    }
     if (
       unique.some(
         (other) =>
