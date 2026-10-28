@@ -469,6 +469,30 @@ export function ScannerView({
       end();
     }
   };
+  const findEdges = async (
+    page: Pick<PageDraft, 'original' | 'id' | 'source' | 'recipe' | 'revision'> &
+      Partial<Pick<PageDraft, 'rotation' | 'format'>>,
+    abort: AbortSignal,
+  ): Promise<Quad | null> => {
+    const result = await getEngine().process(
+      {
+        original: page.original,
+        previewComparison: false,
+        diagnosticContext: { pageId: page.id, source: page.source, operation: 'edit' },
+        limits: replacementLimits(page.original),
+        // Omitting corners runs the existing independent still-image detector.
+        format: page.format,
+        preferredPaper: paperPreference,
+        rotation: page.rotation ?? 0,
+        recipe: page.recipe,
+        revision: page.revision,
+        mime: 'image/jpeg',
+      },
+      abort,
+    );
+    aborted(abort);
+    return 'status' in result ? null : result.corners;
+  };
   const applyPendingCrop = async (corners: Quad) => {
     if (!pendingCrop || !begin()) return;
     const pending = pendingCrop;
@@ -846,6 +870,8 @@ export function ScannerView({
                 <CornerEditor
                   page={pendingCrop}
                   t={t}
+                  signal={signal}
+                  findEdges={(abort) => findEdges(pendingCrop, abort)}
                   disabled={busy}
                   onApply={(corners) => void applyPendingCrop(corners)}
                   onCancel={() => {
@@ -868,10 +894,13 @@ export function ScannerView({
                 <CornerEditor
                   page={draft}
                   t={t}
+                  disabled={busy}
+                  signal={signal}
+                  findEdges={(abort) => findEdges(draft, abort)}
                   onCancel={() => setEditingCorners(false)}
                   onApply={(corners: Quad) => {
                     setEditingCorners(false);
-                    void reprocess({ corners, edgesUncertain: false });
+                    void reprocess({ corners, format: draft.format, edgesUncertain: false });
                   }}
                 />
               ) : (
