@@ -479,7 +479,7 @@ export function ScannerView({
         original: page.original,
         previewComparison: false,
         diagnosticContext: { pageId: page.id, source: page.source, operation: 'edit' },
-        limits: session.limits,
+        limits: replacementLimits(page.original),
         // Omitting corners runs the existing independent still-image detector.
         format: page.format,
         preferredPaper: paperPreference,

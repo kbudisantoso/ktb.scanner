@@ -356,7 +356,9 @@ test('real redetection preserves original, rotation, recipe and paper format thr
   expect(result.cameraRequests).toBe(0);
 });
 
-test('required crop remains unconfirmed after a real unsuccessful retry', async ({ page }) => {
+test('required crop replacement keeps rollback budgets during redetection and remains unconfirmed after failure', async ({
+  page,
+}) => {
   const source = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 600;
@@ -365,6 +367,22 @@ test('required crop remains unconfirmed after a real unsuccessful retry', async 
     return canvas.toDataURL('image/png');
   });
   await page.evaluate((source) => (window as any).edgeHarness.open(source), source);
+  await expect(page.getByRole('heading', { name: 'Dokumentecken festlegen' })).toBeVisible();
+  const baseline = await page.evaluate(() => {
+    const initial = (window as any).edgeHarness.requests[0];
+    return { limits: initial.limits, originalBytes: initial.original.size };
+  });
+  const picker = page.waitForEvent('filechooser');
+  await page.getByRole('button', { name: 'Bild tauschen', exact: true }).click();
+  await (
+    await picker
+  ).setFiles({
+    name: 'replacement-blank.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(source.split(',')[1], 'base64'),
+  });
+  await expect.poll(() => page.evaluate(() => (window as any).edgeHarness.requests.length)).toBe(2);
+  await expect(page.locator('.scanner')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('heading', { name: 'Dokumentecken festlegen' })).toBeVisible();
   const find = page.getByRole('button', { name: 'Kanten finden', exact: true });
   await expect(find).toBeEnabled();
@@ -376,6 +394,13 @@ test('required crop remains unconfirmed after a real unsuccessful retry', async 
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
+  const limits = await page.evaluate(() =>
+    (window as any).edgeHarness.requests.slice(1).map((request: any) => request.limits),
+  );
+  expect(limits).toHaveLength(3);
+  expect(limits[0].workingBytes).toBe(baseline.limits.workingBytes - baseline.originalBytes);
+  expect(limits[1]).toEqual(limits[0]);
+  expect(limits[2]).toEqual(limits[0]);
   await page.evaluate(async () => {
     const h = (window as any).edgeHarness;
     await h.controller.destroy();
