@@ -1020,8 +1020,8 @@ test('page swipes are single-pointer fit gestures and never replace zoom, pan, h
       else if (interruption === 'reduced-motion')
         await page.emulateMedia({ reducedMotion: 'reduce' });
       else await page.getByRole('button', { name: 'Next', exact: true }).click();
-      expect(await previewHash(page)).toBe(second!);
       await idle();
+      expect(await previewHash(page)).toBe(second!);
       await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
       expect(
         await surface.evaluate((element) => element.getAnimations({ subtree: true }).length),
