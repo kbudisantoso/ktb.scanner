@@ -53,29 +53,33 @@ async function detectFrames(page: Page, frames: string[]): Promise<LiveDetection
   }, frames);
 }
 
-test('the real live detector selects the observed perspective sheet instead of its stronger fold panel', async ({
-  page,
-}, testInfo) => {
-  await prepareLiveHarness(page);
-  const frames = [];
-  for (const shadow of [55, 90, 55])
-    frames.push(await page.evaluate(perspectiveFoldedDocumentInBrowser, shadow));
-  const detections = await detectFrames(page, frames);
-  await testInfo.attach('perspective-folds.png', {
-    body: Buffer.from(frames[0].split(',')[1], 'base64'),
-    contentType: 'image/png',
-  });
-  await testInfo.attach('perspective-folded-live-boundaries.json', {
-    body: JSON.stringify({ expected: perspectiveFoldedCorners, detections }),
-    contentType: 'application/json',
-  });
-  for (const detection of detections) {
-    expect(detection.corners).not.toBeNull();
-    for (const [index, expected] of perspectiveFoldedCorners.entries()) {
-      const point = detection.corners![index];
-      expect(
-        Math.hypot(point.x * 799 - expected[0], point.y * 999 - expected[1]),
-      ).toBeLessThanOrEqual(12);
+test(
+  'the real live detector selects the observed perspective sheet instead of its stronger fold panel',
+  {
+    tag: '@worker-only',
+  },
+  async ({ page }, testInfo) => {
+    await prepareLiveHarness(page);
+    const frames = [];
+    for (const shadow of [55, 90, 55])
+      frames.push(await page.evaluate(perspectiveFoldedDocumentInBrowser, shadow));
+    const detections = await detectFrames(page, frames);
+    await testInfo.attach('perspective-folds.png', {
+      body: Buffer.from(frames[0].split(',')[1], 'base64'),
+      contentType: 'image/png',
+    });
+    await testInfo.attach('perspective-folded-live-boundaries.json', {
+      body: JSON.stringify({ expected: perspectiveFoldedCorners, detections }),
+      contentType: 'application/json',
+    });
+    for (const detection of detections) {
+      expect(detection.corners).not.toBeNull();
+      for (const [index, expected] of perspectiveFoldedCorners.entries()) {
+        const point = detection.corners![index];
+        expect(
+          Math.hypot(point.x * 799 - expected[0], point.y * 999 - expected[1]),
+        ).toBeLessThanOrEqual(12);
+      }
     }
-  }
-});
+  },
+);

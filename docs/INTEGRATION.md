@@ -4,17 +4,16 @@ Use Node >=22.13 (Node 24 LTS recommended), pnpm 11.15.1 and Python 3 for indepe
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm build
+pnpm check:package
+pnpm build:hosts
 pnpm typecheck
 pnpm lint
-pnpm test:core
 pnpm test:release
 pnpm test
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 pnpm licenses:inventory
 pnpm check:docs
-pnpm check:package
 ```
 
 `pnpm dev` builds/copies assets and starts Next.js on port 3000; `pnpm dev:astro` starts Astro on 4321. Rebuild after library changes. Browser tests start their own production hosts on ports 3177 and 4377; these must be free. They do not reuse unrelated servers. Node 24 LTS is recommended for reproducibility; browser archive installation previously stalled under Node 26.5.0 and succeeded with the Node 24 CLI.

@@ -1,4 +1,4 @@
-import { acceptPage, chooseFormat, closeTool } from './helpers';
+import { acceptPage, chooseFormat, closeTool, waitForPreview } from './helpers';
 import { chooseProfile, showPdf, tool } from './helpers';
 import { test, expect } from './fixtures';
 
@@ -35,13 +35,17 @@ test('paper orientation corrects axes without turning the image and survives edi
   await tool(page, 'Format');
   const portrait = page.getByRole('button', { name: 'Hochformat', exact: true });
   const landscape = page.getByRole('button', { name: 'Querformat', exact: true });
+  await waitForPreview(page);
   let marker: { x: number; y: number } | undefined;
   for (const orientation of ['portrait', 'landscape', 'portrait']) {
-    await (orientation === 'portrait' ? portrait : landscape).click();
-    await expect(orientation === 'portrait' ? portrait : landscape).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    const target = orientation === 'portrait' ? portrait : landscape;
+    const previousSrc =
+      (await target.getAttribute('aria-pressed')) === 'true'
+        ? null
+        : await preview.getAttribute('src');
+    await target.click();
+    await expect(target).toHaveAttribute('aria-pressed', 'true');
+    await waitForPreview(page, previousSrc);
     await expect
       .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight))
       .toBeCloseTo(orientation === 'portrait' ? 210 / 297 : 297 / 210, 2);
@@ -71,10 +75,14 @@ test('paper orientation corrects axes without turning the image and survives edi
     expect(Math.abs(red.y - marker.y)).toBeLessThan(0.03);
   }
   await closeTool(page);
+  const beforeRotation = await preview.getAttribute('src');
   await page.getByRole('button', { name: '90° drehen', exact: true }).click();
+  await waitForPreview(page, beforeRotation);
   await tool(page, 'Format');
   await expect(landscape).toHaveAttribute('aria-pressed', 'true');
+  const beforePortrait = await preview.getAttribute('src');
   await portrait.click();
+  await waitForPreview(page, beforePortrait);
   await expect
     .poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth / img.naturalHeight))
     .toBeCloseTo(210 / 297, 2);

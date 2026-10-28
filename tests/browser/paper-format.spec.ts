@@ -24,8 +24,20 @@ test.beforeAll(async () => {
 });
 
 for (const scenario of [
-  { name: 'German primary locale', locale: 'de-DE', expected: 'A4' },
-  { name: 'US primary locale', locale: 'en-US', expected: 'letter' },
+  {
+    name: 'German primary locale',
+    locale: 'de-DE',
+    expected: 'A4',
+    roundTrip: true,
+    origin: 'default',
+  },
+  {
+    name: 'US primary locale',
+    locale: 'en-US',
+    expected: 'letter',
+    roundTrip: true,
+    origin: 'heuristic',
+  },
   { name: 'host region overrides browser locale', locale: 'en-US', region: 'DE', expected: 'A4' },
   { name: 'tilted A4 overrides US prior', locale: 'en-US', expected: 'A4', project: [210, 297] },
   {
@@ -141,6 +153,25 @@ for (const scenario of [
         ),
       ).toBe('projective');
     }
+    if (!scenario.roundTrip) {
+      const result = await page.evaluate(async () => {
+        const h = (window as any).paperHarness;
+        const locationRequests = (window as any).locationRequests;
+        await h.controller.destroy();
+        const result = await h.result;
+        h.mount.remove();
+        return { status: result.status, locationRequests };
+      });
+      expect(result).toEqual({ status: 'cancelled', locationRequests: 0 });
+      return;
+    }
+    expect(
+      await page.evaluate(
+        () =>
+          (window as any).paperHarness.events.find((e: any) => e.type === 'format-suggestion')?.data
+            .format.origin,
+      ),
+    ).toBe(scenario.origin);
     if (scenario.name === 'German primary locale') {
       await closeTool(page);
       await page.getByRole('button', { name: 'Ecken korrigieren', exact: true }).click();
@@ -149,7 +180,7 @@ for (const scenario of [
       await expect(format).toBeEnabled();
       await expect(format).toHaveText('A4');
     }
-    // A manual choice must survive processing and export, regardless of the prior.
+    // Retain full export coverage from both default A4 and heuristic Letter.
     await tool(page, 'Format');
     await chooseFormat(page, 'A6');
     await chooseProfile(page, 'none');

@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
+import { previewHash as imageHash } from './helpers';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 let harness: string;
@@ -218,17 +219,6 @@ async function choose(page: Page, index: number, name = /^(Replace image|Bild ta
   expect(chooser.isMultiple()).toBe(false);
   await chooser.setFiles(await file(page, index));
 }
-async function imageHash(page: Page) {
-  return page
-    .getByRole('img', { name: /^(Edited page|Bearbeitete Seite)$/, exact: true })
-    .evaluate(async (image: HTMLImageElement) =>
-      Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest('SHA-256', await (await fetch(image.src)).arrayBuffer()),
-        ),
-      ).join(','),
-    );
-}
 async function result(page: Page) {
   await expect
     .poll(() => page.evaluate(() => (window as any).replacementHarness.results.length))
@@ -283,8 +273,12 @@ test.describe('replacement picker at a mobile viewport', () => {
         await cancelledChooser.setFiles([]);
         await expect(replace).toBeFocused();
         expect(await imageHash(page)).toBe(before);
+        const previousSrc = await page
+          .getByRole('img', { name: /^(Edited page|Bearbeitete Seite)$/, exact: true })
+          .getAttribute('src');
+        expect(previousSrc).toMatch(/^blob:/);
         await choose(page, 1);
-        await expect.poll(() => imageHash(page)).not.toBe(before);
+        expect(await imageHash(page, previousSrc)).not.toBe(before);
         const processed = await page.evaluate(() => (window as any).replacementHarness.jobs.length);
         await choose(page, 1);
         await expect

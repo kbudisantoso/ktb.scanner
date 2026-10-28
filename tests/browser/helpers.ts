@@ -1,5 +1,38 @@
 import { expect } from './fixtures';
 import type { Page } from '@playwright/test';
+export async function waitForPreview(page: Page, previousSrc: string | null = null) {
+  const image = page.getByRole('img', { name: /^(Edited page|Bearbeitete Seite)$/, exact: true });
+  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
+  await expect(image).toBeVisible();
+  await expect
+    .poll(() =>
+      image.evaluate((img: HTMLImageElement, previousSrc) => {
+        const src = img.getAttribute('src');
+        return (
+          !!src &&
+          src.startsWith('blob:') &&
+          src !== previousSrc &&
+          img.currentSrc === src &&
+          img.complete &&
+          img.naturalWidth > 0 &&
+          img.naturalHeight > 0
+        );
+      }, previousSrc),
+    )
+    .toBe(true);
+  await image.evaluate((img: HTMLImageElement) => img.decode());
+  return image;
+}
+export async function previewHash(page: Page, previousSrc: string | null = null) {
+  const image = await waitForPreview(page, previousSrc);
+  return image.evaluate(async (img: HTMLImageElement) =>
+    Array.from(
+      new Uint8Array(
+        await crypto.subtle.digest('SHA-256', await (await fetch(img.src)).arrayBuffer()),
+      ),
+    ).join(','),
+  );
+}
 export async function openOptions(page: Page) {
   const button = page.getByRole('button', { name: 'Optionen', exact: true });
   if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();

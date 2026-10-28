@@ -1,20 +1,15 @@
-import { test, expect } from './fixtures';
+import { test, expect } from '@playwright/test';
 
 for (const host of ['next', 'astro']) {
-  for (const locale of ['en', 'de']) {
-    test(`${host} ${locale}: source and full license notices are reachable in the built application`, async ({
-      page,
-    }) => {
+  test(
+    `${host}: full license notices are served by the built application`,
+    {
+      tag: '@http-contract',
+    },
+    async ({ request }) => {
       const base = host === 'next' ? 'http://127.0.0.1:3177' : 'http://127.0.0.1:4377';
-      await page.goto(`${base}/?lang=${locale}`);
-      const link = page.getByRole('link', {
-        name: locale === 'de' ? 'Lizenzen' : 'Licenses',
-        exact: true,
-      });
-      await expect(link).toBeVisible();
-      const href = await link.getAttribute('href');
-      expect(href).toBe('/third-party-notices.txt');
-      const response = await page.request.get(new URL(href!, base).href);
+      // Cross-browser host language tests cover visible labels and link targets.
+      const response = await request.get(`${base}/third-party-notices.txt`);
       expect(response.ok()).toBe(true);
       expect(response.headers()['content-type']).toContain('text/plain');
       const text = await response.text();
@@ -32,12 +27,6 @@ for (const host of ['next', 'astro']) {
         expect(text).toContain('pdfjs-dist@6.4.299 / LICENSE');
         expect(text).toContain('dist/compiled/react/LICENSE');
       } else expect(text).toContain('astro@7.4.1 / LICENSE');
-      await expect(
-        page.getByRole('link', {
-          name: locale === 'de' ? 'Quellcode' : 'Source code',
-          exact: true,
-        }),
-      ).toHaveAttribute('href', 'https://github.com/kbudisantoso/ktb.scanner');
-    });
-  }
+    },
+  );
 }

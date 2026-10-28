@@ -54,14 +54,13 @@ Do not place custom sounds inside the generated `public/scanner-assets/` directo
 For a deliberate library fork, add the licensed recording and a matching `*.NOTICE.txt` to `packages/scanner/assets/`, then add an ID/label/file entry in `src/sounds.ts` and its translation in `src/locales/en.ts`. Build and host copying discover current audio assets; they do not read local experiment directories. Update the explicit release/archive allowlist, attribution documentation and browser sound coverage when changing the shipped set, then run:
 
 ```sh
-pnpm build
-pnpm test:core
+pnpm check:package
+pnpm build:hosts
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm check:docs
 pnpm check:notices
-pnpm check:package
 pnpm exec playwright test tests/browser/shutter.spec.ts tests/browser/notices.spec.ts
 ```
 

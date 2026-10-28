@@ -1,4 +1,4 @@
-import { discardDraft } from './helpers';
+import { discardDraft, previewHash } from './helpers';
 import { acceptPage, chooseFormat, discardResult, closeTool } from './helpers';
 import { closeAppPanel } from './helpers';
 import { openOptions, pageActions, showPdf, tool } from './helpers';
@@ -59,41 +59,16 @@ test('visible image replacement replaces an unaccepted import without camera acc
   await importRetake(1);
   const preview = page.getByRole('img', { name: 'Bearbeitete Seite', exact: true });
   await expect(preview).toBeVisible();
-  const hash = () =>
-    preview.evaluate(async (img: HTMLImageElement) =>
-      Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest('SHA-256', await (await fetch(img.src)).arrayBuffer()),
-        ),
-      ).join(','),
-    );
-  const before = await hash();
+  const before = await previewHash(page);
   const cancelled = page.waitForEvent('filechooser');
   await repeat.click();
   await (await cancelled).setFiles([]);
   await expect(repeat).toBeFocused();
-  expect(await hash()).toBe(before);
+  expect(await previewHash(page)).toBe(before);
   const previousPreviewSrc = await preview.getAttribute('src');
   expect(previousPreviewSrc).toMatch(/^blob:/);
   await importRetake(3);
-  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
-  await expect(preview).toBeVisible();
-  await expect
-    .poll(() =>
-      preview.evaluate((img: HTMLImageElement, previousSrc) => {
-        const src = img.getAttribute('src');
-        return (
-          !!src &&
-          src.startsWith('blob:') &&
-          src !== previousSrc &&
-          img.currentSrc === src &&
-          img.complete &&
-          img.naturalWidth > 0
-        );
-      }, previousPreviewSrc),
-    )
-    .toBe(true);
-  expect(await hash()).not.toBe(before);
+  expect(await previewHash(page, previousPreviewSrc)).not.toBe(before);
   await expect(page.getByRole('button', { name: 'Weiter', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
   await expect(page.getByRole('heading', { name: '1 Seite fertig', exact: true })).toBeVisible();
