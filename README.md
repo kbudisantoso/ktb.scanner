@@ -52,7 +52,7 @@ These projects retain their own licenses. See [dependencies and pinned versions]
 
 There is no built-in upload, account, document persistence, service worker, OCR text layer, PDF import or cloud synchronization. TIFF/HEIC import and general paper flattening are outside the current implementation. Lens correction is a bounded radial model, not full camera calibration. Detection, automatic format suggestions and cleanup remain heuristics; see [verification and known limits](docs/testing/STATUS.md).
 
-Unreleased source uses **Replace image** (**Bild tauschen**) to choose another imported image directly, without camera access; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the current candidate and remaining imports. This change is not in npm 0.2.0. See [integration](docs/INTEGRATION.md#imperative-integration).
+Unreleased source offers **Replace image** (**Bild tauschen**) for imported images through a direct picker and retains **Retake** (**Wiederholen**) for camera captures. The corner editor also offers **Find edges** (**Kanten finden**), preserving page settings until explicit Apply; Cancel/Undo retain the prior crop. These changes are not in npm 0.2.0. See [integration](docs/INTEGRATION.md).
 
 The unreleased source improves folded-paper contour selection: when a supported complete outer boundary is present, stronger internal panels sharing both opposite sides no longer displace it. This does not reconstruct missing boundaries or flatten paper and is not included in npm 0.2.0.
 

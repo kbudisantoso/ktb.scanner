@@ -290,6 +290,12 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   Zurücksetzen: 'Reset',
   'Zuschnitt und Bildoptimierung laufen...': 'Cropping and optimizing the image...',
   'Zuschnitt übernehmen': 'Apply crop',
+  'Kanten finden': 'Find edges',
+  'Dokumentkanten werden gesucht...': 'Finding document edges...',
+  'Keine Dokumentkanten gefunden. Die bisherige Auswahl bleibt erhalten.':
+    'No document edges found. Your current selection is unchanged.',
+  'Kanten konnten nicht gefunden werden. Bitte erneut versuchen oder Ecken manuell setzen.':
+    'Could not find edges. Try again or adjust the corners manually.',
   fertig: 'ready',
   von: 'of',
   'Änderung wird berechnet...': 'Applying change...',

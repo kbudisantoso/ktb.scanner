@@ -8,6 +8,8 @@ export function CornerEditor({
   page,
   onApply,
   onCancel,
+  findEdges,
+  signal,
   disabled = false,
   t,
 }: {
@@ -15,12 +17,61 @@ export function CornerEditor({
   disabled?: boolean;
   onApply: (q: Quad) => void;
   onCancel: () => void;
+  findEdges: (signal: AbortSignal) => Promise<Quad | null>;
+  signal: AbortSignal;
   t: Translate;
 }) {
   const container = useRef<HTMLDivElement>(null),
     editor = useRef<Editor | null>(null);
   const [error, setError] = useState('');
   const [ready, setReady] = useState(false);
+  const [finding, setFinding] = useState(false);
+  const detection = useRef<AbortController | null>(null);
+  const applySuggestion = useRef<((corners: Quad) => boolean) | null>(null);
+  const callbacks = useRef({ onApply, onCancel, disabled });
+  callbacks.current = { onApply, onCancel, disabled };
+  const cancelFinding = () => {
+    const pending = detection.current;
+    detection.current = null;
+    pending?.abort();
+    if (pending) setFinding(false);
+  };
+  const cancel = () => {
+    if (callbacks.current.disabled || signal.aborted) return;
+    cancelFinding();
+    callbacks.current.onCancel();
+  };
+  const find = async () => {
+    if (disabled || !editor.current || detection.current || signal.aborted) return;
+    const pending = new AbortController();
+    detection.current = pending;
+    const abort = () => {
+      if (detection.current === pending) detection.current = null;
+      pending.abort();
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    setFinding(true);
+    setError('');
+    try {
+      const corners = await findEdges(pending.signal);
+      if (detection.current !== pending || signal.aborted) return;
+      if (!corners || !validQuad(corners) || !applySuggestion.current?.(corners))
+        setError(t('Keine Dokumentkanten gefunden. Die bisherige Auswahl bleibt erhalten.'));
+    } catch {
+      if (detection.current === pending && !signal.aborted)
+        setError(
+          t(
+            'Kanten konnten nicht gefunden werden. Bitte erneut versuchen oder Ecken manuell setzen.',
+          ),
+        );
+    } finally {
+      signal.removeEventListener('abort', abort);
+      if (detection.current === pending) {
+        detection.current = null;
+        setFinding(false);
+      }
+    }
+  };
   const loupe = useRef<HTMLCanvasElement>(null);
   const active = useRef<string | null>(null);
   const draw = useRef<(() => void) | null>(null);
@@ -36,7 +87,10 @@ export function CornerEditor({
   };
   const url = useBlobUrl(page.original);
   useEffect(() => {
-    if (!url || !container.current) return;
+    if (!url || !container.current || signal.aborted) return;
+    setReady(false);
+    setFinding(false);
+    setError('');
     let disposed = false;
     const image = new Image();
     image.onload = async () => {
@@ -109,19 +163,37 @@ export function CornerEditor({
             surfaceColor: tokens.getPropertyValue('--scanner-text').trim() || '#182923',
           },
           onChange: (corners: CornerPoints) => {
+            cancelFinding();
             points = corners;
             draw.current?.();
           },
           onConfirm: (corners: CornerPoints) => {
+            if (disposed || signal.aborted || callbacks.current.disabled || detection.current)
+              return;
             const q = keys.map((key) => ({
               x: Math.min(1, corners[key].x / width),
               y: Math.min(1, corners[key].y / height),
             })) as Quad;
-            if (validQuad(q)) onApply(q);
+            if (validQuad(q)) callbacks.current.onApply(q);
             else setError(t('Bitte vier gültige Ecken setzen.'));
           },
-          onCancel,
+          onCancel: cancel,
         });
+        applySuggestion.current = (corners) => {
+          const pixels = Object.fromEntries(
+            keys.map((key, i) => [key, { x: corners[i].x * width, y: corners[i].y * height }]),
+          ) as unknown as CornerPoints;
+          // Programmatic suggestions must not cancel themselves through onChange.
+          const pending = detection.current;
+          detection.current = null;
+          const applied = editor.current?.setCorners(pixels) ?? false;
+          detection.current = pending;
+          if (applied) {
+            points = pixels;
+            draw.current?.();
+          }
+          return applied;
+        };
         const labels: Record<string, string> = {
           topLeft: t('Ecke oben links'),
           topRight: t('Ecke oben rechts'),
@@ -138,19 +210,37 @@ export function CornerEditor({
         if (!disposed) setError(t('Der Eckeneditor konnte nicht geladen werden.'));
       }
     };
-    image.onerror = () => setError(t('Das Original konnte nicht angezeigt werden.'));
+    image.onerror = () => {
+      if (!disposed && !signal.aborted) setError(t('Das Original konnte nicht angezeigt werden.'));
+    };
     image.src = url;
     return () => {
       disposed = true;
+      const pending = detection.current;
+      detection.current = null;
+      pending?.abort();
       image.onload = image.onerror = null;
       editor.current?.destroy();
       editor.current = null;
+      applySuggestion.current = null;
       draw.current = null;
       hideLoupe();
     };
-  }, [url]);
+  }, [url, signal]);
   return (
-    <section className="scanner-corners">
+    <section
+      className="scanner-corners"
+      aria-busy={finding}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        // Scanic already handles Escape on a corner handle.
+        if (!event.defaultPrevented) {
+          event.preventDefault();
+          cancel();
+        }
+      }}
+    >
       <div
         className="scanner-corner-stage"
         onPointerDownCapture={(e) => selectCorner(e.target)}
@@ -170,11 +260,23 @@ export function CornerEditor({
         />
       </div>
       {error && <p role="alert">{error}</p>}
+      {finding && <p role="status">{t('Dokumentkanten werden gesucht...')}</p>}
+      <button
+        disabled={disabled || !ready}
+        aria-disabled={finding}
+        onClick={(event) => {
+          // Keep a keyboard target while busy, including browsers that do not focus clicked buttons.
+          event.currentTarget.focus();
+          void find();
+        }}
+      >
+        {t('Kanten finden')}
+      </button>
       <div className="scanner-actions">
-        <button disabled={disabled} onClick={onCancel}>
+        <button disabled={disabled} onClick={cancel}>
           {t('Abbrechen')}
         </button>
-        <button disabled={disabled || !ready} onClick={() => editor.current?.confirm()}>
+        <button disabled={disabled || !ready || finding} onClick={() => editor.current?.confirm()}>
           {t('Zuschnitt übernehmen')}
         </button>
       </div>
