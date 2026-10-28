@@ -40,7 +40,7 @@ export function ReviewTools({
   undo: () => void;
   canUndo: boolean;
   discard: () => void;
-  repeat: () => void;
+  repeat: (trigger: HTMLButtonElement) => void;
 }) {
   const [more, setMore] = useState(false);
   const trigger = useRef<ReviewPanel | null>(null),
@@ -83,8 +83,12 @@ export function ReviewTools({
       {!panel ? (
         <>
           <div className="scanner-review-quick">
-            <button className="scanner-repeat" disabled={busy} onClick={repeat}>
-              {t('Wiederholen')}
+            <button
+              className="scanner-repeat"
+              disabled={busy}
+              onClick={(event) => repeat(event.currentTarget)}
+            >
+              {t(draft.source === 'file' ? 'Bild tauschen' : 'Wiederholen')}
             </button>
             <button
               disabled={busy}

@@ -1,6 +1,6 @@
 # Implementation contract
 
-Version 0.8, updated 27 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.9, updated 28 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
@@ -110,7 +110,7 @@ Limits are configurable positive integers. The working estimate is not browser R
 
 [ADR 0020](adr/0020-focused-review-and-shared-viewer.md) supersedes the older stacked tools/single-page manager. Review uses a measured image viewer and fixed Previous/Next/Finish; Finish directly exports the confirmed current draft. Unreviewed import files block completion until reviewed or explicitly discarded, including after limits/errors. Tiles scroll within a bounded region and have at least 120 x 156 pixel top-left cover previews, without altering exports. Editing, atomic replacement, deleting and movement remain available.
 
-Review and required corner confirmation expose a directly visible Repeat button. It reopens the camera without accepting the current draft or adding a page. Returning from the camera keeps the candidate and returns focus to Repeat. A successfully processed replacement clears any previous required-crop state before review. Individual discard remains in More actions; closing the session is separate.
+Review and required corner confirmation use the current source: Retake/Wiederholen reopens the existing camera for camera candidates; Replace image/Bild tauschen opens a dedicated single-image picker without camera access for files. Accepted-page replacement follows the same distinction. Cancelling/empty selection or processing failure preserves the prior candidate, replacement target and remaining import queue; cancelling required corners for a replacement restores the preceding candidate. Return focus to the replacement action. Accepted pages keep their ID/bytes until atomic acceptance. Count rollback resources within existing budgets and invalidate pending work on session end. Individual discard and closing the session remain separate. This shared-UI change adds no public option and is unreleased, outside npm 0.2.0 (D-047).
 
 Filter, Adjust, Format, Original and Quality reclaim the image workspace and hide unrelated navigation. Original and Quality are read-only and return to review with one OK button. Editing tools use Apply to keep edits and Cancel to restore the prior recipe/geometry and undo history, retaining the tool on restore failure. Undo is separate from Reset. Lens Auto contains its actual status. Portrait/landscape share one rotated sheet icon; postcard has the German two-line label "Post-" / "karte" and accessible dimensions. Rotation has no toast. The corner loupe is detached and drawn from original pixels: TL/BR to bottom-left, TR/BL to top-left. Keep 48 pixel handles/keyboard arrows; edge grips and left-handed mode are deferred.
 
@@ -148,7 +148,7 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-06 | Reversible profiles, faint digits, handwriting and colors | F-08, N-01 |
 | T-07 | Independent projected A4/Letter, ambiguous A-series, invalid models, regional bounds and manual precedence without location requests | F-10, F-11, F-13 |
 | T-08 | Presets, receipts, orientation/rotation and layouts | F-12, F-13, F-14, F-28 |
-| T-09 | Adding/editing/ordering and atomic page replacement | F-09, F-15, F-16 |
+| T-09 | Adding/editing/ordering, source-aware DE/EN replacement and direct picker, cancellation/failure/required-crop rollback, retained import queue and atomic accepted-page replacement | F-09, F-15, F-16 |
 | T-10 | No partial confirmation after export error/abort | F-17, F-27, I-03 |
 | T-11 | Sharpness, lighting, unknown and honest quality claims | F-18, N-01 |
 | T-12 | Local OCR/flattening remain outside commissioned scope | F-20, F-21, F-22 |

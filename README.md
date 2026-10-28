@@ -40,7 +40,7 @@ These projects retain their own licenses. See [dependencies and pinned versions]
 | Import | JPEG, PNG and WebP; preserved original bytes and orientation normalization |
 | Crop | Independent still-image detection, perspective correction, original-resolution edge refinement, touch/keyboard corner editor with detached magnifier; explicit confirmation when detection is uncertain |
 | Image profiles | Auto, Photo, Color, Grayscale and soft Black-and-white; optional paper brightening/shadow equalization and reversible brightness, contrast, sharpening and limited radial lens correction |
-| Review | Direct Retake, Undo, focused editing tools, original/before comparison, fit/100%, stepped zoom, pinch and pan |
+| Review | Direct source-aware replacement, Undo, focused editing tools, original/before comparison, fit/100%, stepped zoom, pinch and pan |
 | Multiple pages | Add, replace, edit, delete and reorder; scrollable page tiles; atomic replacement and direct completion |
 | Output layouts | A3/A4/A5/A6, Letter, 100 × 150 mm postcard, receipt widths and original ratio; independent portrait/landscape and image rotation |
 | Image/PDF export | JPEG at quality 0.92 or PNG; one browser-generated PDF containing all confirmed pages and their actual output layouts |
@@ -51,6 +51,8 @@ These projects retain their own licenses. See [dependencies and pinned versions]
 | Reference hosts | Full Next.js workshop with two themes, samples, actual downloads and lazy PDF.js preview; small Astro host using the same built package |
 
 There is no built-in upload, account, document persistence, service worker, OCR text layer, PDF import or cloud synchronization. TIFF/HEIC import and general paper flattening are outside the current implementation. Lens correction is a bounded radial model, not full camera calibration. Detection, automatic format suggestions and cleanup remain heuristics; see [verification and known limits](docs/testing/STATUS.md).
+
+Unreleased source uses **Replace image** (**Bild tauschen**) to choose another imported image directly, without camera access; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the current candidate and remaining imports. This change is not in npm 0.2.0. See [integration](docs/INTEGRATION.md#imperative-integration).
 
 ## Run the demo applications
 
@@ -68,7 +70,7 @@ Open **http://localhost:3000**. `pnpm dev` builds the library and copies its wor
 In the workshop:
 
 1. Choose **Scan document** to open the scanner, **Import images** for existing files, or the sample-documents button for synthetic examples.
-2. Capture/import, confirm uncertain corners, review the result and use **Retake** to take another image. Add more pages or choose **Finish** to export.
+2. Capture/import, confirm uncertain corners and review the result. Use **Retake** for a camera capture or **Replace image** to select another imported image. Add more pages or choose **Finish** to export.
 3. Inspect actual page images and the generated PDF, then download them deliberately. Returning to the start keeps the result; discarding is explicit.
 4. Open **Options** to change language, initial profile, theme, output image format, capture cue and stabilization duration. Use **Sprache / Language** to switch DE/EN, or use `?lang=en` / `?lang=de` to override browser detection. Manual selections remain explicit in the URL when reloading.
 5. Diagnostics start **off**. Enable them explicitly if required; recorded document bytes remain local to that page session. Reloading loses in-memory scans and diagnostics.

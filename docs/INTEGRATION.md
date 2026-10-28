@@ -55,6 +55,8 @@ Call `destroy()` on host unmount too. `open({ signal })` and destruction cancel 
 
 The adapter returns `Processed | CropRequired`. A `crop-required` state has source size, proposed corners and `not-detected`/`capture-conflict`, with no image/format. Custom hosts must obtain explicit corner confirmation before issuing a processing request with those corners. Never convert it into a full-original page. The packaged UI handles this; cancelled replacement preserves the existing page. Unexpected missing export geometry fails with `CROP_REQUIRED`, not partial success.
 
+Unreleased source chooses the replacement action from the current candidate/page source: **Retake/Wiederholen** reopens the camera; **Replace image/Bild tauschen** opens a single-image picker without camera access, including during required crop. Cancelling or failing a replacement preserves the prior candidate and import queue; cancelling required corners for the replacement restores the preceding candidate. Accepted pages remain unchanged until atomic acceptance. Both UI integrations share this behavior without a new public option; it is not in npm 0.2.0.
+
 ## Direct camera entry
 
 From a host Scan button, call `scanner.open({ entry: 'camera', signal })`. With React:

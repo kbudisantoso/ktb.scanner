@@ -18,6 +18,21 @@ test('English is the library default; German and host overrides retain stable me
   assert.equal(createTranslator('en')('Seite {number}', { number: 12 }), 'Page 12');
   assert.equal(createTranslator('de')('Seite {number}', { number: 12 }), 'Seite 12');
   assert.equal(createTranslator()('External host label'), 'External host label');
+  assert.equal(createTranslator('en')('Bild tauschen'), 'Replace image');
+  assert.equal(createTranslator('de')('Bild tauschen'), 'Bild tauschen');
+  for (const key of ['Bild tauschen', 'Replace image'])
+    assert.equal(
+      createTranslator('en', { [key]: 'Choose another image' })('Bild tauschen'),
+      'Choose another image',
+    );
+  assert.equal(
+    createTranslator('en', { Wiederholen: 'Take another photo' })('Wiederholen'),
+    'Take another photo',
+  );
+  assert.equal(
+    createTranslator('en', { Retake: 'Take another photo' })('Wiederholen'),
+    'Take another photo',
+  );
 });
 test('stable error codes have English API messages and localized UI messages', () => {
   const error = new ScannerError(
