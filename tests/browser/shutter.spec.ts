@@ -184,6 +184,7 @@ for (const [mode, sound] of [
     });
     await page.goto('/');
     await openOptions(page);
+    await page.getByLabel('Aufnahmeablauf', { exact: true }).selectOption('review-each');
     await page.getByRole('combobox', { name: 'Aufnahmeton', exact: true }).selectOption(sound);
     await closeAppPanel(page);
     await page.getByRole('button', { name: /Dokument scannen/ }).click();

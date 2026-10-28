@@ -1,3 +1,4 @@
+import { chooseCaptureWorkflow } from './helpers';
 import { acceptPage } from './helpers';
 import { showPdf } from './helpers';
 import { test, expect } from './fixtures';
@@ -164,6 +165,7 @@ test('manual photo cancels a pending live job and independently detects the full
     });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
   await page.getByLabel('Aufnahmemodus').selectOption('manual');

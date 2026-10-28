@@ -37,6 +37,11 @@ export async function openOptions(page: Page) {
   const button = page.getByRole('button', { name: 'Optionen', exact: true });
   if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();
 }
+export async function chooseCaptureWorkflow(page: Page, workflow: 'review-each' | 'continuous') {
+  await openOptions(page);
+  await page.getByLabel('Aufnahmeablauf', { exact: true }).selectOption(workflow);
+  await closeAppPanel(page);
+}
 export async function diagnostics(page: Page) {
   const button = page.getByRole('button', {
     name: 'Diagnosedaten für Erkennung und Export',

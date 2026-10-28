@@ -3,6 +3,8 @@ import { diagnose } from '../diagnostics.ts';
 import type { DiagnosticOptions } from '../diagnostics.ts';
 import type { CaptureDetails } from '../camera.ts';
 import { Camera } from '../camera.ts';
+import { CaptureRearm, sampleFingerprintFromPixels } from '../capture-rearm.ts';
+import type { CaptureOutcome } from './capture-queue.ts';
 import { AutoCapture } from '../capture.ts';
 import { LiveTracker } from '../tracking.ts';
 import { CaptureOutline } from './CaptureOutline.tsx';
@@ -22,6 +24,10 @@ export function CameraView({
   onShutter,
   onPrepareSound,
   onCapture,
+  continuous = false,
+  canCapture = true,
+  onReview,
+  beforeCapture,
   onCancel,
   onClose,
   onImport,
@@ -37,13 +43,45 @@ export function CameraView({
   setMode: (mode: CaptureMode) => void;
   onShutter: () => boolean;
   onPrepareSound: () => void;
-  onCapture: (blob: Blob, hint?: CaptureHint) => void;
+  onCapture: (blob: Blob, hint?: CaptureHint) => Promise<CaptureOutcome>;
+  continuous?: boolean;
+  canCapture?: boolean;
+  onReview: () => void;
+  beforeCapture: (size: Size) => void;
   onCancel: () => void;
   onClose: () => void;
   onImport: () => void;
   pageCount: number;
   t: Translate;
 }) {
+  const callbacks = useRef({
+    onCapture,
+    onShutter,
+    onPrepareSound,
+    onReview,
+    onCancel,
+    onClose,
+    onImport,
+    canCapture,
+    continuous,
+    beforeCapture,
+  });
+  callbacks.current = {
+    onCapture,
+    onShutter,
+    onPrepareSound,
+    onReview,
+    onCancel,
+    onClose,
+    onImport,
+    canCapture,
+    continuous,
+    beforeCapture,
+  };
+  const feedbackImage = useRef<HTMLImageElement>(null),
+    reviewButton = useRef<HTMLButtonElement>(null);
+  const feedbackReady = useRef<(() => void) | undefined>(undefined);
+  const [feedback, setFeedback] = useState<{ url?: string; needsCrop?: boolean } | null>(null);
   const video = useRef<HTMLVideoElement>(null),
     snapshot = useRef<HTMLCanvasElement>(null),
     camera = useRef(new Camera()),
@@ -58,7 +96,7 @@ export function CameraView({
     [device, setDevice] = useState(''),
     [restart, setRestart] = useState(0);
   const [taking, setTaking] = useState(false);
-  const [phase, setPhase] = useState<'live' | 'encoding' | 'processing'>('live');
+  const [phase, setPhase] = useState<'live' | 'encoding' | 'processing' | 'feedback'>('live');
   const [autoBlock, setAutoBlock] = useState('');
   const [previewSize, setPreviewSize] = useState<Size>({ width: 4, height: 3 });
   const shot = useRef<() => void>(() => {});
@@ -71,8 +109,33 @@ export function CameraView({
     [torchPending, setTorchPending] = useState(false);
   useEffect(() => {
     if (signal.aborted) return;
-    const abort = new AbortController(),
-      engine = createScanicAdapter(assetBaseUrl, diagnostics);
+    const abort = new AbortController();
+    let engine: ReturnType<typeof createScanicAdapter> | undefined = createScanicAdapter(
+      assetBaseUrl,
+      diagnostics,
+    );
+    const rearm = new CaptureRearm();
+    const fingerprintCanvas = document.createElement('canvas');
+    fingerprintCanvas.width = fingerprintCanvas.height = 32;
+    const fingerprintContext = fingerprintCanvas.getContext('2d', { willReadFrequently: true })!;
+    const fingerprint = (source: CanvasImageSource) => {
+      fingerprintContext.drawImage(source, 0, 0, 32, 32);
+      return sampleFingerprintFromPixels(fingerprintContext.getImageData(0, 0, 32, 32));
+    };
+    const waits = new Set<{ timer: ReturnType<typeof setTimeout>; resolve: () => void }>();
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        const item = {
+          timer: setTimeout(() => {
+            waits.delete(item);
+            resolve();
+          }, ms),
+          resolve,
+        };
+        waits.add(item);
+      });
+    let feedbackUrl: string | undefined, animation: Animation | undefined;
+    let observedLightRevision = lightRevision.current;
     let timer: ReturnType<typeof setTimeout>,
       active = true,
       pendingShot = false;
@@ -91,6 +154,7 @@ export function CameraView({
     };
     gate.current.rearm();
     setTaking(false);
+    setFeedback(null);
     setPhase('live');
     setRunning(false);
     setProgress(0);
@@ -119,6 +183,7 @@ export function CameraView({
             ...status,
             generation: gate.current.generation,
           });
+        if (!active || abort.signal.aborted) return;
         watchdogState = state;
         setProgress(status.progress);
         if (state === 'expired') setAutoBlock('');
@@ -126,9 +191,9 @@ export function CameraView({
       }
     }, 100);
     const capture = async (automatic = false) => {
-      if (pendingShot || !active || !video.current) return;
+      if (pendingShot || !active || !video.current || !callbacks.current.canCapture) return;
       pendingShot = true;
-      detectionEpoch++;
+      const captureEpoch = ++detectionEpoch;
       clearTimeout(timer);
       detectionAbort.abort();
       const evidence = latest;
@@ -136,7 +201,12 @@ export function CameraView({
       setTaking(true);
       let handedOff = false;
       try {
+        callbacks.current.beforeCapture({
+          width: video.current.videoWidth,
+          height: video.current.videoHeight,
+        });
         diagnose(diagnostics, 'capture-start', { generation: gate.current.generation });
+        if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         let details: CaptureDetails | undefined;
         const blob = await camera.current.capture(
           video.current,
@@ -152,15 +222,19 @@ export function CameraView({
             canvas.height = Math.round(image.height * scale);
             canvas.getContext('2d')!.drawImage(image, 0, 0, canvas.width, canvas.height);
             setPreviewSize({ width: image.width, height: image.height });
-            video.current?.pause();
+            if (callbacks.current.continuous)
+              rearm.lock(fingerprint(image), evidence?.detection.corners ?? null);
+            else video.current?.pause();
             setPhase('encoding');
-            const soundPlayed = onShutter();
+            const soundPlayed = callbacks.current.onShutter();
+            if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
             diagnose(diagnostics, 'capture-shutter', { ...value, soundPlayed });
           },
         );
         if (!active) return;
-        camera.current.stop();
-        engine.destroy();
+        if (!callbacks.current.continuous) camera.current.stop();
+        engine?.destroy();
+        engine = undefined;
         const hint: CaptureHint | undefined =
           evidence?.detection.corners && details
             ? {
@@ -179,19 +253,84 @@ export function CameraView({
           hint,
           encodingMs: details ? performance.now() - details.capturedAtMs : undefined,
         });
+        if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         handedOff = true;
         setPhase('processing');
-        onCapture(blob, hint);
+        const outcome = await callbacks.current.onCapture(blob, hint);
+        if (!active || abort.signal.aborted || !callbacks.current.continuous) return;
+        if (outcome) {
+          setPhase('feedback');
+          if (outcome.preview) {
+            feedbackUrl = URL.createObjectURL(outcome.preview);
+            const ready = new Promise<void>((resolve) => {
+              feedbackReady.current = resolve;
+            });
+            setFeedback({ url: feedbackUrl });
+            await ready;
+            feedbackReady.current = undefined;
+            if (!active) return;
+            await wait(350);
+            const image = feedbackImage.current,
+              button = reviewButton.current;
+            if (
+              active &&
+              image &&
+              button &&
+              !matchMedia('(prefers-reduced-motion: reduce)').matches
+            ) {
+              const from = image.getBoundingClientRect(),
+                to = button.getBoundingClientRect();
+              const scale = Math.min(to.width / from.width, to.height / from.height);
+              animation = image.animate(
+                [
+                  { transform: 'translate(0,0) scale(1)', opacity: 1 },
+                  {
+                    transform: `translate(${to.x + to.width / 2 - from.x - from.width / 2}px,${to.y + to.height / 2 - from.y - from.height / 2}px) scale(${scale})`,
+                    opacity: 0.2,
+                  },
+                ],
+                { duration: 320, easing: 'ease-in', fill: 'forwards' },
+              );
+              await animation.finished.catch(() => {});
+              animation.cancel();
+              animation = undefined;
+            }
+          } else {
+            setFeedback({ needsCrop: outcome.needsCrop });
+            await wait(500);
+          }
+        }
+        if (!active || abort.signal.aborted) return;
+        if (feedbackUrl) URL.revokeObjectURL(feedbackUrl);
+        feedbackUrl = undefined;
+        setFeedback(null);
+        latest = undefined;
+        tracker = new LiveTracker();
+        detectionAbort = new AbortController();
+        engine = createScanicAdapter(assetBaseUrl, diagnostics);
+        pendingShot = false;
+        setTaking(false);
+        setQuad(null);
+        setProgress(0);
+        setPhase('live');
+        timer = setTimeout(() => void tick(), 0);
       } catch (err) {
         if (active) {
+          handedOff = false;
+          if (callbacks.current.continuous && !rearm.blocked && video.current)
+            rearm.lock(fingerprint(video.current), evidence?.detection.corners ?? null);
+          if (callbacks.current.continuous && !engine)
+            engine = createScanicAdapter(assetBaseUrl, diagnostics);
           diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
+          if (!active || abort.signal.aborted) return;
           setError(errorMessage(err));
-          gate.current.rearm();
+          if (!callbacks.current.continuous || !rearm.blocked) gate.current.rearm();
           detectionAbort = new AbortController();
           latest = undefined;
           tracker = new LiveTracker();
           setPhase('live');
           await video.current?.play().catch(() => {});
+          if (!active || abort.signal.aborted) return;
           timer = setTimeout(() => void tick(), 125);
         }
       } finally {
@@ -203,6 +342,11 @@ export function CameraView({
     };
     shot.current = () => {
       diagnose(diagnostics, 'manual-trigger', { generation: gate.current.generation });
+      if (!callbacks.current.canCapture || pendingShot || !active) return;
+      if (callbacks.current.continuous && rearm.blocked) {
+        rearm.reset();
+        gate.current.rearm();
+      }
       if (gate.current.claimManual()) void capture();
     };
     const tick = async () => {
@@ -222,6 +366,9 @@ export function CameraView({
         }
         frameAspect = aspect;
         const generation = gate.current.generation;
+        const frameFingerprint = callbacks.current.continuous ? fingerprint(video.current) : null;
+        const frameLighting = lighting.current,
+          frameLightRevision = lightRevision.current;
         const image = await createImageBitmap(video.current, {
           resizeWidth: Math.max(
             1,
@@ -242,7 +389,7 @@ export function CameraView({
           image.close();
           return;
         }
-        const detection = await engine.detect(image, started, detectionAbort.signal);
+        const detection = await engine!.detect(image, started, detectionAbort.signal);
         if (!active || pendingShot || epoch !== detectionEpoch) return;
         latest = {
           detection,
@@ -252,11 +399,24 @@ export function CameraView({
         lastEvidence = detection.timestamp;
         const evidence = tracker.update(detection, now);
         const view = showTracking(now);
-        const status = gate.current.update(
-          lighting.current ? { ...evidence, sharpness: 'unknown' } : evidence,
-          now,
-          generation,
-        );
+        if (callbacks.current.continuous) {
+          if (frameLighting || lighting.current || frameLightRevision !== lightRevision.current)
+            rearm.interrupt();
+          else if (now >= detection.timestamp && now - detection.timestamp <= 400) {
+            if (observedLightRevision !== frameLightRevision) {
+              if (rearm.blocked) rearm.lock(frameFingerprint, detection.corners);
+              observedLightRevision = frameLightRevision;
+            } else if (rearm.observe(frameFingerprint, detection.corners, detection.timestamp, now))
+              gate.current.rearm();
+          } else rearm.interrupt();
+        }
+        const status = !callbacks.current.canCapture
+          ? { progress: 0, capture: false }
+          : gate.current.update(
+              lighting.current ? { ...evidence, sharpness: 'unknown' } : evidence,
+              now,
+              generation,
+            );
         diagnose(diagnostics, 'live-decision', {
           ...detection,
           receivedAtMs: now,
@@ -270,6 +430,7 @@ export function CameraView({
           ...status,
           reason: gate.current.decisionReason,
         });
+        if (!active || abort.signal.aborted || pendingShot || epoch !== detectionEpoch) return;
         setProgress(status.progress);
         setAutoBlock(evidence.corners ? gate.current.decisionReason : '');
         setWaiting(status.progress > 0 && (!evidence.corners || evidence.sharpness !== 'sharp'));
@@ -284,6 +445,7 @@ export function CameraView({
           setQuad(null);
           setProgress(0);
           diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
+          if (!active || abort.signal.aborted) return;
           setError(errorMessage(err));
         }
       }
@@ -310,28 +472,24 @@ export function CameraView({
           videoWidth: video.current!.videoWidth,
           videoHeight: video.current!.videoHeight,
         });
+        if (!active || abort.signal.aborted) return;
         setPreviewSize({ width: video.current!.videoWidth, height: video.current!.videoHeight });
         setRunning(true);
         setHasTorch(camera.current.supportsTorch);
+        void tick();
         const available = await navigator.mediaDevices.enumerateDevices();
         if (!active) return;
         setDevices(available.filter((d) => d.kind === 'videoinput'));
-        void tick();
       } catch (err) {
         if (active) setError(errorMessage(err));
       }
     };
     const pause = () => {
       if (document.hidden) {
-        lightRevision.current++;
-        lighting.current = false;
-        active = false;
-        abort.abort();
-        detectionAbort.abort();
-        camera.current.stop();
-        engine.destroy();
-        clearTimeout(timer);
+        release();
         setRunning(false);
+        setTaking(false);
+        setFeedback(null);
         setQuad(null);
         setProgress(0);
         setError(t('Kamera pausiert. Bitte erneut starten.'));
@@ -345,8 +503,20 @@ export function CameraView({
       detectionAbort.abort();
       clearTimeout(timer);
       clearInterval(watchdog);
+      for (const item of waits) {
+        clearTimeout(item.timer);
+        item.resolve();
+      }
+      waits.clear();
+      feedbackReady.current?.();
+      feedbackReady.current = undefined;
+      animation?.cancel();
+      if (feedbackUrl) URL.revokeObjectURL(feedbackUrl);
+      feedbackUrl = undefined;
+      fingerprintCanvas.width = fingerprintCanvas.height = 1;
       camera.current.stop();
-      engine.destroy();
+      engine?.destroy();
+      engine = undefined;
     };
     signal.addEventListener('abort', release, { once: true });
     document.addEventListener('visibilitychange', pause);
@@ -422,7 +592,7 @@ export function CameraView({
         </button>
       </div>
       <div
-        className={`scanner-camera ${phase !== 'live' ? 'scanner-camera-captured' : ''}`}
+        className={`scanner-camera ${phase !== 'live' && phase !== 'feedback' ? 'scanner-camera-captured' : ''}`}
         style={{
           aspectRatio: `${previewSize.width}/${previewSize.height}`,
           width: `min(100%, calc(var(--scanner-camera-height, 52dvh) * ${previewSize.width / previewSize.height}))`,
@@ -439,7 +609,7 @@ export function CameraView({
         {quad && phase === 'live' && (
           <CaptureOutline corners={quad} size={previewSize} progress={progress} opacity={opacity} />
         )}
-        {phase !== 'live' && (
+        {phase !== 'live' && phase !== 'feedback' && (
           <>
             <div className="scanner-shutter-flash" aria-hidden="true" />
             <div className="scanner-photo-processing" role="status">
@@ -461,21 +631,38 @@ export function CameraView({
           </>
         )}
       </div>
+      {feedback && (
+        <div className="scanner-capture-feedback" role="status">
+          {feedback.url ? (
+            <img
+              ref={feedbackImage}
+              src={feedback.url}
+              alt={t('Aufgenommene Seite')}
+              onLoad={() => feedbackReady.current?.()}
+              onError={() => feedbackReady.current?.()}
+            />
+          ) : (
+            <p>{t('Ecken später bestätigen')}</p>
+          )}
+        </div>
+      )}
       {phase === 'live' && (
         <p role="status" className="scanner-camera-hint">
-          {!running
-            ? t(error ? 'Kamera nicht bereit' : 'Kamera wird gestartet...')
-            : mode === 'auto' && autoBlock === 'sharpness-unknown'
-              ? t('Schärfe nicht beurteilbar - bitte manuell auslösen.')
-              : mode === 'auto' && autoBlock === 'sharpness-blur'
-                ? t('Bild wirkt unscharf - ruhig halten oder manuell auslösen.')
-                : waiting
-                  ? t('Erkennung kurz unsicher - ruhig halten')
-                  : progress > 0
-                    ? t('Ruhig halten - automatische Aufnahme')
-                    : mode === 'manual'
-                      ? t('Dokument ausrichten und auslösen')
-                      : t('Dokument vollständig ins Bild halten')}
+          {!canCapture
+            ? t('Seitenlimit erreicht - bitte Seiten prüfen.')
+            : !running
+              ? t(error ? 'Kamera nicht bereit' : 'Kamera wird gestartet...')
+              : mode === 'auto' && autoBlock === 'sharpness-unknown'
+                ? t('Schärfe nicht beurteilbar - bitte manuell auslösen.')
+                : mode === 'auto' && autoBlock === 'sharpness-blur'
+                  ? t('Bild wirkt unscharf - ruhig halten oder manuell auslösen.')
+                  : waiting
+                    ? t('Erkennung kurz unsicher - ruhig halten')
+                    : progress > 0
+                      ? t('Ruhig halten - automatische Aufnahme')
+                      : mode === 'manual'
+                        ? t('Dokument ausrichten und auslösen')
+                        : t('Dokument vollständig ins Bild halten')}
         </p>
       )}
       <div className="scanner-camera-options" id={optionsId} hidden={!showOptions}>
@@ -527,14 +714,16 @@ export function CameraView({
           <button
             className="scanner-camera-icon scanner-camera-back"
             disabled={taking}
-            onClick={onCancel}
-            aria-label={t('Zurück zum Import')}
+            onClick={continuous ? onImport : onCancel}
+            aria-label={t(continuous ? 'Bilder importieren' : 'Zurück zum Import')}
           >
-            <CameraIcon name="back" />
-            {pageCount > 0 && <span className="scanner-camera-page-count">{pageCount}</span>}
+            <CameraIcon name={continuous ? 'gallery' : 'back'} />
+            {!continuous && pageCount > 0 && (
+              <span className="scanner-camera-page-count">{pageCount}</span>
+            )}
           </button>
           <button
-            disabled={!running || taking || torchPending}
+            disabled={!running || taking || torchPending || !canCapture}
             className="scanner-shutter-button"
             aria-label={taking ? t('Aufnahme läuft...') : t('Jetzt aufnehmen')}
             onClick={() => {
@@ -545,12 +734,20 @@ export function CameraView({
             <span>{taking ? t('Aufnahme läuft...') : t('Jetzt aufnehmen')}</span>
           </button>
           <button
-            className="scanner-camera-icon"
-            aria-label={t('Bilder importieren')}
-            disabled={taking}
-            onClick={onImport}
+            className={`scanner-camera-icon${continuous ? ' scanner-camera-review' : ''}`}
+            ref={reviewButton}
+            aria-label={
+              continuous ? `${t('Seiten prüfen')} (${pageCount})` : t('Bilder importieren')
+            }
+            disabled={taking || (continuous && !pageCount)}
+            onClick={continuous ? onReview : onImport}
           >
-            <CameraIcon name="gallery" />
+            <CameraIcon name={continuous ? 'forward' : 'gallery'} />
+            {continuous && (
+              <span className="scanner-camera-review-label">
+                {t('Seiten prüfen')} ({pageCount})
+              </span>
+            )}
           </button>
         </div>
         <span className="scanner-camera-caption">

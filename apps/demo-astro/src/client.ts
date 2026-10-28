@@ -6,6 +6,7 @@ const input = document.querySelector<HTMLInputElement>('#file')!;
 const status = document.querySelector<HTMLElement>('#status')!;
 const results = document.querySelector<HTMLElement>('#results')!;
 const language = document.querySelector<HTMLSelectElement>('#language')!;
+const workflow = document.querySelector<HTMLSelectElement>('#capture-workflow')!;
 const requested = new URL(location.href).searchParams.get('lang');
 const preferred = navigator.languages?.[0] || navigator.language;
 let locale: ScanLocale =
@@ -34,6 +35,7 @@ async function open(files?: File[]) {
   openButton.setAttribute('aria-disabled', 'true');
   importButton.disabled = true;
   language.disabled = true;
+  workflow.disabled = true;
   const current = generation;
   try {
     const { createScanner } = await import('@ktb-tools/scanner/react');
@@ -42,6 +44,7 @@ async function open(files?: File[]) {
       mount: document.querySelector<HTMLElement>('#scanner-mount')!,
       assetBaseUrl: '/scanner-assets/',
       createPdf: true,
+      captureWorkflow: workflow.value === 'review-each' ? 'review-each' : 'continuous',
       locale,
       theme: {
         '--scanner-background': '#f0eef5',
@@ -65,6 +68,7 @@ async function open(files?: File[]) {
     openButton.setAttribute('aria-disabled', 'false');
     importButton.disabled = false;
     language.disabled = false;
+    workflow.disabled = false;
   }
 }
 
@@ -114,6 +118,7 @@ function setLanguage(updateUrl = false) {
     element.textContent = t(element.dataset.i18n!);
   });
   results.setAttribute('aria-label', t('Scanergebnisse'));
+  workflow.setAttribute('aria-label', t('Aufnahmeablauf'));
   if (lastResult) render(lastResult);
   else status.textContent = t('Bilder und PDF bleiben lokal in dieser Sitzung.');
 }

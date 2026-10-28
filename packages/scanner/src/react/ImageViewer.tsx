@@ -11,6 +11,8 @@ export interface ImageViewerProps {
   texts?: Record<string, string>;
   locale?: ScanLocale;
   className?: string;
+  /** Optional page gesture, only at fit with one pointer and without held Before. */
+  onPageSwipe?: (direction: 'previous' | 'next') => void;
 }
 type Point = { x: number; y: number };
 type View = { scale: number; x: number; y: number; fit: boolean };
@@ -25,11 +27,15 @@ export function ImageViewer({
   texts,
   locale,
   className = '',
+  onPageSwipe,
 }: ImageViewerProps) {
   const t = createTranslator(locale, texts);
   const url = useBlobUrl(image),
     beforeUrl = useBlobUrl(before);
   const surface = useRef<HTMLDivElement>(null);
+  const swipeHandler = useRef(onPageSwipe);
+  swipeHandler.current = onPageSwipe;
+  const swipe = useRef<Point | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [natural, setNatural] = useState({ width: 0, height: 0 });
   const [loaded, setLoaded] = useState('');
@@ -111,8 +117,9 @@ export function ImageViewer({
     setView({ scale: 1, x: 0, y: 0, fit: true });
     setHeld(false);
     pointers.current.clear();
+    swipe.current = null;
     gesture.current = null;
-    ignore.current = 0;
+    // Keep the swipe/pan click guard across a synchronous page change.
     lastTap.current = -Infinity;
   }, [resetKey]);
   useEffect(() => {
@@ -120,6 +127,7 @@ export function ImageViewer({
     const cancel = () => {
       release();
       pointers.current.clear();
+      swipe.current = null;
       gesture.current = null;
     };
     const key = (e: KeyboardEvent) => {
@@ -141,9 +149,29 @@ export function ImageViewer({
   const finishPointer = (id: number, cancelled = false) => {
     if (!pointers.current.has(id)) return;
     const moved = gesture.current?.moved || !!gesture.current?.distance;
+    let pageDirection: 'previous' | 'next' | undefined;
+    const startPoint = swipe.current,
+      endPoint = pointers.current.get(id);
+    if (
+      !cancelled &&
+      pointers.current.size === 1 &&
+      startPoint &&
+      endPoint &&
+      current.current.fit &&
+      !held
+    ) {
+      const dx = endPoint.x - startPoint.x,
+        dy = endPoint.y - startPoint.y;
+      if (Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        ignore.current = performance.now() + 500;
+        pageDirection = dx < 0 ? 'next' : 'previous';
+      }
+    }
+    swipe.current = null;
     pointers.current.delete(id);
     if (moved || cancelled) ignore.current = performance.now() + 500;
     start();
+    if (pageDirection) swipeHandler.current?.(pageDirection);
   };
   return (
     <div className={`scanner-image-viewer ${className}`} lang={locale ?? 'en'}>
@@ -196,7 +224,12 @@ export function ImageViewer({
           if (e.button !== 0) return;
           e.currentTarget.setPointerCapture(e.pointerId);
           const r = e.currentTarget.getBoundingClientRect();
-          pointers.current.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+          const point = { x: e.clientX - r.left, y: e.clientY - r.top };
+          swipe.current =
+            !pointers.current.size && current.current.fit && !held && swipeHandler.current
+              ? point
+              : null;
+          pointers.current.set(e.pointerId, point);
           start();
         }}
         onPointerMove={(e) => {

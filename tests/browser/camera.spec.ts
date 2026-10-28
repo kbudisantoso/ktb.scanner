@@ -1,3 +1,4 @@
+import { chooseCaptureWorkflow } from './helpers';
 import { closeAppPanel, openOptions } from './helpers';
 import { diagnostics } from './helpers';
 import { test, expect } from './fixtures';
@@ -55,6 +56,7 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
     Object.defineProperty(window, 'ImageCapture', { configurable: true, value: undefined });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await diagnostics(page);
   await page.getByLabel('Diagnose aufzeichnen', { exact: true }).check();
   await closeAppPanel(page);
@@ -159,6 +161,60 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
       .some((artifact: any) => artifact.stage === 'live-input'),
   ).toBe(true);
   expect(manifest.events.at(-1).data.status).toBe('cancelled');
+  // Exercise a native canvas MediaStream in addition to the cross-engine camera facade.
+  if (browserName === 'chromium') {
+    await closeAppPanel(page);
+    await chooseCaptureWorkflow(page, 'continuous');
+    const before = await page.evaluate(() => {
+      const state = (window as any).cameraTest;
+      return { requests: state.requests, stops: state.stops };
+    });
+    await page.getByRole('button', { name: /Dokument scannen/ }).click();
+    await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
+    await page.getByLabel('Aufnahmemodus').selectOption('manual');
+    await expect(page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true })).toBeEnabled();
+    await page.evaluate(() => {
+      const video = document.querySelector<HTMLVideoElement>('.scanner-camera video')!;
+      (window as any).cameraTest.continuousStream = video.srcObject;
+    });
+    for (const count of [1, 2]) {
+      await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
+      await expect(
+        page.getByRole('img', { name: 'Aufgenommene Seite', exact: true }),
+      ).toBeVisible();
+      expect(
+        await page.evaluate(() => {
+          const video = document.querySelector<HTMLVideoElement>('.scanner-camera video')!;
+          const state = (window as any).cameraTest;
+          return {
+            paused: video.paused,
+            sameStream: video.srcObject === state.continuousStream,
+            state: state.continuousStream.getVideoTracks()[0].readyState,
+            requests: state.requests,
+            stops: state.stops,
+          };
+        }),
+      ).toEqual({
+        paused: false,
+        sameStream: true,
+        state: 'live',
+        requests: before.requests + 1,
+        stops: before.stops,
+      });
+      await expect(
+        page.getByRole('button', { name: `Seiten prüfen (${count})`, exact: true }),
+      ).toBeEnabled();
+    }
+    await page.getByRole('button', { name: 'Seiten prüfen (2)', exact: true }).click();
+    await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => (window as any).cameraTest.continuousStream.getVideoTracks()[0].readyState,
+      ),
+    ).toBe('ended');
+    await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+    await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
+  }
 });
 
 test('denied camera leaves import accessible', async ({ page }) => {
@@ -172,6 +228,7 @@ test('denied camera leaves import accessible', async ({ page }) => {
     });
   });
   await page.goto('/');
+  await chooseCaptureWorkflow(page, 'review-each');
   await closeAppPanel(page);
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
   await page.getByRole('button', { name: 'Kamera starten', exact: true }).click();
@@ -287,6 +344,7 @@ for (const stabilityMs of [400, 1000, 2000])
       });
     });
     await page.goto('/');
+    await chooseCaptureWorkflow(page, 'review-each');
     await openOptions(page);
     await page
       .getByLabel('Stabilisierungsdauer', { exact: true })
