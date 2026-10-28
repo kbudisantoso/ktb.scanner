@@ -9,12 +9,7 @@ import type {
   CropRequired,
   LiveDetection,
 } from './types.ts';
-import {
-  selectDocumentCandidate,
-  compareCaptureHint,
-  guardCaptureCrop,
-  candidateQuad,
-} from './candidates.ts';
+import { selectDocumentCandidate, compareCaptureHint, candidateQuad } from './candidates.ts';
 import type { DocumentCandidate } from './candidates.ts';
 import { imageHeader } from './image-header.ts';
 import {
@@ -184,7 +179,8 @@ async function process(
     if (bitmap.width * bitmap.height > limits.inputPixels)
       throw new ScannerError('LIMIT_EXCEEDED', 'Zu viele dekodierte Bildpunkte.');
     const size = { width: bitmap.width, height: bitmap.height };
-    const trustedHint =
+    // A comparable live hint may seed manual correction, never automatic still geometry.
+    const editorHint =
       request.captureHint?.stable === true &&
       compareCaptureHint(request.captureHint, size, null).state === 'still-not-detected'
         ? request.captureHint
@@ -192,8 +188,8 @@ async function process(
     const requireCrop = (reason: CropRequired['reason'], proposed?: Quad): CropRequired => {
       const corners: Quad =
         proposed ??
-        (trustedHint
-          ? structuredClone(trustedHint.corners)
+        (editorHint
+          ? structuredClone(editorHint.corners)
           : [
               { x: 0.1, y: 0.1 },
               { x: 0.9, y: 0.1 },
@@ -269,25 +265,10 @@ async function process(
       const provisionalCorners = provisional.candidate
         ? candidateQuad(provisional.candidate, small)
         : null;
-      const conflict =
-        provisionalCorners && guardCaptureCrop(trustedHint, size, provisionalCorners).rejected;
-      let guided: ReturnType<typeof refineEdges> | undefined;
-      if (trustedHint && (!provisionalCorners || conflict)) {
-        guided = refineEdges(getPixels(), trustedHint.corners);
-        trace?.event('still-guided-edge-check', { ...guided, seed: trustedHint.corners });
-      }
-      if (!guided?.supported && (!provisionalCorners || conflict)) {
+      if (!provisionalCorners) {
         // Near-diagonal paper edges can break the classical contour approximation.
-        // Retry orientation only for missing hypotheses, then map back to the original.
-        const q = trustedHint?.corners ?? provisionalCorners;
-        const align = q
-          ? (-Math.atan2((q[1].y - q[0].y) * small.height, (q[1].x - q[0].x) * small.width) * 180) /
-            Math.PI
-          : 0;
-        const rotations = [...new Set([align, -30, 30].map((v) => Math.round(v)))].filter(
-          (v) => Math.abs(v) >= 5 && Math.abs(v) <= 85,
-        );
-        for (const degrees of rotations) {
+        // Retry missing still hypotheses without treating live geometry as crop evidence.
+        for (const degrees of [-30, 30]) {
           const theta = (degrees * Math.PI) / 180,
             c = Math.cos(theta),
             s = Math.sin(theta);
@@ -347,27 +328,16 @@ async function process(
           }
         }
       }
-      const matching = trustedHint
-        ? pool.filter((candidate) => {
-            const q = candidateQuad(candidate, small);
-            return q && compareCaptureHint(trustedHint, size, q).state === 'agrees';
-          })
-        : [];
-      const selected = selectDocumentCandidate(matching.length ? matching : pool, small);
+      const selected = selectDocumentCandidate(pool, small);
       trace?.event('candidate-selection', {
         phase: 'still-combined',
         ...selected,
         candidate: undefined,
-        targetMatched: matching.length > 0,
       });
-      const initial = guided?.supported
-        ? guided.corners
-        : selected.candidate
-          ? candidateQuad(selected.candidate, small)
-          : null;
+      const initial = selected.candidate ? candidateQuad(selected.candidate, small) : null;
       stillDetected = !!initial;
       if (initial) {
-        const refined = guided?.supported ? guided : refineEdges(getPixels(), initial);
+        const refined = refineEdges(getPixels(), initial);
         trace?.event('edge-refinement', { initial, ...refined });
         corners = refined.corners;
         edgesUncertain = !refined.supported;
@@ -393,17 +363,6 @@ async function process(
     trace?.event('live-still-comparison', {
       ...compareCaptureHint(request.captureHint, size, stillDetected ? corners : null),
     });
-    if (!request.corners && stillDetected) {
-      const guarded = guardCaptureCrop(request.captureHint, size, corners);
-      if (guarded.rejected) {
-        trace?.event('capture-crop-guard', {
-          action: 'manual-crop-required',
-          detectedCorners: corners,
-          ...guarded.comparison,
-        });
-        return requireCrop('capture-conflict');
-      }
-    }
     const ratioEvidence = estimatePaperRatio(size, corners);
     // Confirming a crop does not calibrate the camera or prove the physical paper format.
     const formatGeometryUncertain =

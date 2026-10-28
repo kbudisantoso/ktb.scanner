@@ -12,6 +12,8 @@ Cancel live timers/jobs through their separate signal before capturing. A genera
 
 ## Consequences and verification
 
+Unreleased clarification, 28 October 2026 (D-050): rank all still candidates independently. Do not restrict the pool to live-matching contours, prioritize a live-seeded edge fit or reject an independently detected sheet solely on live disagreement. A false fold panel in live detection must not cut the complete still to that panel or override middle-sheet selection. Live comparison remains diagnostic; a fresh comparable hint may only initialize an unconfirmed editor if still detection is missing. The [real-worker regressions](../../tests/browser/independent-still.spec.ts) compare the same original with and without deliberately wrong live hints.
+
 Completeness and ordering remain heuristics; occluded or undetected sheets cannot be reliably ranked. ADR 0009 replaces any historical full-image fallback with required manual corner confirmation. Synthetic two/three-sheet, perspective, clipping and delayed-job cases supplement, rather than replace, physical-device diagnosis.
 
 See [decisions](../DECISIONS.md), [implementation contract](../SPECIFICATION.md) and [test status](../testing/STATUS.md).

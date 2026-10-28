@@ -155,9 +155,7 @@ test('missing crop blocks acceptance and export until confirmation; cancelled re
   expect(result.corners[0].x).toBeGreaterThan(0.1);
 });
 
-test('a conflicting still contour requires confirmation instead of the complete photo', async ({
-  page,
-}) => {
+test('a live disagreement does not veto independently detected still corners', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const h = (window as any).cropHarness;
     const canvas = document.createElement('canvas');
@@ -174,7 +172,7 @@ test('a conflicting still contour requires confirmation instead of the complete 
     const original = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!)));
     const engine = h.createScanicAdapter('/scanner-assets/');
     try {
-      return await engine.process({
+      const result = await engine.process({
         original,
         limits: h.resolveLimits(),
         rotation: 0,
@@ -194,12 +192,24 @@ test('a conflicting still contour requires confirmation instead of the complete 
           ],
         },
       });
+      return 'status' in result
+        ? result
+        : {
+            corners: result.corners,
+            size: result.size,
+            previewBytes: result.preview.size,
+            format: result.format,
+          };
     } finally {
       engine.destroy();
     }
   });
-  expect(result.status).toBe('crop-required');
-  expect(result.reason).toBe('capture-conflict');
-  expect(result).not.toHaveProperty('preview');
-  expect(result).not.toHaveProperty('format');
+  expect(result).not.toHaveProperty('status');
+  expect(result.size).toEqual({ width: 600, height: 800 });
+  expect(result.previewBytes).toBeGreaterThan(0);
+  expect(result).toHaveProperty('format');
+  expect(result.corners[0].x * 599).toBeCloseTo(180, -1);
+  expect(result.corners[0].y * 799).toBeCloseTo(180, -1);
+  expect(result.corners[2].x * 599).toBeCloseTo(440, -1);
+  expect(result.corners[2].y * 799).toBeCloseTo(620, -1);
 });
