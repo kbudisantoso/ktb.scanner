@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import { previewHash, waitForPreview } from './helpers';
 import type { Page } from '@playwright/test';
+import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -297,7 +298,50 @@ test('continuous collection reuses the stream, reviews FIFO and retakes only the
   ).toEqual([1, 0]);
   await page.getByRole('button', { name: 'Review pages (3)', exact: true }).click();
   const first = await previewHash(page);
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await test.step('The next processed camera page is the real incoming layer before the first acceptance', async () => {
+    const surface = page.locator('.scanner-image-surface');
+    await expect(surface).toHaveAttribute('data-page-motion', 'idle');
+    const box = (await surface.boundingBox())!;
+    const x = box.x + box.width * 0.8,
+      y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - box.width / 2, y, { steps: 5 });
+    const neighbour = surface.locator('[data-motion-layer="neighbour"]');
+    await expect(neighbour).toBeVisible();
+    const incoming = await neighbour.evaluate(async (image: HTMLImageElement) => {
+      await image.decode();
+      return Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest('SHA-256', await (await fetch(image.src)).arrayBuffer()),
+        ),
+      ).join(',');
+    });
+    expect(incoming).not.toBe(first);
+    await expect(surface.locator('[data-motion-layer]')).toHaveCount(2);
+    expect(
+      await page.evaluate(() =>
+        (window as any).continuousHarness.events.filter(
+          (event: any) => event.type === 'page-accepted',
+        ),
+      ),
+    ).toHaveLength(0);
+    await info.attach('camera-ready-mid-drag.png', {
+      contentType: 'image/png',
+      body: await page.screenshot(),
+    });
+    await page.mouse.up();
+    await expect(surface).toHaveAttribute('data-page-motion', 'idle');
+    await expect(surface).toHaveAttribute('data-zoom', 'fit');
+    expect(await previewHash(page)).toBe(incoming);
+    expect(
+      await page.evaluate(() =>
+        (window as any).continuousHarness.events.filter(
+          (event: any) => event.type === 'page-accepted',
+        ),
+      ),
+    ).toHaveLength(1);
+  });
   const second = await previewHash(page);
   expect(second).not.toBe(first);
   const firstId = await page.evaluate(
@@ -418,8 +462,19 @@ test('required corners and rejected batches retain pending pages and enforce the
   await page.evaluate(() =>
     (window as any).continuousHarness.open('controller', { locale: 'de', limits: { pages: 2 } }),
   );
-  await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
-  await expect(page.getByText('Ecken später bestätigen', { exact: true })).toBeVisible();
+  // Observe the 500 ms hint on animation frames before triggering the capture.
+  await Promise.all([
+    page.waitForFunction(() => {
+      const hint = document.querySelector('.scanner-capture-feedback p');
+      return (
+        hint?.textContent === 'Ecken später bestätigen' &&
+        hint.getBoundingClientRect().width > 0 &&
+        hint.getBoundingClientRect().height > 0 &&
+        getComputedStyle(hint).visibility === 'visible'
+      );
+    }),
+    page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click(),
+  ]);
   await expect(page.getByRole('img', { name: 'Aufgenommene Seite' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Seiten prüfen (1)', exact: true })).toBeEnabled();
   const files = await page.evaluate(async () => {
@@ -629,7 +684,7 @@ test('invalid workflows fail before resources and the omitted option retains rev
 
 test('page swipes are single-pointer fit gestures and never replace zoom, pan, held Before or disabled navigation', async ({
   page,
-}) => {
+}, info) => {
   await prepare(page);
   await page.evaluate(async () => {
     const h = (window as any).continuousHarness;
@@ -692,40 +747,373 @@ test('page swipes are single-pointer fit gestures and never replace zoom, pan, h
   ]);
   await page.evaluate(() => (window as any).continuousHarness.root.unmount());
   await expect.poll(() => page.evaluate(() => (window as any).continuousHarness.urls.size)).toBe(0);
+  const documents = [];
+  for (const index of [1, 4])
+    documents.push(await page.evaluate(fixtureInBrowser, fixtures[index]));
   // Camera workflow selection does not disable page gestures on ordinary imports.
-  await page.evaluate(async () => {
+  await page.evaluate(async (documents) => {
     const h = (window as any).continuousHarness,
-      files = [];
-    for (const scene of [1, 2]) {
-      h.scene = scene;
-      h.draw();
-      files.push(
-        new File(
-          [
-            await new Promise<Blob>((resolve) =>
-              h.canvas.toBlob((blob: Blob) => resolve(blob), 'image/png'),
-            ),
-          ],
-          `import-${scene}.png`,
-          { type: 'image/png' },
-        ),
-      );
-    }
-    h.open('controller', { captureWorkflow: 'review-each' }, { initialFiles: files });
-  });
+      post = Worker.prototype.postMessage;
+    h.files = await Promise.all(
+      documents.map(
+        async (url, index) =>
+          new File([await (await fetch(url)).blob()], `synthetic-${index}.png`, {
+            type: 'image/png',
+          }),
+      ),
+    );
+    h.corruptFile = new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'corrupt.png', {
+      type: 'image/png',
+    });
+    h.processes = [];
+    Worker.prototype.postMessage = function (message: any, transfer?: any) {
+      if (message.kind === 'process') {
+        h.processes.push({
+          accepted: h.events.filter((event: any) => event.type === 'page-accepted').length,
+          layers: document.querySelectorAll('[data-motion-layer]').length,
+          outgoingLive: h.urls.has(h.outgoingSource),
+        });
+        if (h.holdNextProcess) {
+          h.holdNextProcess = false;
+          h.releaseProcess = () => {
+            h.releaseProcess = null;
+            post.call(this, message, transfer ?? []);
+          };
+          return;
+        }
+      }
+      post.call(this, message, transfer ?? []);
+    };
+    h.open('controller', { captureWorkflow: 'review-each' }, { initialFiles: h.files });
+    h.mount.addEventListener('pointerdown', (event: PointerEvent) => {
+      h.pointerId = event.pointerId;
+    });
+  }, documents);
   const first = await previewHash(page);
   const firstSource = await (await waitForPreview(page)).getAttribute('src');
-  await drag(-90);
-  const second = await previewHash(page, firstSource);
-  expect(second).not.toBe(first);
+  const accepted = () =>
+    page.evaluate(
+      () =>
+        (window as any).continuousHarness.events.filter(
+          (event: any) => event.type === 'page-accepted',
+        ).length,
+    );
+  const idle = async () => {
+    await expect(surface).toHaveAttribute('data-page-motion', 'idle');
+    await expect(surface).toHaveAttribute('data-zoom', 'fit');
+  };
+  const beginDrag = async (fraction: number) => {
+    const box = (await surface.boundingBox())!;
+    const x = box.x + box.width * (fraction < 0 ? 0.8 : 0.2),
+      y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    const dx = Math.round(box.width * fraction);
+    await page.mouse.move(x + dx, y, { steps: 5 });
+    return dx;
+  };
+  const cancelDrag = async () => {
+    await surface.dispatchEvent('pointercancel', {
+      pointerId: await page.evaluate(() => (window as any).continuousHarness.pointerId),
+      pointerType: 'mouse',
+      button: 0,
+    });
+    await page.mouse.up();
+    await idle();
+  };
+  const layers = () =>
+    surface.locator('[data-motion-layer]').evaluateAll(async (images: HTMLImageElement[]) => {
+      const box = images[0].parentElement!.getBoundingClientRect();
+      return Promise.all(
+        images.map(async (image) => {
+          const rect = image.getBoundingClientRect();
+          return {
+            layer: image.dataset.motionLayer,
+            hash: Array.from(
+              new Uint8Array(
+                await crypto.subtle.digest('SHA-256', await (await fetch(image.src)).arrayBuffer()),
+              ),
+            ).join(','),
+            ready: image.complete && image.naturalWidth > 0,
+            visible: getComputedStyle(image).visibility,
+            natural: [image.naturalWidth, image.naturalHeight],
+            rendered: [rect.width, rect.height],
+            available: [box.width, box.height],
+            translate: parseFloat(getComputedStyle(image).translate),
+            visibleWidth: Math.max(
+              0,
+              Math.min(rect.right, box.right) - Math.max(rect.left, box.left),
+            ),
+            live: (window as any).continuousHarness.urls.has(image.src),
+          };
+        }),
+      );
+    });
+  await test.step('Raw files do not process or accept during drag, bounds, short swipes or cancellation', async () => {
+    await idle();
+    await drag(3);
+    await expect(surface).toHaveAttribute('data-zoom', '100');
+    await page.waitForTimeout(510);
+    await surface.dblclick();
+    await idle();
+    for (const fraction of [0.5, -0.03, -0.5]) {
+      await beginDrag(fraction);
+      await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
+      expect(await accepted()).toBe(0);
+      expect(await page.evaluate(() => (window as any).continuousHarness.processes.length)).toBe(1);
+      if (fraction === -0.5) await cancelDrag();
+      else {
+        await page.mouse.up();
+        await idle();
+      }
+      expect(await previewHash(page)).toBe(first);
+      expect(await accepted()).toBe(0);
+      expect((await layers())[0].translate).toBe(0);
+    }
+  });
+  let second: string;
+  await test.step('A valid raw-file swipe saves once and frees the old decoder before native processing', async () => {
+    await page.evaluate((source) => {
+      const h = (window as any).continuousHarness;
+      h.outgoingSource = source;
+      h.holdNextProcess = true;
+    }, firstSource);
+    const dx = await beginDrag(-0.5);
+    expect((await layers())[0].translate).toBeCloseTo(dx, 0);
+    expect(await accepted()).toBe(0);
+    await info.attach('raw-file-mid-drag.png', {
+      contentType: 'image/png',
+      body: await page.screenshot(),
+    });
+    await page.mouse.up();
+    await expect
+      .poll(() => page.evaluate(() => typeof (window as any).continuousHarness.releaseProcess))
+      .toBe('function');
+    expect(await accepted()).toBe(1);
+    expect(await page.evaluate(() => (window as any).continuousHarness.processes.at(-1))).toEqual({
+      accepted: 1,
+      layers: 0,
+      outgoingLive: false,
+    });
+    await expect(surface).toHaveCount(0);
+    await page.evaluate(() => (window as any).continuousHarness.releaseProcess());
+    second = await previewHash(page, firstSource);
+    expect(second).not.toBe(first);
+    await idle();
+    const receipt = (await layers())[0];
+    expect(receipt.natural[0] / receipt.natural[1]).toBeLessThan(0.3);
+    expect(await accepted()).toBe(1);
+    const saved = await page.evaluate(
+      () =>
+        (window as any).continuousHarness.events.find(
+          (event: any) => event.type === 'page-accepted',
+        ).data,
+    );
+    expect(saved.pageId).not.toBe(saved.draftId);
+    await info.attach('raw-file-receipt-ready.png', {
+      contentType: 'image/png',
+      body: await page.screenshot(),
+    });
+  });
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   expect(await previewHash(page)).toBe(first);
-  const acceptedFirst = await (await waitForPreview(page)).getAttribute('src');
-  await drag(-90);
-  expect(await previewHash(page, acceptedFirst)).toBe(second);
-  await expect(surface).toHaveAttribute('data-zoom', 'fit');
+  await idle();
+  await test.step('Ready A4 and receipt pages follow the finger from the matching edge in both directions', async () => {
+    for (const direction of ['next', 'previous'] as const) {
+      const beforeAccepted = await accepted();
+      const urlCount = await page.evaluate(() => (window as any).continuousHarness.urls.size);
+      const dx = await beginDrag(direction === 'next' ? -0.5 : 0.5);
+      const neighbour = surface.locator('[data-motion-layer="neighbour"]');
+      await expect(neighbour).toBeVisible();
+      await expect.poll(async () => (await layers()).every((image) => image.ready)).toBe(true);
+      const images = await layers();
+      expect(images.map((image) => image.layer)).toEqual(['current', 'neighbour']);
+      expect(images.map((image) => image.hash)).toEqual(
+        direction === 'next' ? [first, second!] : [second!, first],
+      );
+      expect(images[0].translate).toBeCloseTo(dx, 0);
+      expect(images[1].translate).toBeCloseTo(
+        dx + (direction === 'next' ? 1 : -1) * images[0].available[0],
+        0,
+      );
+      for (const image of images) {
+        expect(image.visible).toBe('visible');
+        expect(image.visibleWidth).toBeGreaterThan(5);
+        expect(image.live).toBe(true);
+        expect(image.rendered[0] / image.rendered[1]).toBeCloseTo(
+          image.natural[0] / image.natural[1],
+          3,
+        );
+        const fit = Math.min(
+          1,
+          (image.available[0] - 24) / image.natural[0],
+          (image.available[1] - 24) / image.natural[1],
+        );
+        expect(image.rendered[0]).toBeCloseTo(image.natural[0] * fit, 0);
+        expect(image.rendered[1]).toBeCloseTo(image.natural[1] * fit, 0);
+      }
+      expect(await accepted()).toBe(beforeAccepted);
+      expect(await page.evaluate(() => (window as any).continuousHarness.urls.size)).toBe(
+        urlCount + 1,
+      );
+      await info.attach(`ready-${direction}-mid-drag.png`, {
+        contentType: 'image/png',
+        body: await page.screenshot(),
+      });
+      await page.evaluate(() => {
+        window.addEventListener(
+          'pointerup',
+          () => ((window as any).continuousHarness.swipeReleasedAt = performance.now()),
+          { once: true },
+        );
+      });
+      await page.mouse.up();
+      // Mouse up generates the release click; it must keep both pages fitted.
+      await expect(surface).toHaveAttribute('data-zoom', 'fit');
+      await idle();
+      expect(await previewHash(page)).toBe(direction === 'next' ? second! : first);
+      expect(await accepted()).toBe(beforeAccepted + 1);
+      await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
+      await expect
+        .poll(() => page.evaluate(() => (window as any).continuousHarness.urls.size))
+        .toBe(urlCount);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => performance.now() - (window as any).continuousHarness.swipeReleasedAt,
+          ),
+        )
+        .toBeGreaterThanOrEqual(500);
+      await surface.dispatchEvent('click', { detail: 1 });
+      await expect(surface).toHaveAttribute('data-zoom', '100');
+      await page.getByRole('button', { name: 'Fit image', exact: true }).click();
+      await expect(surface).toHaveAttribute('data-zoom', 'fit');
+    }
+  });
+  await test.step('Resize cancels a drag, while resize or reduced motion after acceptance finish the real navigation', async () => {
+    const resize = () =>
+      surface.evaluate((element: HTMLElement) => {
+        element.style.width = `${element.getBoundingClientRect().width - 40}px`;
+      });
+    const restoreSize = () =>
+      surface.evaluate((element: HTMLElement) => element.style.removeProperty('width'));
+    const beforeAccepted = await accepted();
+    await beginDrag(-0.5);
+    await resize();
+    await idle();
+    await page.mouse.up();
+    expect(await accepted()).toBe(beforeAccepted);
+    expect(await previewHash(page)).toBe(first);
+    await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
+    await restoreSize();
+    for (const interruption of ['resize', 'reduced-motion', 'footer'] as const) {
+      const before = await accepted();
+      await beginDrag(-0.5);
+      await page.mouse.up();
+      await expect(surface).toHaveAttribute('data-page-motion', 'navigating');
+      // Hold a real in-progress exit so the interruption cannot race its 190 ms completion.
+      await surface.evaluate((element) => {
+        for (const animation of element.getAnimations({ subtree: true })) animation.pause();
+      });
+      expect(await accepted()).toBe(before + 1);
+      if (interruption === 'resize') await resize();
+      else if (interruption === 'reduced-motion')
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+      else await page.getByRole('button', { name: 'Next', exact: true }).click();
+      expect(await previewHash(page)).toBe(second!);
+      await idle();
+      await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
+      expect(
+        await surface.evaluate((element) => element.getAnimations({ subtree: true }).length),
+      ).toBe(0);
+      expect(await accepted()).toBe(before + (interruption === 'footer' ? 2 : 1));
+      await restoreSize();
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.getByRole('button', { name: 'Back', exact: true }).click();
+      expect(await previewHash(page)).toBe(first);
+      await idle();
+    }
+  });
+  await test.step('A failed neighbour decode and changed motion preference cancel without accepting', async () => {
+    const beforeAccepted = await accepted();
+    await beginDrag(-0.5);
+    await expect(surface.locator('[data-motion-layer="neighbour"]')).toBeVisible();
+    await surface.locator('[data-motion-layer="neighbour"]').dispatchEvent('error');
+    await page.mouse.up();
+    await idle();
+    expect(await previewHash(page)).toBe(first);
+    expect(await accepted()).toBe(beforeAccepted);
+    await expect(surface.locator('[data-motion-layer]')).toHaveCount(1);
+    await beginDrag(-0.5);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await idle();
+    await page.mouse.up();
+    expect(await accepted()).toBe(beforeAccepted);
+    expect(await previewHash(page)).toBe(first);
+    await beginDrag(-0.5);
+    expect((await layers())[0].translate).toBe(0);
+    expect(
+      await surface.evaluate((element) => element.getAnimations({ subtree: true }).length),
+    ).toBe(0);
+    await page.mouse.up();
+    await idle();
+    expect(await previewHash(page)).toBe(second!);
+    expect(await accepted()).toBe(beforeAccepted + 1);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  });
   await page.evaluate(() => (window as any).continuousHarness.controller.destroy());
   await expect.poll(() => page.evaluate(() => (window as any).continuousHarness.urls.size)).toBe(0);
+  await test.step('Delayed raw processing failure and abort keep accepted bytes and release all owned resources', async () => {
+    for (const fail of [true, false]) {
+      await page.evaluate((fail) => {
+        const h = (window as any).continuousHarness;
+        h.events = [];
+        h.results = [];
+        h.open(
+          'controller',
+          { captureWorkflow: 'review-each' },
+          {
+            initialFiles: fail ? [h.files[0], h.corruptFile] : h.files,
+          },
+        );
+      }, fail);
+      expect(await previewHash(page)).toBe(first);
+      await idle();
+      await page.evaluate(() => ((window as any).continuousHarness.holdNextProcess = true));
+      await beginDrag(-0.5);
+      await page.mouse.up();
+      await expect
+        .poll(() => page.evaluate(() => typeof (window as any).continuousHarness.releaseProcess))
+        .toBe('function');
+      expect(await accepted()).toBe(1);
+      if (fail) {
+        await page.evaluate(() => (window as any).continuousHarness.releaseProcess());
+        await expect(page.getByRole('alert')).toBeVisible();
+        await expect(page.locator('[data-motion-layer]')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Page 1: Edit', exact: true }).click();
+        expect(await previewHash(page)).toBe(first);
+        await idle();
+        await expect(page.getByRole('button', { name: 'Finish', exact: true })).toBeDisabled();
+      } else await page.evaluate(() => (window as any).continuousHarness.abort.abort());
+      await page.evaluate(() => (window as any).continuousHarness.controller.destroy());
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const h = (window as any).continuousHarness;
+            return [h.workers.size, h.urls.size, h.mount.childElementCount];
+          }),
+        )
+        .toEqual([0, 0, 0]);
+      if (!fail) {
+        await page.evaluate(() => (window as any).continuousHarness.releaseProcess());
+        await page.waitForTimeout(250);
+      }
+      expect(await page.evaluate(() => (window as any).continuousHarness.results)).toEqual([
+        { status: 'cancelled' },
+      ]);
+      expect(await accepted()).toBe(1);
+    }
+  });
 });
 
 test('editing an accepted source at its exact original-byte budget does not count its cloned Blob twice', async ({

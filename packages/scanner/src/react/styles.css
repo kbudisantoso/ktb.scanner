@@ -1512,3 +1512,10 @@
   font-size: 11px;
   line-height: 1.2;
 }
+
+.scanner-image-surface[data-page-motion]:not([data-page-motion='idle']) {
+  cursor: grabbing;
+}
+.scanner-image-surface[data-page-motion] > img {
+  will-change: translate;
+}
