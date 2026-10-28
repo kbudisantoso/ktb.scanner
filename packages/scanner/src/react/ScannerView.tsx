@@ -43,7 +43,7 @@ const editOf = ({ recipe, format, rotation, corners, edgesUncertain }: PageDraft
 function PageImage({ blob, alt, t }: { blob: Blob; alt: string; t: Translate }) {
   const url = useBlobUrl(blob);
   return url ? (
-    <img src={url} alt={alt} />
+    <img src={url} alt={alt} draggable={false} />
   ) : (
     <div className="scanner-image-loading" aria-label={t('Vorschau wird geladen')} />
   );

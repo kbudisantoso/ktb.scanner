@@ -638,6 +638,7 @@ export function CameraView({
               ref={feedbackImage}
               src={feedback.url}
               alt={t('Aufgenommene Seite')}
+              draggable={false}
               onLoad={() => feedbackReady.current?.()}
               onError={() => feedbackReady.current?.()}
             />

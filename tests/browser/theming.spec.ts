@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
+import type { Locator } from '@playwright/test';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -303,6 +304,148 @@ test('standalone viewer consumes inherited font, palette, radius and focus; abse
     (window as any).themeHarness.mount.style.removeProperty('--scanner-font'),
   );
   expect(await viewer.evaluate((e) => getComputedStyle(e).fontFamily)).toBe('serif');
+});
+
+test('scanner chrome and standalone viewer resist native selection while host text and editable fields retain it', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  const selected = () => page.evaluate(() => window.getSelection()?.toString() ?? '');
+  const drag = async (target: Locator) => {
+    const b = (await target.boundingBox())!;
+    await page.mouse.move(b.x + 10, b.y + b.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width - 10, b.y + b.height / 2, { steps: 8 });
+    await page.mouse.up();
+  };
+  const host = page.locator('main h1');
+  await host.dblclick();
+  expect(await selected()).not.toBe('');
+  await page.mouse.click(2, 2);
+  expect(await selected()).toBe('');
+  await page.evaluate(() => {
+    const h = (window as any).themeHarness;
+    h.nativeDrags = 0;
+    document.addEventListener('dragstart', () => h.nativeDrags++, true);
+    h.open('controller');
+  });
+  const dialog = page.getByRole('dialog');
+  const heading = dialog.getByRole('heading').first();
+  await heading.dblclick();
+  expect(await selected()).toBe('');
+  await drag(heading);
+  expect(await selected()).toBe('');
+  await page.evaluate(() => {
+    const fields = document.createElement('div');
+    fields.id = 'selection-fields';
+    fields.style.cssText = 'position:absolute;inset:60px 16px auto;z-index:20;background:white';
+    fields.innerHTML =
+      '<input aria-label="Text input"><textarea aria-label="Text area"></textarea><select aria-label="Choice"><option value="a">A</option><option value="b">B</option></select><div contenteditable="true" role="textbox" aria-label="Editable note"></div>';
+    document.querySelector('.scanner-body')!.append(fields);
+  });
+  for (const name of ['Text input', 'Text area']) {
+    const field = page.getByLabel(name, { exact: true });
+    await field.fill('abcdef');
+    await field.press('Shift+ArrowLeft');
+    await field.press('Shift+ArrowLeft');
+    expect(
+      await field.evaluate((e: HTMLInputElement | HTMLTextAreaElement) => [
+        e.selectionStart,
+        e.selectionEnd,
+      ]),
+    ).toEqual([4, 6]);
+    await field.press('Z');
+    await expect(field).toHaveValue('abcdZ');
+    expect(
+      await field.evaluate((e: HTMLInputElement | HTMLTextAreaElement) => e.selectionStart),
+    ).toBe(5);
+  }
+  const editable = page.getByRole('textbox', { name: 'Editable note', exact: true });
+  await editable.fill('abcdef');
+  await editable.press('Shift+ArrowLeft');
+  expect(await selected()).toBe('f');
+  await editable.press('Z');
+  await expect(editable).toHaveText('abcdeZ');
+  await page.getByLabel('Choice', { exact: true }).selectOption('b');
+  await expect(page.getByLabel('Choice', { exact: true })).toHaveValue('b');
+  expect(
+    await page
+      .locator('#selection-fields > *')
+      .evaluateAll((nodes) => nodes.map((e) => getComputedStyle(e).userSelect)),
+  ).toEqual(['text', 'text', 'text', 'text']);
+  await page.locator('#selection-fields').evaluate((e) => e.remove());
+  const data = await page.evaluate(fixtureInBrowser, fixtures[1]);
+  await dialog.locator('input[type=file][multiple]').setInputFiles({
+    name: 'synthetic.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(data.split(',')[1], 'base64'),
+  });
+  await expect(dialog.getByRole('img', { name: 'Edited page', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: /^Page overview/ }).click();
+  const tile = dialog.locator('.scanner-page-tile img');
+  await expect(tile).toBeVisible();
+  expect(await tile.evaluate((e: HTMLImageElement) => e.draggable)).toBe(false);
+  await drag(tile);
+  expect(await selected()).toBe('');
+  if (info.project.name === 'mobile-webkit')
+    await info.attach('scanner-selection.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  await page.evaluate(async (data) => {
+    const h = (window as any).themeHarness;
+    await h.controller.destroy();
+    await h.pending;
+    h.mount.style.cssText =
+      'position:fixed;top:80px;left:16px;right:16px;height:480px;display:flex';
+    h.root = h.createRoot(h.mount);
+    const image = await (await fetch(data)).blob();
+    h.root.render(
+      h.React.createElement(h.ImageViewer, {
+        image,
+        before: image,
+        alt: 'Standalone synthetic page',
+        resetKey: 'selection',
+      }),
+    );
+  }, data);
+  await expect(page.locator('.scanner')).toHaveCount(0);
+  const viewer = page.locator('.scanner-image-viewer');
+  const image = viewer.getByRole('img', { name: 'Standalone synthetic page', exact: true });
+  await expect(image).toBeVisible();
+  expect(await viewer.evaluate((e) => getComputedStyle(e).userSelect)).toBe('none');
+  await viewer.getByRole('button', { name: 'Hold to view before', exact: true }).dblclick();
+  expect(await selected()).toBe('');
+  await viewer.evaluate((e) => {
+    const field = document.createElement('input');
+    field.setAttribute('aria-label', 'Standalone text input');
+    field.style.cssText = 'position:absolute;top:4px;left:4px;z-index:1';
+    e.append(field);
+  });
+  const viewerField = viewer.getByLabel('Standalone text input', { exact: true });
+  await viewerField.fill('viewer');
+  await viewerField.press('Shift+ArrowLeft');
+  expect(
+    await viewerField.evaluate((e: HTMLInputElement) => [e.selectionStart, e.selectionEnd]),
+  ).toEqual([5, 6]);
+  await viewerField.press('Z');
+  await expect(viewerField).toHaveValue('vieweZ');
+  await viewerField.evaluate((e) => e.remove());
+  expect(await image.evaluate((e: HTMLImageElement) => e.draggable)).toBe(false);
+  await drag(image);
+  expect(await page.evaluate(() => (window as any).themeHarness.nativeDrags)).toBe(0);
+  if (info.project.name === 'mobile-webkit')
+    await info.attach('viewer-selection.png', {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  await page.evaluate(() => {
+    const h = (window as any).themeHarness;
+    h.root.unmount();
+    h.mount.remove();
+  });
+  await host.dblclick();
+  expect(await selected()).not.toBe('');
 });
 
 test('capture contour and corner loupe use their tokens in actual SVG and canvas output', async ({
