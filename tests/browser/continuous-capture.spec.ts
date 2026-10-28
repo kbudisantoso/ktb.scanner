@@ -462,8 +462,19 @@ test('required corners and rejected batches retain pending pages and enforce the
   await page.evaluate(() =>
     (window as any).continuousHarness.open('controller', { locale: 'de', limits: { pages: 2 } }),
   );
-  await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
-  await expect(page.getByText('Ecken später bestätigen', { exact: true })).toBeVisible();
+  // Observe the 500 ms hint on animation frames before triggering the capture.
+  await Promise.all([
+    page.waitForFunction(() => {
+      const hint = document.querySelector('.scanner-capture-feedback p');
+      return (
+        hint?.textContent === 'Ecken später bestätigen' &&
+        hint.getBoundingClientRect().width > 0 &&
+        hint.getBoundingClientRect().height > 0 &&
+        getComputedStyle(hint).visibility === 'visible'
+      );
+    }),
+    page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click(),
+  ]);
   await expect(page.getByRole('img', { name: 'Aufgenommene Seite' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Seiten prüfen (1)', exact: true })).toBeEnabled();
   const files = await page.evaluate(async () => {
