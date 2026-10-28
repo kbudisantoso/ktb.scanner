@@ -73,9 +73,27 @@ test('visible image replacement replaces an unaccepted import without camera acc
   await (await cancelled).setFiles([]);
   await expect(repeat).toBeFocused();
   expect(await hash()).toBe(before);
+  const previousPreviewSrc = await preview.getAttribute('src');
+  expect(previousPreviewSrc).toMatch(/^blob:/);
   await importRetake(3);
+  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
   await expect(preview).toBeVisible();
-  await expect.poll(hash).not.toBe(before);
+  await expect
+    .poll(() =>
+      preview.evaluate((img: HTMLImageElement, previousSrc) => {
+        const src = img.getAttribute('src');
+        return (
+          !!src &&
+          src.startsWith('blob:') &&
+          src !== previousSrc &&
+          img.currentSrc === src &&
+          img.complete &&
+          img.naturalWidth > 0
+        );
+      }, previousPreviewSrc),
+    )
+    .toBe(true);
+  expect(await hash()).not.toBe(before);
   await expect(page.getByRole('button', { name: 'Weiter', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
   await expect(page.getByRole('heading', { name: '1 Seite fertig', exact: true })).toBeVisible();

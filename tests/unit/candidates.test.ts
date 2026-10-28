@@ -5,7 +5,6 @@ import {
   compareCaptureHint,
   paperShape,
   candidateQuad,
-  guardCaptureCrop,
 } from '../../packages/scanner/src/candidates.ts';
 import type { DocumentCandidate } from '../../packages/scanner/src/candidates.ts';
 import type { CaptureHint, Quad } from '../../packages/scanner/src/types.ts';
@@ -284,17 +283,4 @@ test('fresh live comparison records disagreement but retains still-image authori
   assert.equal(result.stillCorners, still);
   assert.equal(compareCaptureHint(hint, size, quad).state, 'agrees');
   assert.equal(compareCaptureHint(hint, size, null).state, 'still-not-detected');
-});
-test('fresh comparable crop conflicts require a crop without returning any whole-image geometry', () => {
-  const wrong = quad.map((p) => ({ ...p, x: p.x + 0.09 })) as Quad;
-  const result = guardCaptureCrop(hint, size, wrong);
-  assert(result.rejected);
-  assert.equal(result.corners, null);
-  assert.equal(guardCaptureCrop(hint, size, quad).rejected, false);
-  assert.equal(guardCaptureCrop({ ...hint, stable: false }, size, wrong).rejected, false);
-  for (const invalid of [
-    { ...hint, ageMs: 401 },
-    { ...hint, mapping: 'unverified-photo-area' as const },
-  ])
-    assert.equal(guardCaptureCrop(invalid, size, wrong).rejected, false);
 });

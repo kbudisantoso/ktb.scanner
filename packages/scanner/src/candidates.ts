@@ -327,11 +327,3 @@ export function compareCaptureHint(
     authority: 'still-image',
   };
 }
-
-/** A fresh comparable live/photo conflict must not silently cut away document content. */
-export function guardCaptureCrop(hint: CaptureHint | undefined, size: Size, corners: Quad) {
-  const comparison = compareCaptureHint(hint, size, corners);
-  const rejected =
-    hint?.stable === true && comparison.state === 'disagrees' && comparison.drift! > 0.08;
-  return { comparison, rejected, corners: rejected ? null : corners };
-}

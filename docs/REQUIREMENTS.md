@@ -41,7 +41,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-21 | CONDITIONAL | If F-20 is introduced, run asynchronously, mark uncertainty, invalidate stale results and allow manual acceptance. |
 | F-22 | OPTIONAL | Add reliable geometric paper flattening under a separate decision; visible folds alone are not a rejection. |
 | F-23 | MUST | Smooth only the displayed live contour, confirm isolated jumps and bridge short losses for bounded time. Raw evidence still governs capture; display smoothing never determines the final crop. |
-| F-24 | MUST | Secure the complete original, then independently detect/refine its edges. The live contour is only a fresh comparable hint. Camera and import share the same source-coordinate processing. |
+| F-24 | MUST | Secure the complete original, then independently detect/refine its edges. The live contour is an acquisition indicator, not final crop authority: it must neither force an inner crop nor veto a plausible independently detected still. Missing still geometry requires explicit confirmation. Camera and import share the same source-coordinate processing. |
 | F-25 | MUST | Expose Auto/Manual; switching to Manual invalidates pending automatic triggers immediately while retaining live detection and processing. |
 | F-26 | MUST | Animate the green contour during the same measured stability window that triggers capture. Pause bounded uncertainty without counting it; reset on movement/loss. Provide a text alternative and avoid repeated spoken percentages. |
 | F-27 | MUST | Build one multi-page browser raster PDF from all confirmed images, without OCR; no partial successful handoff on an export failure. |
