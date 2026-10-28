@@ -4,9 +4,14 @@
 
 ### Added
 
+- Individual brightness, contrast, sharpness and lens reset actions in Adjust preserve unrelated page settings.
+
 - **Find edges** (**Kanten finden**) reruns automatic detection from the original in the corner editor while retaining page settings. Preview the proposed corners before applying them; cancelling the editor preserves the previous crop, and unsuccessful detection keeps the current corner selection.
 
 ### Fixed
+
+- Put replacement, direct discard and Add page below the review document with equally sized mobile actions; keep Undo visibly labelled.
+- Hide the session-close X inside editing tools and make Escape follow local cancellation and focus restoration.
 
 - Imported images now offer **Replace image** (**Bild tauschen**) with a direct single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the previous candidate/page and remaining imports.
 - Keep observed complete document boundaries instead of replacing them with stronger internal fold panels that share both opposite paper sides.

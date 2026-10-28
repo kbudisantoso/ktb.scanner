@@ -153,6 +153,7 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   Graustufen: 'Grayscale',
   Herunterladen: 'Download',
   Helligkeit: 'Brightness',
+  'Helligkeit zurücksetzen': 'Reset brightness',
   Hinweise: 'Hints',
   Hoch: 'Portrait',
   Hochformat: 'Portrait orientation',
@@ -179,12 +180,14 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   Kameravorschau: 'Camera preview',
   'Keine Korrektur': 'No correction',
   Kontrast: 'Contrast',
+  'Kontrast zurücksetzen': 'Reset contrast',
   Korrigiert: 'Corrected',
   'Letztes Ergebnis öffnen': 'Open last result',
   'Licht ausschalten': 'Turn light off',
   'Licht einschalten': 'Turn light on',
   'Limits müssen positive ganze Zahlen sein.': 'Limits must be positive integers.',
   Linse: 'Lens',
+  'Linse zurücksetzen': 'Reset lens',
   Linsenentzerrung: 'Lens correction mode',
   Linsenkorrektur: 'Lens correction',
   'Lokal im Browser · kein Upload.': 'Local in your browser · no upload.',
@@ -242,6 +245,7 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   Schließen: 'Close',
   'Schwarz-Weiß': 'Black and white',
   Schärfe: 'Sharpness',
+  'Schärfe zurücksetzen': 'Reset sharpness',
   'Schärfe nicht beurteilbar - bitte manuell auslösen.':
     'Sharpness cannot be assessed - capture manually.',
   'Schärfe nicht sicher beurteilbar.': 'Sharpness cannot be assessed reliably.',
@@ -253,6 +257,12 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   'Seiten aufgenommen': 'pages captured',
   Seitenaktionen: 'Page actions',
   Seitenübersicht: 'Page overview',
+  'Setzt alle Bildoptimierungen auf Foto, neutrale Tonwerte und Linse Aus zurück. Ecken, Format und Drehung bleiben erhalten.':
+    'Resets all image optimization to Photo, neutral adjustments and Lens Off. Corners, format and rotation are preserved.',
+  'Setzt die Linse auf Auto zurück und entfernt die manuelle Linsenstärke. Andere Einstellungen bleiben erhalten.':
+    'Resets the lens to Auto and removes the manual lens strength. Other settings are preserved.',
+  'Setzt nur diese Anpassung auf 0 zurück. Andere Einstellungen bleiben erhalten.':
+    'Resets only this adjustment to 0. Other settings are preserved.',
   'Sitzungen,': 'sessions,',
   Stabilisierungsdauer: 'Stability duration',
   Standard: 'Default',

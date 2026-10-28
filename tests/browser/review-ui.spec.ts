@@ -102,6 +102,23 @@ async function fits(page: Page, selector: string) {
     ),
   ).toBe(true);
 }
+async function equallyDistributed(page: Page, selector: string) {
+  const geometry = await page.locator(selector).evaluate((row) => {
+    const bounds = row.getBoundingClientRect();
+    const buttons = [...row.querySelectorAll('button')].map((button) =>
+      button.getBoundingClientRect(),
+    );
+    return {
+      widthDifference:
+        Math.max(...buttons.map((b) => b.width)) - Math.min(...buttons.map((b) => b.width)),
+      topDifference:
+        Math.max(...buttons.map((b) => b.top)) - Math.min(...buttons.map((b) => b.top)),
+      left: Math.abs(buttons[0].left - bounds.left),
+      right: Math.abs(buttons.at(-1)!.right - bounds.right),
+    };
+  });
+  for (const difference of Object.values(geometry)) expect(difference).toBeLessThan(1);
+}
 for (const theme of ['forest', 'ink'])
   for (const [width, height] of [
     [320, 568],
@@ -127,7 +144,30 @@ for (const theme of ['forest', 'ink'])
         await expect(
           page.getByRole('button', { name: 'Bild tauschen', exact: true }),
         ).toBeVisible();
+        const actions = page.locator('.scanner-review-quick').getByRole('button');
+        await expect(actions).toHaveCount(3);
+        await expect(actions.nth(0)).toHaveText('Bild tauschen');
+        await expect(actions.nth(1)).toHaveAccessibleName('Aufnahme verwerfen');
+        await expect(actions.nth(2)).toHaveAccessibleName('Weitere Seite');
+        await expect(
+          page
+            .locator('.scanner-header')
+            .getByRole('button', { name: 'Weitere Seite', exact: true }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Weitere Aktionen', exact: true }),
+        ).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveText(
+          'Rückgängig',
+        );
+        await equallyDistributed(page, '.scanner-review-quick');
+        await equallyDistributed(page, '.scanner-review-utility');
         await fits(page, '.scanner');
+        if (info.project.name === 'mobile-webkit')
+          await info.attach('review-actions.png', {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+          });
       });
       await test.step('Focused tools and held comparison', async () => {
         const surface = page.locator('.scanner-image-surface');
@@ -137,6 +177,7 @@ for (const theme of ['forest', 'ink'])
           await tool(page, panel);
           await expect(page.locator('.scanner-review-footer')).toHaveCount(0);
           await expect(page.getByRole('button', { name: /^Seitenübersicht/ })).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
           await expect(surface).toHaveAttribute('data-zoom', '100');
           if (panel === 'Anpassen') {
             for (const name of ['Helligkeit', 'Kontrast', 'Schärfe', 'Linse'] as const) {
@@ -188,6 +229,7 @@ for (const theme of ['forest', 'ink'])
       });
       await test.step('Corners, page navigation and tiles', async () => {
         await page.getByRole('button', { name: 'Ecken korrigieren', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
         const tl = page.getByRole('button', { name: 'Ecke oben links', exact: true });
         await tl.focus();
         await page.keyboard.press('ArrowRight');
@@ -197,6 +239,9 @@ for (const theme of ['forest', 'ink'])
         );
         await fits(page, '.scanner');
         await page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }).click();
+        await expect(
+          page.getByRole('button', { name: 'Ecken korrigieren', exact: true }),
+        ).toBeFocused();
         await expect(next).toBeEnabled();
         await next.click();
         await expect(finish).toBeEnabled();

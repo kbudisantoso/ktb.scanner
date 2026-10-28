@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { AutoOptimization, LensCorrection, Recipe } from '../types.ts';
 import { NEUTRAL_ADJUSTMENTS } from '../adjustments.ts';
 
@@ -85,6 +85,13 @@ export function ImageControls({
     sharpness: 'Schärfe',
     lens: 'Linse',
   };
+  const resetNames = {
+    brightness: 'Helligkeit zurücksetzen',
+    contrast: 'Kontrast zurücksetzen',
+    sharpness: 'Schärfe zurücksetzen',
+    lens: 'Linse zurücksetzen',
+  };
+  const description = useId();
   return (
     <section className="scanner-image-controls" aria-label={t('Bild optimieren')}>
       <div className="scanner-segments" role="group" aria-label={t('Anpassung wählen')}>
@@ -153,6 +160,27 @@ export function ImageControls({
           )}
         </>
       )}
+      <button
+        className="scanner-reset-edit"
+        disabled={busy}
+        aria-describedby={description}
+        onClick={() => {
+          if (active === 'lens') {
+            const next: Recipe = { ...recipe, dewarp: 'auto' };
+            delete next.lensStrength;
+            change(next);
+          } else change({ ...recipe, adjustments: { ...adjustments, [active]: 0 } });
+        }}
+      >
+        {t(resetNames[active])}
+      </button>
+      <span id={description} className="scanner-sr-only">
+        {t(
+          active === 'lens'
+            ? 'Setzt die Linse auf Auto zurück und entfernt die manuelle Linsenstärke. Andere Einstellungen bleiben erhalten.'
+            : 'Setzt nur diese Anpassung auf 0 zurück. Andere Einstellungen bleiben erhalten.',
+        )}
+      </span>
     </section>
   );
 }

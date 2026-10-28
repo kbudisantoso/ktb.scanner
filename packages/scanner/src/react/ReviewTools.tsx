@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { PageDraft, Rotation, FormatSelection } from '../types.ts';
 import type { Translate } from './hooks.ts';
 import { PAPER, cropSize, layoutMm } from '../geometry.ts';
@@ -28,6 +28,7 @@ export function ReviewTools({
   canUndo,
   discard,
   repeat,
+  add,
 }: {
   draft: PageDraft;
   busy: boolean;
@@ -41,8 +42,8 @@ export function ReviewTools({
   canUndo: boolean;
   discard: () => void;
   repeat: (trigger: HTMLButtonElement) => void;
+  add: () => void;
 }) {
-  const [more, setMore] = useState(false);
   const trigger = useRef<ReviewPanel | null>(null),
     root = useRef<HTMLElement>(null),
     id = useId();
@@ -92,50 +93,52 @@ export function ReviewTools({
             </button>
             <button
               disabled={busy}
-              aria-label={t('Weitere Aktionen')}
-              aria-expanded={more}
-              onClick={() => setMore((value) => !value)}
+              aria-label={t('Aufnahme verwerfen')}
+              title={t('Verwerfen')}
+              onClick={discard}
             >
-              <ToolIcon name="more" />
+              <ToolIcon name="trash" />
             </button>
             <button
-              disabled={busy || !canUndo}
-              aria-label={t('Rückgängig')}
-              title={t('Rückgängig')}
-              onClick={undo}
+              disabled={busy}
+              aria-label={t('Weitere Seite')}
+              title={t('Weitere Seite')}
+              onClick={add}
             >
-              <ToolIcon name="reset" />
+              <ToolIcon name="plus" />
+            </button>
+          </div>
+          <div className="scanner-review-utility">
+            <button disabled={busy || !canUndo} onClick={undo}>
+              {t('Rückgängig')}
             </button>
             <button
               disabled={busy}
               data-review-tool="original"
               aria-label={t('Original vergleichen')}
-              onClick={(e) => open('original')}
+              onClick={() => open('original')}
             >
-              <ToolIcon name="source" />
+              {t('Original')}
             </button>
             {!!count && (
               <button
                 disabled={busy}
                 data-review-tool="quality"
                 aria-label={t('Hinweise')}
-                onClick={(e) => open('quality')}
+                onClick={() => open('quality')}
                 className="scanner-hints"
               >
-                <ToolIcon name="info" />
-                {count}
+                {t('Hinweise')} {count}
               </button>
             )}
           </div>
-          {more && (
-            <div className="scanner-review-menu">
-              <button disabled={busy} aria-label={t('Aufnahme verwerfen')} onClick={discard}>
-                {t('Verwerfen')}
-              </button>
-            </div>
-          )}
           <div className="scanner-toolstrip" role="group" aria-label={t('Seite bearbeiten')}>
-            <button disabled={busy} aria-label={t('Ecken korrigieren')} onClick={corners}>
+            <button
+              disabled={busy}
+              data-review-tool="corners"
+              aria-label={t('Ecken korrigieren')}
+              onClick={corners}
+            >
               <ToolIcon name="crop" />
               {t('Ecken')}
             </button>
@@ -200,6 +203,7 @@ export function ReviewTools({
                 className="scanner-reset-edit"
                 disabled={busy}
                 aria-label={t('Optimierung zurücksetzen')}
+                aria-describedby={`${id}-reset`}
                 onClick={() =>
                   recipe({
                     version: 1,
@@ -209,8 +213,13 @@ export function ReviewTools({
                   })
                 }
               >
-                {t('Zurücksetzen')}
+                {t('Optimierung zurücksetzen')}
               </button>
+              <span id={`${id}-reset`} className="scanner-sr-only">
+                {t(
+                  'Setzt alle Bildoptimierungen auf Foto, neutrale Tonwerte und Linse Aus zurück. Ecken, Format und Drehung bleiben erhalten.',
+                )}
+              </span>
             </>
           )}
           {panel === 'adjust' && (

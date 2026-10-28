@@ -1027,20 +1027,25 @@
   min-height: 0;
 }
 .scanner-review-quick {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: calc(4px * var(--scanner-spacing, 1));
 }
-.scanner-review-quick button {
+.scanner-review-utility {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: calc(4px * var(--scanner-spacing, 1));
+}
+.scanner-review-quick button,
+.scanner-review-utility button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: calc(4px * var(--scanner-spacing, 1));
   padding: calc(6px * var(--scanner-spacing, 1));
   min-width: 44px;
-}
-.scanner-review-quick .scanner-hints {
-  margin-left: auto;
+  font-size: 12px;
 }
 .scanner .scanner-repeat {
   font-size: 13px;
@@ -1423,20 +1428,6 @@
   min-height: 0;
   /* Scanic reserves 12 px; enlarged touch handles need room beyond its canvas. */
   padding: max(20px, calc(20px * var(--scanner-spacing, 1)));
-}
-.scanner-review-menu {
-  position: absolute;
-  inset: auto 0 64px;
-  display: flex;
-  gap: calc(8px * var(--scanner-spacing, 1));
-  padding: calc(8px * var(--scanner-spacing, 1));
-  background: var(--scanner-surface);
-  border: 1px solid var(--scanner-border);
-  border-radius: var(--scanner-panel-radius, 8px);
-  z-index: 5;
-}
-.scanner-review-menu button {
-  flex: 1;
 }
 .scanner-workspace select {
   appearance: none;

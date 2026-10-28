@@ -27,7 +27,7 @@ import { suggestFormat } from '../geometry.ts';
 import { createScanicAdapter } from '../scanic.ts';
 import { aborted, errorMessage, ScannerError } from '../errors.ts';
 import { useBlobUrl } from './hooks.ts';
-import { CornerEditor } from './CornerEditor.tsx';
+import { CornerEditor, type CornerEditorHandle } from './CornerEditor.tsx';
 import { CameraView } from './CameraView.tsx';
 import { ShutterSound } from '../shutter-sound.ts';
 import { resolveShutterSoundUrl } from '../sounds.ts';
@@ -86,6 +86,21 @@ export function ScannerView({
   const restoredHistory = useRef<Edit[] | null>(null);
   const panelSnapshot = useRef<Edit | null>(null);
   const panelHistory = useRef<Edit[]>([]);
+  const cornerReturnFocus = useRef(false);
+  const cornerEditor = useRef<CornerEditorHandle | null>(null);
+  useEffect(() => {
+    if (
+      !editingCorners &&
+      !busy &&
+      alive.current &&
+      !signal.aborted &&
+      root.current?.isConnected &&
+      cornerReturnFocus.current
+    ) {
+      root.current?.querySelector<HTMLButtonElement>('[data-review-tool="corners"]')?.focus();
+      cornerReturnFocus.current = false;
+    }
+  }, [editingCorners, busy, signal]);
   useEffect(() => {
     setReviewPanel(null);
     setHistory(restoredHistory.current ?? []);
@@ -117,6 +132,20 @@ export function ScannerView({
     history: Edit[];
   } | null>(null);
   const alive = useRef(true);
+  useEffect(() => {
+    if (
+      alive.current &&
+      !signal.aborted &&
+      !busy &&
+      !camera &&
+      !discard &&
+      !pageGrid &&
+      (reviewPanel || editingCorners || pendingCrop) &&
+      root.current?.isConnected &&
+      !root.current.contains(document.activeElement)
+    )
+      root.current.focus();
+  }, [busy, camera, discard, pageGrid, reviewPanel, editingCorners, pendingCrop, signal]);
   // Update synchronously: repeated input events can arrive before React renders again.
   const preferences = useRef({ initialMode: mode, imageType: mime });
   const notifyPreference = (change: ScannerPreferenceChange) => {
@@ -626,6 +655,14 @@ export function ScannerView({
     if (queue.current.length) void processInput(queue.current[0], 'file', undefined, true);
     else setPageGrid(true);
   };
+  const cancelPendingCrop = () => {
+    if (guard.current) return;
+    if (restoreFileReplacement()) return;
+    setPendingCrop(null);
+    setPageGrid(true);
+    replaceId.current = undefined;
+    if (queue.current.length) void processInput(queue.current[0], 'file', undefined, true);
+  };
   const exportAll = async () => {
     if (!begin()) return;
     setStatus(t('Bilder und PDF werden erstellt...'));
@@ -686,6 +723,11 @@ export function ScannerView({
     else finish({ status: 'cancelled' });
   };
   const keyboard = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape' && !camera && !discard && (editingCorners || pendingCrop)) {
+      event.preventDefault();
+      cornerEditor.current?.cancel();
+      return;
+    }
     if (event.key === 'Escape' && reviewPanel && draft && !editingCorners) {
       event.preventDefault();
       cancelPanel();
@@ -781,20 +823,6 @@ export function ScannerView({
             <>
               <button
                 disabled={busy}
-                aria-label={t('Weitere Seite')}
-                onClick={() => {
-                  if (saveDraft()) {
-                    replaceId.current = undefined;
-                    setDraft(null);
-                    setPageGrid(true);
-                    startCamera();
-                  }
-                }}
-              >
-                <ToolIcon name="plus" />
-              </button>
-              <button
-                disabled={busy}
                 aria-label={`${t('Seitenübersicht')} (${pages.length + (replaceId.current ? 0 : 1)})`}
                 onClick={showPages}
               >
@@ -802,9 +830,11 @@ export function ScannerView({
               </button>
             </>
           )}
-          <button aria-label={t('Schließen')} title={t('Schließen')} onClick={close}>
-            <ToolIcon name="close" />
-          </button>
+          {!reviewPanel && !editingCorners && !pendingCrop && (
+            <button aria-label={t('Schließen')} title={t('Schließen')} onClick={close}>
+              <ToolIcon name="close" />
+            </button>
+          )}
         </div>
       </header>
       <div className="scanner-body">
@@ -868,22 +898,14 @@ export function ScannerView({
                   </button>
                 </div>
                 <CornerEditor
+                  cancelRef={cornerEditor}
                   page={pendingCrop}
                   t={t}
                   signal={signal}
                   findEdges={(abort) => findEdges(pendingCrop, abort)}
                   disabled={busy}
                   onApply={(corners) => void applyPendingCrop(corners)}
-                  onCancel={() => {
-                    if (!guard.current) {
-                      if (restoreFileReplacement()) return;
-                      setPendingCrop(null);
-                      setPageGrid(true);
-                      replaceId.current = undefined;
-                      if (queue.current.length)
-                        void processInput(queue.current[0], 'file', undefined, true);
-                    }
-                  }}
+                  onCancel={cancelPendingCrop}
                 />
               </>
             )}
@@ -892,6 +914,7 @@ export function ScannerView({
               !pageGrid &&
               (editingCorners ? (
                 <CornerEditor
+                  cancelRef={cornerEditor}
                   page={draft}
                   t={t}
                   disabled={busy}
@@ -925,6 +948,7 @@ export function ScannerView({
                     change={(patch) => void reprocess(patch)}
                     layout={(format) => setDraft((current) => current && { ...current, format })}
                     corners={() => {
+                      cornerReturnFocus.current = true;
                       setReviewPanel(null);
                       setEditingCorners(true);
                     }}
@@ -932,6 +956,14 @@ export function ScannerView({
                     canUndo={!!history.length}
                     discard={discardDraft}
                     repeat={repeatCapture}
+                    add={() => {
+                      if (saveDraft()) {
+                        replaceId.current = undefined;
+                        setDraft(null);
+                        setPageGrid(true);
+                        startCamera();
+                      }
+                    }}
                   />
                 </div>
               ))}

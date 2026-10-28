@@ -264,6 +264,8 @@ test('declarative component survives StrictMode and callback updates, snapshots 
       .locator('.scanner')
       .evaluate((e) => getComputedStyle(e).getPropertyValue('--scanner-accent').trim()),
   ).toBe('#4931aa');
+  await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
   await page.getByRole('button', { name: 'Schließen', exact: true }).click();
   await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
   await expect

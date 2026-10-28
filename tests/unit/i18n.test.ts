@@ -50,6 +50,19 @@ test('English is the library default; German and host overrides retain stable me
     createTranslator('en', { 'Find edges': 'Detect again' })('Kanten finden'),
     'Detect again',
   );
+  for (const [key, translation] of [
+    ['Helligkeit zurücksetzen', 'Reset brightness'],
+    ['Kontrast zurücksetzen', 'Reset contrast'],
+    ['Schärfe zurücksetzen', 'Reset sharpness'],
+    ['Linse zurücksetzen', 'Reset lens'],
+  ]) {
+    assert.equal(en(key), translation);
+    assert.equal(de(key), key);
+  }
+  assert.equal(
+    createTranslator('en', { 'Reset lens': 'Restore lens auto' })('Linse zurücksetzen'),
+    'Restore lens auto',
+  );
 });
 test('stable error codes have English API messages and localized UI messages', () => {
   const error = new ScannerError(

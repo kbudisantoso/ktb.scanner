@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import { chooseProfile, closeTool, tool, tone } from './helpers';
+import { chooseProfile, closeTool, tool, tone, previewHash, waitForPreview } from './helpers';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 test('undo and cancelled tools restore actual pixels; zoom, hold comparison and native pinch remain usable', async ({
@@ -17,35 +17,27 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
   const image = page.getByRole('img', { name: 'Bearbeitete Seite', exact: true }),
     surface = page.locator('.scanner-image-surface');
   await expect(image).toBeVisible();
-  const hash = () =>
-    image.evaluate(async (i: HTMLImageElement) =>
-      Array.from(
-        new Uint8Array(
-          await crypto.subtle.digest('SHA-256', await (await fetch(i.src)).arrayBuffer()),
-        ),
-      ).join(','),
-    );
+  const hash = () => previewHash(page);
   const baseline = await hash();
-  // Reprocessing replaces and revokes preview URLs. Retry the complete byte
-  // assertion if WebKit observes the old URL during that asynchronous handoff.
-  const expectBaseline = () =>
-    expect(async () => {
-      await expect(image).toBeVisible();
-      expect(await hash()).toBe(baseline);
-    }).toPass({ timeout: 30_000 });
+  const expectBaseline = async () => expect(await hash()).toBe(baseline);
   await surface.dblclick();
   await expect(surface).toHaveAttribute('data-zoom', '100');
   await chooseProfile(page, 'grayscale');
   await closeTool(page);
   await expect(surface).toHaveAttribute('data-zoom', '100');
   expect(await hash()).not.toBe(baseline);
+  const optimizedPreview = await image.getAttribute('src');
   await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
+  await waitForPreview(page, optimizedPreview);
   await expectBaseline();
   await tone(page, 'Helligkeit');
+  const neutralPreview = await image.getAttribute('src');
   await page.getByRole('slider', { name: 'Helligkeit', exact: true }).press('End');
-  await expect(page.locator('.scanner')).toHaveAttribute('aria-busy', 'false');
+  await waitForPreview(page, neutralPreview);
   expect(await hash()).not.toBe(baseline);
+  const adjustedPreview = await image.getAttribute('src');
   await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+  await waitForPreview(page, adjustedPreview);
   await expectBaseline();
   await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
   await tool(page, 'Filter');
@@ -95,4 +87,19 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
     await expect(surface).not.toHaveAttribute('data-zoom', 'fit');
     await client.detach();
   }
+  const original = page.getByRole('button', { name: 'Original vergleichen', exact: true });
+  await original.click();
+  await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'OK', exact: true }).click();
+  await expect(original).toBeFocused();
+  const corners = page.getByRole('button', { name: 'Ecken korrigieren', exact: true });
+  await corners.click();
+  await expect(
+    page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }),
+  ).toBeEnabled();
+  // Escape remains local even if the browser leaves focus outside the editor.
+  await page.getByRole('dialog').focus();
+  await page.keyboard.press('Escape');
+  await expect(corners).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Scans verwerfen?', exact: true })).toHaveCount(0);
 });
