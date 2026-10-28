@@ -29,7 +29,8 @@ const paths: Record<Name, string> = {
   sheet: 'M5 3h14v18H5z',
   crop: 'M6 2v16h16M2 6h16v16M9 6h9v9',
   rotate: 'M5 8a8 8 0 1 1-1 8M5 3v5h5',
-  filter: 'M7 8a4 4 0 1 0 0 .01M17 8a4 4 0 1 0 0 .01M12 17a4 4 0 1 0 0 .01',
+  filter:
+    'M3 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0zM13 8a4 4 0 1 0 8 0a4 4 0 1 0-8 0zM8 17a4 4 0 1 0 8 0a4 4 0 1 0-8 0z',
   adjust: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6',
   format: 'M5 3h14v18H5zM8 7h8M8 17h8',
   more: 'M5 12h.01M12 12h.01M19 12h.01',
