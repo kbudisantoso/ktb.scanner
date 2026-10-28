@@ -16,7 +16,6 @@
     "packages/scanner/src",
     "apps/demo-astro/src/client.ts",
     "tests",
-    "playwright.config.ts",
-    "vitest.config.ts"
+    "playwright.config.ts"
   ]
 }

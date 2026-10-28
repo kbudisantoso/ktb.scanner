@@ -356,19 +356,18 @@ React/engine resources load on scanner open; PDF generation and the reference PD
 ## Verify and contribute
 
 ```sh
-pnpm test:core
 pnpm test:release
-pnpm build
+pnpm check:package
+pnpm build:hosts
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 pnpm check:docs
-pnpm check:package
 ```
 
-Sound tests mute physical output while exercising native audio behavior. Browser emulation and synthetic inputs do not replace phone or assistive-technology acceptance. See [test status](docs/testing/STATUS.md), [device protocol](docs/testing/DEVICE-PROTOCOL.md), [contribution guide](CONTRIBUTING.md) and [security policy](SECURITY.md).
+`pnpm test` runs the native suite and built-package SSR checks once. Use `pnpm test:core` for a focused pre-build check. The sequence above uses the archive gate as the clean library build, then builds the hosts; `pnpm build` still builds the complete workspace. Sound tests mute physical output while exercising native audio behavior. Browser emulation and synthetic inputs do not replace phone or assistive-technology acceptance. See [test status](docs/testing/STATUS.md), [device protocol](docs/testing/DEVICE-PROTOCOL.md), [contribution guide](CONTRIBUTING.md) and [security policy](SECURITY.md).
 
 Further documentation: [package API](packages/scanner/README.md), [requirements](docs/REQUIREMENTS.md), [implementation contract](docs/SPECIFICATION.md), [decisions](docs/DECISIONS.md), [ADRs](docs/adr/README.md), [dependencies](docs/DEPENDENCIES.md), [publishing status](docs/PUBLISHING.md) and [changelog](CHANGELOG.md).
 

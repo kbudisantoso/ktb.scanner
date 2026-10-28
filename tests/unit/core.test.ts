@@ -179,14 +179,6 @@ test('overlay smoothing does not retain a lost contour', () => {
   const shown = smoothQuad(quad, next, 180)!;
   assert(shown[0].x > quad[0].x && shown[0].x < next[0].x);
 });
-test('capture is not early and fires exactly once', () => {
-  const gate = new AutoCapture();
-  prime(gate);
-  assert.equal(gate.update(detection(1000), 1000).capture, true);
-  assert.equal(gate.update(detection(1100), 1100).capture, false);
-  gate.rearm();
-  assert.equal(gate.update(detection(1200), 1200).progress, 0);
-});
 for (const problem of ['blur', 'unknown', 'loss', 'gap', 'stale', 'duplicate'] as const)
   test(`capture pauses without counting uncertain time for ${problem}`, () => {
     const gate = new AutoCapture();
@@ -204,14 +196,6 @@ for (const problem of ['blur', 'unknown', 'loss', 'gap', 'stale', 'duplicate'] a
     assert.equal(gate.update(detection(next), next).capture, problem === 'gap');
     assert.equal(gate.update(detection(next + 100), next + 100).capture, problem !== 'gap');
   });
-test('slow drift is measured against start, not smoothed frames', () => {
-  const gate = new AutoCapture();
-  for (let time = 0; time <= 3500; time += 100) {
-    const shift = time / 16000;
-    const q = quad.map((p) => ({ x: p.x + shift, y: p.y })) as Quad;
-    assert.equal(gate.update(detection(time, q), time).capture, false);
-  }
-});
 test('manual switch invalidates in-flight detections and starts fresh on return', () => {
   const gate = new AutoCapture();
   prime(gate);

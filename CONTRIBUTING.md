@@ -27,27 +27,30 @@ Create a branch such as `fix/42-receipt-preview` or `feat/57-export-option`. Use
 ## Verification
 
 ```sh
-pnpm test:core
 pnpm test:release
-pnpm build
+pnpm check:package
+pnpm build:hosts
 pnpm typecheck
 pnpm lint
 pnpm test
 pnpm check:docs
-pnpm check:package
 pnpm licenses:inventory
 pnpm check:notices
 pnpm exec playwright install chromium firefox webkit
 pnpm test:browser
 ```
 
-The full build produces the library, copies assets and builds both hosts. Browser tests use their own ports 3177 and 4377. Sound tests mute physical output while exercising native audio behavior. Known browser exceptions and remaining physical-device work are listed in the [test status](docs/testing/STATUS.md).
+`pnpm test` runs the native suite and built-package SSR checks once; `pnpm test:core` remains a focused check that can run before building. The sequence above uses `check:package` to clean-build and inspect the library, then `build:hosts` to copy assets and build both references. `pnpm build` still builds the complete workspace. Browser tests use their own ports 3177 and 4377. Sound tests mute physical output while exercising native audio behavior. Known browser exceptions and remaining physical-device work are listed in the [test status](docs/testing/STATUS.md).
 
 Headless Firefox on Linux needs an available audio backend for native Web Audio tests. CI starts PulseAudio with a virtual null sink; output stays muted and no hardware speaker is required. Use an equivalent audio backend when reproducing these tests on a headless Linux machine.
 
+Full host-language value tables and HTTP notice contents run on Chromium. All engines retain host-language switch/reload and visible legal-link checks. Direct fixed-size worker cases run on Chromium, Firefox and WebKit; mobile WebKit retains the camera, touch, focus, layout and lifecycle coverage. Tags and project filters declare these boundaries in `playwright.config.ts`.
+
+The default 12 MP smoke retains a cold and warm import with discard/reentry. `pnpm test:benchmark` runs the same Chromium case with six timing samples. Main/manual/release CI also keeps that extended mode; PR CI uses the shorter smoke. This separates repeated measurements from the functional checks without another runner or test configuration.
+
 All four browser CI profiles use the [official Playwright image](https://playwright.dev/docs/docker), pinned to `v1.64.1-noble` and its immutable manifest digest. It already contains Chromium, Firefox, WebKit and their system libraries, so no job downloads browsers or reinstalls the full browser dependencies. Keep the image tag/digest and the exact `@playwright/test` version aligned; CI checks the package version, the selected engine's executable and a real browser launch/close before building/testing. CI also installs `fonts-dejavu-core`, refreshes the Fontconfig cache and verifies that `monospace` resolves to `DejaVu Sans Mono` before launching browsers. This CI-only baseline keeps synthetic canvas calibration text consistent; the minimal image otherwise resolves it to WenQuanYi Zen Hei Mono, which changes fixture pixels and quality measurements. Scanner code, fixture definitions, quality thresholds and assertions are unchanged. A container pull and this small font-package installation are still required on a fresh runner, so this is not a fixed runtime guarantee.
 
-Firefox additionally installs PulseAudio and its command-line utilities, then starts the existing per-user server and virtual null sink inside the container. The root-user message from PulseAudio is a [warning](https://github.com/pulseaudio/pulseaudio/blob/v16.1/src/daemon/main.c#L758). The job creates separate private Pulse runtime, state and configuration directories under the runner temporary directory, plus an explicit Unix socket and authentication cookie. These Pulse-specific paths carry into later steps; the GitHub-provided home path stays unchanged. Before the Actions run, CI verifies that path is `/github/home` and adjusts only that ephemeral directory's owner to the container job UID/GID, as required for Firefox startup. The daemon loads only the local native protocol and the null sink needed by the tests, without system-wide mode or anonymous authentication. The physically muted test fixture is unchanged. This remaining package installation still uses `apt`. The container uses `--init` for process reaping and `--ipc=host` for Chromium's shared-memory requirements; all run steps use Bash explicitly. All four profiles, complete test suites and the `CI Success` gate remain required. Container checks do not establish physical Safari/iPhone acceptance. No custom image is built or published.
+Firefox additionally installs PulseAudio and its command-line utilities, then starts the existing per-user server and virtual null sink inside the container. The root-user message from PulseAudio is a [warning](https://github.com/pulseaudio/pulseaudio/blob/v16.1/src/daemon/main.c#L758). The job creates separate private Pulse runtime, state and configuration directories under the runner temporary directory, plus an explicit Unix socket and authentication cookie. These Pulse-specific paths carry into later steps; the GitHub-provided home path stays unchanged. Before the Actions run, CI verifies that path is `/github/home` and adjusts only that ephemeral directory's owner to the container job UID/GID, as required for Firefox startup. The daemon loads only the local native protocol and the null sink needed by the tests, without system-wide mode or anonymous authentication. The physically muted test fixture is unchanged. This remaining package installation still uses `apt`. The container uses `--init` for process reaping and `--ipc=host` for Chromium's shared-memory requirements; all run steps use Bash explicitly. All four profiles and the `CI Success` gate remain required; project filters avoid repeating the engine-independent contracts described above. Container checks do not establish physical Safari/iPhone acceptance. No custom image is built or published.
 
 `pnpm licenses:inventory` records the resolved production dependencies locally. Preserve third-party license notices, including CC0 audio attribution and the full CC0 dedication. Do not assume the source-code license relicenses media.
 

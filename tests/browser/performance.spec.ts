@@ -34,8 +34,9 @@ test('record desktop 12-megapixel timings and responsive reference views', async
     background: '#435a52',
   } satisfies Fixture);
   await page.getByRole('button', { name: /Dokument scannen/ }).click();
+  const rounds = process.env.SCANNER_BENCHMARK === '1' ? 6 : 2;
   const durations = [];
-  for (let run = 0; run < 6; run++) {
+  for (let run = 0; run < rounds; run++) {
     const start = performance.now();
     await page.locator('.scanner input[type=file][multiple]').setInputFiles({
       name: '12mp.png',
@@ -45,7 +46,7 @@ test('record desktop 12-megapixel timings and responsive reference views', async
     await expect(page.getByRole('img', { name: 'Bearbeitete Seite' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Abschließen', exact: true })).toBeEnabled();
     durations.push(Math.round(performance.now() - start));
-    if (run < 5) await discardDraft(page);
+    if (run < rounds - 1) await discardDraft(page);
   }
   await testInfo.attach('desktop-review.png', {
     body: await page.screenshot({ fullPage: true }),
@@ -75,10 +76,11 @@ test('record desktop 12-megapixel timings and responsive reference views', async
       profile: 'auto',
       resolvedProfile: manifest.pages[0].metadata.autoOptimization?.profile,
       diagnostics: false,
+      rounds,
       coldMs: durations[0],
       warmMs: durations.slice(1),
-      warmMedianMs: warm[2],
-      warmMaxMs: warm[4],
+      warmMedianMs: warm[Math.floor(warm.length / 2)],
+      warmMaxMs: warm.at(-1),
       exportAndPdfPreviewMs: Math.round(performance.now() - exportStart),
       outputSizePx: manifest.pages[0].metadata.outputSizePx,
       scope:

@@ -21,6 +21,12 @@ const frame = (
   sharpness: LiveDetection['sharpness'] = 'sharp',
 ): LiveDetection => ({ timestamp, corners, sharpness });
 
+const wideQuad: Quad = [
+  { x: 0.15, y: 0.1 },
+  { x: 0.85, y: 0.1 },
+  { x: 0.85, y: 0.9 },
+  { x: 0.15, y: 0.9 },
+];
 for (const duration of [...AUTO_CAPTURE_STABILITY_PRESETS_MS, 100, 875, 5000]) {
   test(`${duration} ms stability uses measured time, never triggers early and claims once`, () => {
     const gate = new AutoCapture('auto', duration);
@@ -42,8 +48,25 @@ for (const duration of [...AUTO_CAPTURE_STABILITY_PRESETS_MS, 100, 875, 5000]) {
   });
 }
 
-test('stability defaults, per-open precedence and invalid values are explicit', () => {
-  assert.equal(new AutoCapture().stabilityMs, 1000);
+function assertSlowDrift(gate: AutoCapture, corners: Quad) {
+  for (let time = 0; time <= 3500; time += 100) {
+    const shifted = corners.map((point) => ({ ...point, x: point.x + time / 16000 })) as Quad;
+    assert.equal(gate.update(frame(time, shifted), time).capture, false);
+  }
+}
+test('slow drift is measured against start, not smoothed frames', () => {
+  assertSlowDrift(new AutoCapture(), wideQuad);
+});
+
+test('default capture timing, per-open precedence and invalid values are explicit', () => {
+  const gate = new AutoCapture();
+  assert.equal(gate.stabilityMs, 1000);
+  for (let time = 0; time <= 950; time += 50)
+    assert.equal(gate.update(frame(time, wideQuad), time).capture, false);
+  assert.equal(gate.update(frame(1000, wideQuad), 1000).capture, true);
+  assert.equal(gate.update(frame(1100, wideQuad), 1100).capture, false);
+  gate.rearm();
+  assert.equal(gate.update(frame(1200, wideQuad), 1200).progress, 0);
   assert.equal(resolveAutoCaptureStabilityMs(), 1000);
   assert.equal(resolveAutoCaptureStabilityMs(2000), 2000);
   assert.equal(resolveAutoCaptureStabilityMs(2000, 600), 600);
@@ -151,8 +174,7 @@ test('small alternating edge jitter can complete capture without masking cumulat
     assert.equal(status.capture, time === 1000);
   }
   gate.rearm();
-  for (let time = 0; time <= 3500; time += 100)
-    assert.equal(gate.update(frame(time, shifted(time / 16000)), time).capture, false);
+  assertSlowDrift(gate, quad);
 });
 test('long losses reset without changing mode generation; stale/unknown data cannot trigger', () => {
   const gate = new AutoCapture();

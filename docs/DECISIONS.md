@@ -12,7 +12,7 @@ Updated 28 October 2026. These decisions resolve the initial product scope. The 
 | D-006 | Primary iPhone Safari and Android Chrome, current/previous supported generations | Add desktop browsers. About 100 ms feedback and warm 12 MP review within five seconds are development targets, not device measurements. |
 | D-007 | English library default with built-in German, host text overrides, theme tokens and two reference themes | Green progress plus text, keyboard corners/order and focus handling. No untested accessibility conformance claim. |
 | D-008 | JPEG/PNG/WebP import; JPEG 0.92/PNG and multi-page raster PDF export | No OCR layer. Original return is opt-in. TIFF, HEIC/HEIF and PDF import are deferred. |
-| D-009 | TypeScript/pnpm, one package with separate React entry | DOM/React-free core import, workers, controlled assets, Vitest and Playwright. |
+| D-009 | TypeScript/pnpm, one package with separate React entry | DOM/React-free core import, workers, controlled assets, native Node.js core/SSR tests and Playwright. |
 | D-010 | Paper format determines rectification target ratio | Correct both crop axes and fill the PDF page without added margins. Receipts/original ratio remain proportional. |
 | D-011 | Local reference diagnostics across sessions | Explicit opt-in per D-033. Shared 512 MiB, at most 128 MiB heavy detail; explicit deletion, one hour without download, ten minutes after download. No upload/persistence. |
 | D-012 | Fresh still detection and multi-sheet choice | Cancel live jobs before capture; prefer complete sheets, then horizontal middle/left-middle. Inner/duplicate/weaker fragments do not count as independent sheets. |

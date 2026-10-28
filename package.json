@@ -9,17 +9,20 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "build": "pnpm build:library && pnpm assets && pnpm --filter @ktb/demo-next build && pnpm --filter @ktb/demo-astro build",
+    "build": "pnpm build:library && pnpm build:hosts",
     "build:library": "pnpm --filter @ktb-tools/scanner build",
+    "build:hosts": "pnpm assets && pnpm --filter @ktb/demo-next build && pnpm --filter @ktb/demo-astro build",
     "assets": "node scripts/copy-assets.mjs",
     "dev": "pnpm build:library && pnpm assets && pnpm --filter @ktb/demo-next dev",
     "dev:astro": "pnpm build:library && pnpm assets && pnpm --filter @ktb/demo-astro dev",
     "typecheck": "tsc --noEmit && pnpm --filter @ktb/demo-next typecheck",
-    "lint": "prettier --check .github packages apps scripts tests package.json tsconfig.json tsconfig.core.json playwright.config.ts vitest.config.ts pnpm-workspace.yaml",
-    "test": "vitest run",
+    "lint": "prettier --check .github packages apps scripts tests package.json tsconfig.json tsconfig.core.json playwright.config.ts pnpm-workspace.yaml",
+    "test": "pnpm test:core && pnpm test:ssr",
     "test:core": "node --experimental-strip-types --test tests/unit/*.test.ts",
+    "test:ssr": "node --experimental-strip-types --test tests/ssr.test.ts",
     "test:release": "node --test scripts/release.test.mjs",
     "test:browser": "playwright test",
+    "test:benchmark": "SCANNER_BENCHMARK=1 playwright test tests/browser/performance.spec.ts --project=chromium",
     "check:docs": "node scripts/check-docs.mjs",
     "check:notices": "node scripts/check-notices.mjs",
     "typecheck:core": "tsc -p tsconfig.core.json",
@@ -35,7 +38,6 @@
     "prettier": "3.9.10",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "typescript": "7.0.2",
-    "vitest": "5.0.5"
+    "typescript": "7.0.2"
   }
 }

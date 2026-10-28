@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
 import { build } from 'esbuild';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
@@ -170,48 +171,90 @@ for (const [width, height] of [
   });
 }
 
+async function expectHostLinks(page: Page, locale: 'en' | 'de') {
+  const license = page.getByRole('link', {
+    name: locale === 'de' ? 'Lizenzen' : 'Licenses',
+    exact: true,
+  });
+  const source = page.getByRole('link', {
+    name: locale === 'de' ? 'Quellcode' : 'Source code',
+    exact: true,
+  });
+  await expect(license).toBeVisible();
+  await expect(license).toHaveAttribute('href', '/third-party-notices.txt');
+  await expect(source).toBeVisible();
+  await expect(source).toHaveAttribute('href', 'https://github.com/kbudisantoso/ktb.scanner');
+}
+
+async function closeNextOptions(page: Page, locale: 'en' | 'de') {
+  await page
+    .getByRole('button', {
+      name: locale === 'de' ? 'Optionen schließen' : 'Close options',
+      exact: true,
+    })
+    .click();
+}
+
+async function interactWithNextOptions(page: Page, locale: 'en' | 'de') {
+  // A real client interaction prevents a matching English SSR shell from passing before hydration.
+  await page.getByRole('button', { name: /^(Options|Optionen)$/ }).click();
+  await closeNextOptions(page, locale);
+}
+
+const hostLanguages = [
+  { browser: 'en-US', expected: 'en', allEngines: true },
+  { browser: 'de-DE', expected: 'de', allEngines: true },
+  { browser: 'de-CH', expected: 'de', allEngines: false },
+  { browser: 'fr-FR', expected: 'en', allEngines: false },
+  { browser: 'de-DE', query: 'en', expected: 'en', allEngines: false },
+  { browser: 'en-US', query: 'de', expected: 'de', allEngines: false },
+  { browser: 'de-AT', query: 'fr', expected: 'de', allEngines: false },
+] as const;
+
 for (const host of ['next', 'astro'] as const)
-  for (const scenario of [
-    { browser: 'en-US', expected: 'en' },
-    { browser: 'de-DE', expected: 'de' },
-    { browser: 'de-CH', expected: 'de' },
-    { browser: 'fr-FR', expected: 'en' },
-    { browser: 'de-DE', query: 'en', expected: 'en' },
-    { browser: 'en-US', query: 'de', expected: 'de' },
-    { browser: 'de-AT', query: 'fr', expected: 'de' },
-  ] as const) {
+  for (const scenario of hostLanguages) {
     test.describe(`${host} language ${scenario.browser} / ${'query' in scenario ? scenario.query : 'automatic'}`, () => {
       test.use({ locale: scenario.browser });
-      test('detects browser language and retains an explicit selection after reload', async ({
-        page,
-      }) => {
-        const base = host === 'next' ? 'http://127.0.0.1:3177/' : 'http://127.0.0.1:4377/';
-        const query = 'query' in scenario ? scenario.query : undefined;
-        await page.goto(base + (query ? `?lang=${query}` : ''));
-        const selector = page.getByLabel('Sprache / Language', { exact: true });
-        await expect(selector).toHaveValue(scenario.expected);
-        await expect(page.locator('html')).toHaveAttribute('lang', scenario.expected);
-        await expect(
-          page.getByRole('button', {
-            name: scenario.expected === 'de' ? 'Dokument scannen' : 'Scan document',
-            exact: true,
-          }),
-        ).toBeVisible();
-        expect(new URL(page.url()).searchParams.get('lang')).toBe(query ?? null);
-        if (host === 'next')
-          await page
-            .getByRole('button', {
-              name: scenario.expected === 'de' ? 'Optionen' : 'Options',
+      test(
+        'detects browser language and retains an explicit selection after reload',
+        {
+          tag: scenario.allEngines ? [] : '@host-locale-matrix',
+        },
+        async ({ page }) => {
+          const base = host === 'next' ? 'http://127.0.0.1:3177/' : 'http://127.0.0.1:4377/';
+          const query = 'query' in scenario ? scenario.query : undefined;
+          await page.goto(base + (query ? `?lang=${query}` : ''));
+          if (host === 'next') await interactWithNextOptions(page, scenario.expected);
+          const selector = page.getByLabel('Sprache / Language', { exact: true });
+          await expect(selector).toHaveValue(scenario.expected);
+          await expect(page.locator('html')).toHaveAttribute('lang', scenario.expected);
+          await expect(
+            page.getByRole('button', {
+              name: scenario.expected === 'de' ? 'Dokument scannen' : 'Scan document',
               exact: true,
-            })
-            .click();
-        const manual = scenario.expected === 'de' ? 'en' : 'de';
-        await selector.selectOption(manual);
-        await expect(page.locator('html')).toHaveAttribute('lang', manual);
-        expect(new URL(page.url()).searchParams.get('lang')).toBe(manual);
-        await page.reload();
-        await expect(selector).toHaveValue(manual);
-        await expect(page.locator('html')).toHaveAttribute('lang', manual);
-      });
+            }),
+          ).toBeVisible();
+          expect(new URL(page.url()).searchParams.get('lang')).toBe(query ?? null);
+          await expectHostLinks(page, scenario.expected);
+          if (host === 'next')
+            await page
+              .getByRole('button', {
+                name: scenario.expected === 'de' ? 'Optionen' : 'Options',
+                exact: true,
+              })
+              .click();
+          const manual = scenario.expected === 'de' ? 'en' : 'de';
+          await selector.selectOption(manual);
+          await expect(page.locator('html')).toHaveAttribute('lang', manual);
+          expect(new URL(page.url()).searchParams.get('lang')).toBe(manual);
+          if (host === 'next') await closeNextOptions(page, manual);
+          await expectHostLinks(page, manual);
+          await page.reload();
+          if (host === 'next') await interactWithNextOptions(page, manual);
+          await expect(selector).toHaveValue(manual);
+          await expect(page.locator('html')).toHaveAttribute('lang', manual);
+          await expectHostLinks(page, manual);
+        },
+      );
     });
   }

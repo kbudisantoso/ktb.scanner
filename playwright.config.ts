@@ -1,4 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
+// Full host-language value tables and HTTP response bodies do not vary by browser engine.
+const chromiumContracts = /@host-locale-matrix|@http-contract/;
 export default defineConfig({
   testDir: './tests/browser',
   timeout: 90_000,
@@ -15,9 +17,21 @@ export default defineConfig({
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-webkit', use: { ...devices['iPhone 13'] } },
+    {
+      name: 'firefox',
+      grepInvert: chromiumContracts,
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      grepInvert: chromiumContracts,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile-webkit',
+      grepInvert: [chromiumContracts, /@worker-only/],
+      use: { ...devices['iPhone 13'] },
+    },
   ],
   webServer: [
     {
