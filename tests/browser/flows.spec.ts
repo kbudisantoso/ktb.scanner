@@ -207,6 +207,8 @@ test('all acceptance fixtures pass through the real engine without losing the so
         })),
       )
       .toEqual({ width: fixture.width, height: fixture.height });
+    await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'OK', exact: true }).click();
     await page.getByRole('button', { name: 'Schließen', exact: true }).click();
     await page.getByRole('button', { name: 'Scans verwerfen', exact: true }).click();
   }
