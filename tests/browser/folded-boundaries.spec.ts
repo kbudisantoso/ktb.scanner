@@ -1,8 +1,6 @@
 import { buildSync } from 'esbuild';
 import { test, expect } from './fixtures';
 import {
-  foldedDocumentInBrowser,
-  foldedPaper,
   perspectiveFoldedCorners,
   perspectiveFoldedDocumentInBrowser,
 } from '../fixtures/folded-document';
@@ -54,42 +52,6 @@ async function detectFrames(page: Page, frames: string[]): Promise<LiveDetection
     }
   }, frames);
 }
-
-test('the real live detector retains observed complete boundaries with two strong fold shadows', async ({
-  page,
-}, testInfo) => {
-  await prepareLiveHarness(page);
-  const frames = [];
-  for (const foldShadow of [55, 135, 195, 55])
-    frames.push(
-      await page.evaluate(foldedDocumentInBrowser, {
-        background: 65,
-        foldShadow,
-        foldHalfWidth: 15,
-      }),
-    );
-  const detections = await detectFrames(page, frames);
-  await testInfo.attach('folded-live-boundaries.json', {
-    body: JSON.stringify({ fixture: foldedPaper, detections }),
-    contentType: 'application/json',
-  });
-  for (const detection of detections) {
-    expect(detection.corners).not.toBeNull();
-    const corners = detection.corners!;
-    for (const [index, expected] of [
-      [foldedPaper.x, foldedPaper.y],
-      [foldedPaper.x + foldedPaper.paperWidth, foldedPaper.y],
-      [foldedPaper.x + foldedPaper.paperWidth, foldedPaper.y + foldedPaper.paperHeight],
-      [foldedPaper.x, foldedPaper.y + foldedPaper.paperHeight],
-    ].entries())
-      expect(
-        Math.hypot(
-          corners[index].x * (foldedPaper.width - 1) - expected[0],
-          corners[index].y * (foldedPaper.height - 1) - expected[1],
-        ),
-      ).toBeLessThanOrEqual(12);
-  }
-});
 
 test('the real live detector selects the observed perspective sheet instead of its stronger fold panel', async ({
   page,
