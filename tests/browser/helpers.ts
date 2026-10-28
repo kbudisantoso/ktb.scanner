@@ -141,6 +141,5 @@ export async function closeAppPanel(page: Page) {
 
 export async function discardDraft(page: Page) {
   await closeTool(page);
-  await page.getByRole('button', { name: 'Weitere Aktionen', exact: true }).click();
   await page.getByRole('button', { name: 'Aufnahme verwerfen', exact: true }).click();
 }

@@ -1,15 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import type { CornerEditor as Editor, CornerPoints } from 'scanic';
 import type { Quad, PageDraft } from '../types.ts';
 import { validQuad } from '../geometry.ts';
 import { useBlobUrl } from './hooks.ts';
 import type { Translate } from './hooks.ts';
+export type CornerEditorHandle = { cancel: () => void };
 export function CornerEditor({
   page,
   onApply,
   onCancel,
   findEdges,
   signal,
+  cancelRef,
   disabled = false,
   t,
 }: {
@@ -19,6 +22,7 @@ export function CornerEditor({
   onCancel: () => void;
   findEdges: (signal: AbortSignal) => Promise<Quad | null>;
   signal: AbortSignal;
+  cancelRef?: Ref<CornerEditorHandle>;
   t: Translate;
 }) {
   const container = useRef<HTMLDivElement>(null),
@@ -41,6 +45,7 @@ export function CornerEditor({
     cancelFinding();
     callbacks.current.onCancel();
   };
+  useImperativeHandle(cancelRef, () => ({ cancel }), [signal]);
   const find = async () => {
     if (disabled || !editor.current || detection.current || signal.aborted) return;
     const pending = new AbortController();

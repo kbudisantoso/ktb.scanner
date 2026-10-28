@@ -364,6 +364,53 @@ test('replacement preserves the remaining import queue and does not accept the f
     expect(finished.pages[index].original).toEqual(Array.from((await file(page, index)).buffer));
 });
 
+test('Escape from required initial corners discards only that candidate and preserves the import queue', async ({
+  page,
+}) => {
+  await start(page, 'controller', 'en', [2, 1]);
+  await expect(
+    page.getByRole('heading', { name: 'Set document corners', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+  const find = page.getByRole('button', { name: 'Find edges', exact: true });
+  await expect(find).toBeEnabled();
+  const jobs = await page.evaluate(() => {
+    const h = (window as any).replacementHarness;
+    h.hold = true;
+    h.searchWorker = [...h.workers][0];
+    return h.jobs.length;
+  });
+  await find.click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).replacementHarness.jobs.length))
+    .toBe(jobs + 1);
+  await expect(page.locator('.scanner-corners')).toHaveAttribute('aria-busy', 'true');
+  await page.evaluate(() => ((window as any).replacementHarness.hold = false));
+  await page.getByRole('dialog').focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Finish', exact: true })).toBeEnabled();
+  await expect(page.getByRole('img', { name: 'Edited page', exact: true })).toBeVisible();
+  await page.evaluate(() => (window as any).replacementHarness.late());
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+  expect(
+    await page.evaluate(() => {
+      const h = (window as any).replacementHarness;
+      return {
+        results: h.results.length,
+        accepted: h.events.filter((e: any) => e.type === 'page-accepted').length,
+        searchWorkerAlive: h.workers.has(h.searchWorker),
+        activeWorkers: h.workers.size,
+      };
+    }),
+  ).toEqual({ results: 0, accepted: 0, searchWorkerAlive: false, activeWorkers: 1 });
+  await page.getByRole('button', { name: 'Finish', exact: true }).click();
+  const finished = await result(page);
+  expect(finished.status).toBe('confirmed');
+  expect(finished.requests).toBe(0);
+  expect(finished.pages).toHaveLength(1);
+  expect(finished.pages[0].original).toEqual(Array.from((await file(page, 1)).buffer));
+});
+
 for (const baseline of [0, 2]) {
   test(`unconfirmed replacement crop cancels back to the previous ${baseline === 0 ? 'review' : 'required crop'} with unchanged original`, async ({
     page,
@@ -375,7 +422,11 @@ for (const baseline of [0, 2]) {
     await expect(
       page.getByRole('heading', { name: 'Set document corners', exact: true }),
     ).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+    if (baseline === 0) {
+      await page.getByRole('dialog').focus();
+      await page.keyboard.press('Escape');
+    } else await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Replace image', exact: true })).toBeFocused();
     if (baseline === 0) expect(await imageHash(page)).toBe(before);
     else {
@@ -397,17 +448,35 @@ for (const baseline of [0, 2]) {
   });
 }
 
-test('accepted file replacement preserves ID and page position; corrupt or unconfirmed replacement keeps the saved revision', async ({
+test('add, discard and accepted file replacement preserve the saved page; replacement remains atomic', async ({
   page,
 }) => {
   await start(page);
   await expect(page.getByRole('button', { name: 'Replace image', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^Page overview/ }).click();
+  await page.getByRole('button', { name: 'Add page', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).replacementHarness.requests)).toBe(1);
+  await expect(page.getByRole('dialog')).toHaveClass(/scanner-camera-mode/);
+  await expect(page.getByRole('button', { name: 'Resume camera', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to import', exact: true }).click();
+  await expect(page.locator('.scanner-pages article')).toHaveCount(1);
   const original = await page.evaluate(
     () =>
       (window as any).replacementHarness.events.find((event: any) => event.type === 'page-accepted')
         .data.pageId,
   );
+  await page.getByRole('button', { name: 'Page 1: Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Rotate 90°', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
+  await page.getByRole('button', { name: 'Discard capture', exact: true }).click();
+  await expect(page.locator('.scanner-pages article')).toHaveCount(1);
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).replacementHarness.events.filter(
+          (event: any) => event.type === 'page-accepted',
+        ).length,
+    ),
+  ).toBe(1);
   const actions = page.getByRole('button', { name: 'Page 1: Page actions', exact: true });
   await actions.click();
   let picker = page.waitForEvent('filechooser');
@@ -440,7 +509,7 @@ test('accepted file replacement preserves ID and page position; corrupt or uncon
   await page.getByRole('button', { name: 'Finish', exact: true }).click();
   const finished = await result(page);
   expect(finished.pages).toHaveLength(1);
-  expect(finished.requests).toBe(0);
+  expect(finished.requests).toBe(1);
   expect(finished.pages[0]).toMatchObject({ id: original, revision: 2, source: 'file' });
   expect(finished.pages[0].original).toEqual(Array.from((await file(page, 1)).buffer));
 });
