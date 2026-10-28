@@ -9,6 +9,21 @@
   padding: calc(20px * var(--scanner-spacing, 1));
   box-sizing: border-box;
 }
+.scanner,
+.scanner-image-viewer {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+:is(.scanner, .scanner-image-viewer)
+  :is(input, textarea, select, [contenteditable]:not([contenteditable='false'])) {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+:is(.scanner, .scanner-image-viewer) :is(img, video) {
+  -webkit-user-drag: none;
+}
 .scanner {
   --scanner-background: #f4f6f2;
   --scanner-surface: #fff;

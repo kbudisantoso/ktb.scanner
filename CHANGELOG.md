@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- Suppress accidental text selection, touch callouts and native media dragging in scanner/viewer controls while preserving native form editing and image gestures.
 - Put replacement, direct discard and Add page below the review document with equally sized mobile actions; keep Undo visibly labelled.
 - Hide the session-close X inside editing tools and make Escape follow local cancellation and focus restoration.
 
