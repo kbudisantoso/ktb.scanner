@@ -1,24 +1,20 @@
 'use client';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { createTranslator, type ScanLocale } from '@ktb-tools/scanner';
+import { demoTitle } from './locale';
 
 const Context = createContext({ locale: 'en' as ScanLocale, setLocale: (_: ScanLocale) => {} });
-export function DemoLocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocale] = useState<ScanLocale>('en');
-  useEffect(() => {
-    const requested = new URL(location.href).searchParams.get('lang');
-    const preferred = navigator.languages?.[0] || navigator.language;
-    setLocale(
-      requested === 'en' || requested === 'de'
-        ? requested
-        : /^de(?:-|$)/i.test(preferred)
-          ? 'de'
-          : 'en',
-    );
-  }, []);
+export function DemoLocaleProvider({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode;
+  initialLocale: ScanLocale;
+}) {
+  const [locale, setLocale] = useState(initialLocale);
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = locale === 'de' ? 'Scanner Werkstatt' : 'Scanner workshop';
+    document.title = demoTitle(locale);
   }, [locale]);
   const changeLocale = (next: ScanLocale) => {
     setLocale(next);
