@@ -11,6 +11,7 @@
 
 ### Fixed
 
+- Avoid premature memory-limit errors when changing filters on large, nearly full-frame scans by planning the actual processing buffers within the existing resource limits.
 - Render the Next.js reference host in its selected language from the first HTML response, avoiding the brief English content after refresh.
 - Suppress accidental text selection, touch callouts and native media dragging in scanner/viewer controls while preserving native form editing and image gestures.
 - Put replacement, direct discard and Add page below the review document with equally sized mobile actions. Remove the extra Undo/Original row for more image space; retain Undo in the existing Cancel/Apply footer of the current editing tool, remove the extra Filter reset, center zoom in the shared scanner/result viewer, and keep the counted hints button at the bottom right of page review, disabled at 0. The corner editor still shows the complete original; held Before retains the unoptimized crop comparison.

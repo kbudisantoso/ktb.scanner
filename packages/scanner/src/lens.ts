@@ -181,7 +181,12 @@ export function lensMapping(size: Size, strength: number) {
     const factor = 2 / (1 + Math.sqrt(disc));
     return { x: cx + (ux - cx) * factor, y: cy + (uy - cy) * factor };
   };
-  return { forward, backward };
+  const corners = (quad: Quad): Quad =>
+    quad.map((p) => {
+      const u = forward({ x: p.x * (size.width - 1), y: p.y * (size.height - 1) });
+      return { x: u.x / (size.width - 1), y: u.y / (size.height - 1) };
+    }) as Quad;
+  return { forward, backward, corners };
 }
 
 export function correctLens(
@@ -211,9 +216,5 @@ export function correctLens(
             (1 - fy) +
           (data[(y1 * width + x0) * 4 + c] * (1 - fx) + data[(y1 * width + x1) * 4 + c] * fx) * fy;
     }
-  const corners = quad.map((p) => {
-    const u = map.forward({ x: p.x * (width - 1), y: p.y * (height - 1) });
-    return { x: u.x / (width - 1), y: u.y / (height - 1) };
-  }) as Quad;
-  return { data: out, corners };
+  return { data: out, corners: map.corners(quad) };
 }
