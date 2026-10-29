@@ -15,7 +15,6 @@ import { imageHeader } from './image-header.ts';
 import {
   validQuad,
   limitedSize,
-  cropSize,
   area,
   rectifiedSize,
   suggestFormat,
@@ -31,6 +30,7 @@ import { correctLens, estimateLens } from './lens.ts';
 import { grayscale, blackAndWhite } from './color-profiles.ts';
 import { WorkerTrace } from './diagnostics.worker.ts';
 import { ScannerError } from './errors.ts';
+import { sourceMemoryPeak, planProcessingMemory } from './processing-memory.ts';
 const worker = globalThis as unknown as {
   onmessage: (event: MessageEvent) => void;
   postMessage: (message: unknown) => void;
@@ -120,8 +120,16 @@ async function process(
   includeEngineBuffers = engineBuffers,
 ): Promise<ProcessingResult> {
   const { original, limits } = request;
+  const canvases = new Set<OffscreenCanvas>();
+  const own = (canvas: OffscreenCanvas) => {
+    canvases.add(canvas);
+    return canvas;
+  };
+  let sourcePixels: ImageData | undefined;
+  let sourceData: ImageData | undefined;
+  let extracted: Awaited<ReturnType<typeof extractDocument>> | undefined;
   const render = (image: ImageData, format: NonNullable<ProcessRequest['format']>) => {
-    const input = new OffscreenCanvas(image.width, image.height);
+    const input = own(new OffscreenCanvas(image.width, image.height));
     input.getContext('2d')!.putImageData(image, 0, 0);
     const bounded = limitedSize(
       rectifiedSize(input, format),
@@ -129,9 +137,11 @@ async function process(
       limits.outputDimension,
     );
     const quarter = request.rotation === 90 || request.rotation === 270;
-    const result = new OffscreenCanvas(
-      quarter ? bounded.height : bounded.width,
-      quarter ? bounded.width : bounded.height,
+    const result = own(
+      new OffscreenCanvas(
+        quarter ? bounded.height : bounded.width,
+        quarter ? bounded.width : bounded.height,
+      ),
     );
     const ctx = result.getContext('2d')!;
     ctx.fillStyle = '#fff';
@@ -152,23 +162,19 @@ async function process(
   if (original.size > limits.fileBytes)
     throw new ScannerError('LIMIT_EXCEEDED', 'Die Bilddatei ist zu groß.');
   const header = imageHeader(new Uint8Array(await original.arrayBuffer()));
-  const paperFieldBytes = ['auto', 'paper', 'grayscale'].includes(request.recipe.enhancement)
-    ? 4 * 1024 * 1024
-    : 0;
-  if (
-    header.width < 2 ||
-    header.height < 2 ||
-    header.width * header.height > limits.inputPixels ||
-    header.width * header.height * (request.recipe.dewarp === 'off' ? 8 : 12) +
-      limits.outputPixels *
-        (request.recipe.enhancement === 'bw' ? 32 : request.recipe.dewarp === 'off' ? 24 : 28) +
-      paperFieldBytes >
-      limits.workingBytes
-  )
+  const checkMemory = (bytes: number) => {
+    if (!Number.isFinite(bytes) || bytes > limits.workingBytes)
+      throw new ScannerError(
+        'LIMIT_EXCEEDED',
+        'Das Bild überschreitet das Pixel- oder Arbeitsspeicherlimit.',
+      );
+  };
+  if (header.width < 2 || header.height < 2 || header.width * header.height > limits.inputPixels)
     throw new ScannerError(
       'LIMIT_EXCEEDED',
       'Das Bild überschreitet das Pixel- oder Arbeitsspeicherlimit.',
     );
+  checkMemory(sourceMemoryPeak(header, { engineBuffers, trace: !!trace }));
   const bitmap = await createImageBitmap(new Blob([original], { type: header.mime }), {
     imageOrientation: 'from-image',
   });
@@ -179,6 +185,7 @@ async function process(
     if (bitmap.width * bitmap.height > limits.inputPixels)
       throw new ScannerError('LIMIT_EXCEEDED', 'Zu viele dekodierte Bildpunkte.');
     const size = { width: bitmap.width, height: bitmap.height };
+    checkMemory(sourceMemoryPeak(size, { engineBuffers, trace: !!trace }));
     // A comparable live hint may seed manual correction, never automatic still geometry.
     const editorHint =
       request.captureHint?.stable === true &&
@@ -199,11 +206,13 @@ async function process(
       trace?.event('crop-required', { reason, size, corners });
       return { status: 'crop-required', reason, size, corners };
     };
-    source = canvasFor(bitmap);
+    source = own(canvasFor(bitmap));
     bitmap.close();
     await trace?.image('normalized-original', source, 'orientation-normalized-original');
-    const small = canvasFor(source, 1000),
-      data = small.getContext('2d')!.getImageData(0, 0, small.width, small.height);
+    const small = own(canvasFor(source, 1000));
+    let data: ImageData | undefined = small
+      .getContext('2d')!
+      .getImageData(0, 0, small.width, small.height);
     await trace?.image('detection-input', small, 'orientation-normalized-original');
     let stillDetected = !!request.corners;
     let corners = request.corners,
@@ -211,14 +220,13 @@ async function process(
     if (!corners) {
       const detection = createDetectionJob();
       const pool: DocumentCandidate[] = [];
-      let sourcePixels: ImageData | undefined;
       const getPixels = () =>
         (sourcePixels ??= source!
           .getContext('2d')!
           .getImageData(0, 0, source!.width, source!.height));
       for (const bound of [1000, 800]) {
         if (bound === 800 && Math.max(small.width, small.height) <= 800) continue;
-        const pass = bound === 1000 ? small : canvasFor(source, bound);
+        const pass = bound === 1000 ? small : own(canvasFor(source, bound));
         try {
           const passData =
             bound === 1000
@@ -272,9 +280,11 @@ async function process(
           const theta = (degrees * Math.PI) / 180,
             c = Math.cos(theta),
             s = Math.sin(theta);
-          const rotated = new OffscreenCanvas(
-            Math.ceil(Math.abs(small.width * c) + Math.abs(small.height * s)),
-            Math.ceil(Math.abs(small.width * s) + Math.abs(small.height * c)),
+          const rotated = own(
+            new OffscreenCanvas(
+              Math.ceil(Math.abs(small.width * c) + Math.abs(small.height * s)),
+              Math.ceil(Math.abs(small.width * s) + Math.abs(small.height * c)),
+            ),
           );
           const context = rotated.getContext('2d')!;
           context.fillStyle = '#777';
@@ -350,6 +360,7 @@ async function process(
         return requireCrop('not-detected');
       }
     }
+    sourcePixels = undefined;
     if (!validQuad(corners))
       throw new ScannerError('CORNERS_INVALID', 'Bitte vier gültige Dokumentecken setzen.');
     if (
@@ -395,20 +406,6 @@ async function process(
       quality.reasons.push('edges');
       if (quality.assessment !== 'unknown') quality.assessment = 'review-advised';
     }
-    const desired = limitedSize(
-      cropSize(corners, size),
-      limits.outputPixels,
-      limits.outputDimension,
-    );
-    const crop = cropSize(corners, size),
-      scale = Math.min(1, desired.width / crop.width, desired.height / crop.height);
-    const working = new OffscreenCanvas(
-      Math.max(2, Math.floor(size.width * scale)),
-      Math.max(2, Math.floor(size.height * scale)),
-    );
-    working.getContext('2d')!.drawImage(source, 0, 0, working.width, working.height);
-    source.width = source.height = 1;
-    let sourceData = working.getContext('2d')!.getImageData(0, 0, working.width, working.height);
     const lensCorrection =
       request.recipe.dewarp === 'auto'
         ? estimateLens(data, corners)
@@ -420,11 +417,28 @@ async function process(
             strength: request.recipe.dewarp === 'manual' ? request.recipe.lensStrength! : 0,
             supportedEdges: 0,
           };
+    const plan = planProcessingMemory({
+      source: size,
+      corners,
+      format,
+      recipe: request.recipe,
+      limits,
+      lensCorrection,
+      previewComparison: request.previewComparison,
+    });
+    checkMemory(plan.peakBytes);
+    small.width = small.height = 1;
+    data = undefined;
+    sourcePixels = undefined;
+    const working = own(new OffscreenCanvas(plan.workingSize.width, plan.workingSize.height));
+    working.getContext('2d')!.drawImage(source, 0, 0, working.width, working.height);
+    source.width = source.height = 1;
+    sourceData = working.getContext('2d')!.getImageData(0, 0, working.width, working.height);
     let extractionCorners = corners;
     let unoptimizedPreview: Blob | undefined;
     if (lensCorrection.status === 'applied') {
       if (request.previewComparison !== false) {
-        const base = await extractDocument(
+        let base: Awaited<ReturnType<typeof extractDocument>> | undefined = await extractDocument(
           sourceData,
           pixels(corners, working.width, working.height),
           { output: 'imagedata' },
@@ -435,8 +449,10 @@ async function process(
             'Der Vergleichszuschnitt konnte nicht erstellt werden.',
           );
         const baseline = render(base.output, format);
+        base = undefined;
         unoptimizedPreview = await baseline.convertToBlob({ type: request.mime, quality: 0.92 });
         baseline.width = baseline.height = 1;
+        checkMemory(plan.processingBytes + unoptimizedPreview.size);
       }
       const corrected = correctLens(sourceData, corners, lensCorrection.strength);
       sourceData = new ImageData(
@@ -450,11 +466,13 @@ async function process(
           'CORNERS_INVALID',
           'Die Linsenentzerrung ergibt keinen gültigen Zuschnitt. Bitte Stärke reduzieren.',
         );
-      working.getContext('2d')!.putImageData(sourceData, 0, 0);
-      await trace?.image('lens-corrected', working, 'lens-corrected-source');
+      if (trace) {
+        working.getContext('2d')!.putImageData(sourceData, 0, 0);
+        await trace.image('lens-corrected', working, 'lens-corrected-source');
+      }
     }
     trace?.event('lens-correction', { ...lensCorrection });
-    const extracted = await extractDocument(
+    extracted = await extractDocument(
       sourceData,
       pixels(extractionCorners, working.width, working.height),
       { output: 'imagedata' },
@@ -465,11 +483,16 @@ async function process(
         'Die Perspektivkorrektur ist fehlgeschlagen. Bitte Ecken prüfen.',
       );
     trace?.event('quality', { ...quality });
-    const corrected = new OffscreenCanvas(extracted.output.width, extracted.output.height);
-    corrected.getContext('2d')!.putImageData(extracted.output, 0, 0);
-    await trace?.image('perspective-corrected', corrected, 'unconstrained-rectified-document');
-    corrected.width = corrected.height = 1;
+    sourceData = undefined;
+    working.width = working.height = 1;
+    if (trace) {
+      const corrected = own(new OffscreenCanvas(extracted.output.width, extracted.output.height));
+      corrected.getContext('2d')!.putImageData(extracted.output, 0, 0);
+      await trace.image('perspective-corrected', corrected, 'unconstrained-rectified-document');
+      corrected.width = corrected.height = 1;
+    }
     output = render(extracted.output, format);
+    extracted = undefined;
     const ctx = output.getContext('2d')!;
     await trace?.image('format-and-rotation', output, 'output-image');
     if (
@@ -479,6 +502,7 @@ async function process(
         Object.values(request.recipe.adjustments ?? {}).some(Boolean))
     ) {
       unoptimizedPreview = await output.convertToBlob({ type: request.mime, quality: 0.92 });
+      checkMemory(plan.processingBytes + unoptimizedPreview.size);
     }
     let autoOptimization: AutoOptimization | undefined;
     if (request.recipe.enhancement === 'auto') {
@@ -536,7 +560,7 @@ async function process(
     if (autoOptimization) trace?.event('auto-optimization', { ...autoOptimization });
     await trace?.image('enhanced', output, 'output-image');
     const preview = await output.convertToBlob({ type: request.mime, quality: 0.92 });
-    thumbnailCanvas = canvasFor(output, 256);
+    thumbnailCanvas = own(canvasFor(output, 256));
     const thumbnail = await thumbnailCanvas.convertToBlob({ type: 'image/jpeg', quality: 0.8 });
     if (
       preview.type !== request.mime ||
@@ -578,9 +602,10 @@ async function process(
     };
   } finally {
     bitmap.close();
-    if (source) source.width = source.height = 1;
-    if (output) output.width = output.height = 1;
-    if (thumbnailCanvas) thumbnailCanvas.width = thumbnailCanvas.height = 1;
+    sourcePixels = sourceData = undefined;
+    extracted = undefined;
+    for (const canvas of canvases) canvas.width = canvas.height = 1;
+    canvases.clear();
   }
 }
 worker.onmessage = async ({ data }) => {

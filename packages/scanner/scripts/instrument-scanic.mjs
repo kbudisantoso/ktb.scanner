@@ -2,6 +2,14 @@
 export function instrumentScanic(source) {
   const replacements = [
     [
+      'a=O(t,o),s=a.getContext("2d"),r=[[g.x,g.y],[B.x,B.y],[Q.x,Q.y],[C.x,C.y]];return{canvas:a,imageData:uA(s,A,wA(r,[[0,0],[t-1,0],[t-1,o-1],[0,o-1]]),t,o,r)}}',
+      'a=O(t,o);try{const s=a.getContext("2d"),r=[[g.x,g.y],[B.x,B.y],[Q.x,Q.y],[C.x,C.y]];return{canvas:a,imageData:uA(s,A,wA(r,[[0,0],[t-1,0],[t-1,o-1],[0,o-1]]),t,o,r)}}catch(error){a.width=a.height=1;throw error}}',
+    ],
+    [
+      'try{const{canvas:g,imageData:Q}=dA(A,I);return{output:await z(g,Q,B),corners:I,success:!0,message:"Document extracted successfully"}}catch(Q){return{output:null,corners:I,success:!1,message:`Extraction failed: ${Q.message}`}}}',
+      'let extractionCanvas,completed=!1;try{const{canvas:g,imageData:Q}=dA(A,I);extractionCanvas=g;const output=await z(g,Q,B);completed=!0;return{output,corners:I,success:!0,message:"Document extracted successfully"}}catch(Q){return{output:null,corners:I,success:!1,message:`Extraction failed: ${Q.message}`}}finally{if(extractionCanvas&&(B==="imagedata"||!completed))extractionCanvas.width=extractionCanvas.height=1}}',
+    ],
+    [
       'const h=r.corners,l=r.contour;let y=h;',
       'typeof Q.selectCandidate==="function"&&C&&!C._timingsOnly&&(C.selectedCandidate=Object.fromEntries(Object.keys(C.selectedCandidate||{}).map(A=>[A,r[A]])),C.selectedCandidate.corners=r.corners);const h=r.corners,l=r.contour;let y=h;',
     ],
@@ -30,7 +38,7 @@ export function instrumentScanic(source) {
     source = source.replace(needle, replacement);
   }
   return (
-    '// Local adaptation: optional document selection callback and opt-in diagnostic buffers.\n' +
+    '// Local adaptation: document selection, diagnostic buffers and extraction-canvas cleanup.\n' +
     source
   );
 }

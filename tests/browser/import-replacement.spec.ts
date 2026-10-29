@@ -15,7 +15,8 @@ test.beforeAll(async () => {
         import {Scanner,createScanner} from './packages/scanner/dist/react/index.js';
         import {createScanicAdapter} from './packages/scanner/dist/scanic.js';
         import {resolveLimits} from './packages/scanner/dist/index.js';
-        window.replacementHarness={React,StrictMode,createRoot,Scanner,createScanner,createScanicAdapter,resolveLimits,
+        import {sourceMemoryPeak} from './packages/scanner/src/processing-memory.ts';
+        window.replacementHarness={React,StrictMode,createRoot,Scanner,createScanner,createScanicAdapter,resolveLimits,sourceMemoryPeak,
           results:[],events:[],errors:[],requests:0,jobs:[],workers:new Set(),urls:new Set()};`,
     },
     bundle: true,
@@ -119,8 +120,7 @@ test.beforeEach(async ({ page }) => {
       h.abort = new AbortController();
       let limits;
       if (budget === 'originalBytes') limits = { originalBytes: h.files[0].size * 2 - 1 };
-      if (budget === 'workingBytes') limits = { workingBytes: 1000 * 1300 * 8 + 8_000_000 * 24 };
-      if (budget === 'resultBytes') {
+      if (budget === 'workingBytes' || budget === 'resultBytes') {
         const engine = h.createScanicAdapter('/scanner-assets/');
         try {
           const result = await engine.process({
@@ -131,13 +131,17 @@ test.beforeEach(async ({ page }) => {
             revision: 1,
             mime: 'image/jpeg',
           });
-          limits = {
-            resultBytes:
-              result.preview.size +
-              result.thumbnail.size +
-              (result.unoptimizedPreview?.size ?? 0) +
-              1,
-          };
+          const previewBytes =
+            result.preview.size + result.thumbnail.size + (result.unoptimizedPreview?.size ?? 0);
+          // Initial processing fits; retaining the rollback candidate crosses the same guard.
+          limits =
+            budget === 'workingBytes'
+              ? {
+                  workingBytes:
+                    h.sourceMemoryPeak(result.size, { trace: true }) +
+                    Math.floor((h.files[0].size + previewBytes) / 2),
+                }
+              : { resultBytes: previewBytes + 1 };
         } finally {
           engine.destroy();
         }

@@ -103,25 +103,45 @@ test('visible automatic optimization, manual controls, reset and export keep the
   const applied = await hash(),
     appliedPreview = await preview.getAttribute('src');
   expect(applied).not.toBe(neutral);
-  await page.evaluate(() => {
-    const post = Worker.prototype.postMessage;
-    Worker.prototype.postMessage = function (this: Worker, message: any, transfer?: any) {
-      if (message.kind === 'process') {
-        Worker.prototype.postMessage = post;
-        throw new Error('Synthetic slider reset failure');
-      }
-      post.call(this, message, transfer ?? []);
-    };
-  });
-  await activateReset(pendingReset);
-  await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
-    'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.',
-  );
-  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
-  await expect(pendingRange).toHaveValue('100');
-  await expect(pendingReset).toBeEnabled();
-  await expect(preview).toHaveAttribute('src', appliedPreview!);
-  expect(await hash()).toBe(applied);
+  for (const failure of ['post-message', 'working-budget']) {
+    await page.evaluate((failure) => {
+      const post = Worker.prototype.postMessage;
+      Worker.prototype.postMessage = function (this: Worker, message: any, transfer?: any) {
+        if (message.kind === 'process') {
+          Worker.prototype.postMessage = post;
+          if (failure === 'post-message') throw new Error('Synthetic slider reset failure');
+          const observe = ({ data }: MessageEvent) => {
+            if (data.id !== message.id || data.diagnostic) return;
+            (window as any).resetGuardCode = data.error?.code;
+            this.removeEventListener('message', observe);
+          };
+          this.addEventListener('message', observe);
+          message = {
+            ...message,
+            request: {
+              ...message.request,
+              limits: { ...message.request.limits, workingBytes: 1024 ** 2 },
+            },
+          };
+        }
+        post.call(this, message, transfer ?? []);
+      };
+    }, failure);
+    await activateReset(pendingReset);
+    const alert = page.getByRole('dialog').getByRole('alert');
+    await expect(alert).toBeVisible();
+    if (failure === 'post-message')
+      await expect(alert).toHaveText('Verarbeitung fehlgeschlagen. Bitte erneut versuchen.');
+    else
+      await expect
+        .poll(() => page.evaluate(() => (window as any).resetGuardCode))
+        .toBe('LIMIT_EXCEEDED');
+    await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
+    await expect(pendingRange).toHaveValue('100');
+    await expect(pendingReset).toBeEnabled();
+    await expect(preview).toHaveAttribute('src', appliedPreview!);
+    expect(await hash()).toBe(applied);
+  }
   await action(() => activateReset(pendingReset));
   await expect(pendingRange).toHaveValue('0');
   await expect(pendingReset).toBeDisabled();
@@ -354,3 +374,171 @@ test('real worker straightens a radial grid and retains the truly unoptimized cr
   expect(result.exportHasBase).toBe(false);
   expect(result.sourceCornersMatch).toBe(true);
 });
+
+test(
+  '12 MP filters preserve full output with a simulated retention reserve and recover after rejection',
+  {
+    tag: '@worker-only',
+  },
+  async ({ page }) => {
+    test.setTimeout(180_000);
+    await page.goto('/');
+    const results = await page.evaluate(async (defaults) => {
+      const worker = new Worker('/scanner-assets/processing.worker.js', { type: 'module' });
+      let id = 0;
+      const run = (request: any): Promise<any> =>
+        new Promise((resolve, reject) => {
+          const job = ++id;
+          worker.onmessage = ({ data }) => {
+            if (data.id === job && !data.diagnostic) resolve(data);
+          };
+          worker.onerror = reject;
+          worker.postMessage({ id: job, kind: 'process', request });
+        });
+      const sha = async (bytes: ArrayBuffer) =>
+        Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).join(',');
+      const fingerprint = async (result: any) => {
+        const bitmap = await createImageBitmap(result.preview);
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        try {
+          const context = canvas.getContext('2d')!;
+          context.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return {
+            size: result.size,
+            outputSize: result.outputSize,
+            decodedSize: { width: canvas.width, height: canvas.height },
+            corners: result.corners,
+            format: result.format,
+            lens: result.lensCorrection,
+            auto: result.autoOptimization,
+            pixels: await sha(context.getImageData(0, 0, canvas.width, canvas.height).data.buffer),
+            bytes: await sha(await result.preview.arrayBuffer()),
+            comparison: result.unoptimizedPreview
+              ? await sha(await result.unoptimizedPreview.arrayBuffer())
+              : null,
+          };
+        } finally {
+          bitmap.close();
+          canvas.width = canvas.height = 1;
+        }
+      };
+      const records = [];
+      let retryRequest: any;
+      try {
+        for (const { width, height, crop, left, top, right, bottom, enhancements } of [
+          {
+            width: 4096,
+            height: 3072,
+            crop: 'nearly-full',
+            left: 0.01,
+            top: 0.01,
+            right: 0.99,
+            bottom: 0.99,
+            enhancements: ['auto', 'bw', 'none'],
+          },
+          {
+            width: 4032,
+            height: 3024,
+            crop: 'small',
+            left: 0.3,
+            top: 0.25,
+            right: 0.7,
+            bottom: 0.75,
+            enhancements: ['bw'],
+          },
+        ]) {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext('2d')!;
+          const background = context.createLinearGradient(0, 0, width, height);
+          background.addColorStop(0, '#aaaaaa');
+          background.addColorStop(1, '#eeeeee');
+          context.fillStyle = background;
+          context.fillRect(0, 0, width, height);
+          context.fillStyle = '#303030';
+          context.font = '48px monospace';
+          for (let y = 180; y < height - 160; y += 130)
+            context.fillText('SYNTHETIC 0123456789 12,34 EUR', 140, y);
+          context.fillStyle = '#b52a45';
+          context.fillRect(width * 0.7, height * 0.7, 110, 65);
+          const original = await new Promise<Blob>((resolve) =>
+            canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.92),
+          );
+          canvas.width = canvas.height = 1;
+          const base = {
+            original,
+            corners: [
+              { x: left, y: top },
+              { x: right, y: top },
+              { x: right, y: bottom },
+              { x: left, y: bottom },
+            ],
+            rotation: 0,
+            revision: 1,
+            mime: 'image/jpeg',
+            format: { kind: 'original-ratio', origin: 'user' },
+            previewComparison: true,
+          };
+          const samples = [];
+          for (const workingBytes of [defaults.workingBytes - 16 * 1024 ** 2, 512 * 1024 ** 2]) {
+            let adjustments;
+            const profiles = [];
+            for (const enhancement of enhancements) {
+              const request = {
+                ...base,
+                limits: { ...defaults, workingBytes },
+                recipe: { version: 1, enhancement, dewarp: 'auto', adjustments },
+              };
+              const response = await run(request);
+              if (response.error)
+                throw new Error(
+                  `${width}x${height}/${crop}/${enhancement}: ${response.error.code}`,
+                );
+              if (enhancement !== 'none' && !(response.result.unoptimizedPreview instanceof Blob))
+                throw new Error(`${width}x${height}/${crop}/${enhancement}: missing Before image`);
+              if (enhancement === 'auto')
+                adjustments = response.result.autoOptimization?.adjustments;
+              profiles.push(await fingerprint(response.result));
+              if (workingBytes < defaults.workingBytes && enhancement === 'none')
+                retryRequest = request;
+            }
+            samples.push(profiles);
+          }
+          records.push({ width, height, crop, samples });
+        }
+        const rejected = await run({
+          ...retryRequest,
+          limits: { ...defaults, workingBytes: 1024 ** 2 },
+          recipe: { ...retryRequest.recipe, enhancement: 'bw' },
+        });
+        const recovered = await run(retryRequest);
+        if (recovered.error) throw new Error(`Worker did not recover: ${recovered.error.code}`);
+        return {
+          records,
+          rejection: rejected.error?.code,
+          recovered: await fingerprint(recovered.result),
+        };
+      } finally {
+        worker.terminate();
+      }
+    }, DEFAULT_LIMITS);
+    expect(results.records).toHaveLength(2);
+    for (const result of results.records) {
+      const [reservedBudget, higherBudget] = result.samples;
+      expect(reservedBudget).toEqual(higherBudget);
+      for (const output of reservedBudget) {
+        expect(output.size).toEqual({ width: result.width, height: result.height });
+        expect(output.decodedSize).toEqual(output.outputSize);
+        const pixels = output.outputSize.width * output.outputSize.height;
+        expect(pixels).toBeLessThanOrEqual(DEFAULT_LIMITS.outputPixels);
+        expect(pixels).toBeGreaterThan(result.crop === 'nearly-full' ? 7_900_000 : 2_000_000);
+        expect(output.corners).toEqual(higherBudget[0].corners);
+        expect(output.lens.status).not.toBe('off');
+      }
+    }
+    expect(results.rejection).toBe('LIMIT_EXCEEDED');
+    expect(results.recovered).toEqual(results.records[0].samples[0][2]);
+  },
+);

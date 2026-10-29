@@ -63,7 +63,7 @@ Updated 28 October 2026. These decisions resolve the initial product scope. The 
 
 ## Output and resource defaults
 
-20 pages, 20 MiB/file, 24 MP decoded input, 100 MiB original bytes, 8 MP/4,096 px output with no upscaling, 128 MiB results and 384 MiB estimated working buffers. One high-resolution page at a time. The working estimate is not browser RSS. Recipe undo holds at most twelve edit records.
+20 pages, 20 MiB/file, 24 MP decoded input, 100 MiB original bytes, 8 MP/4,096 px output with no upscaling, 128 MiB results and 384 MiB estimated working buffers. One high-resolution page at a time. Estimate the peak of successive phases from actual source, crop, lens correction and intermediate/output dimensions, preserving retained-resource accounting. Keep the working limit and output quality unchanged; do not reject a filter solely for a hypothetical maximum-size output or silently reduce resolution to pass. The working estimate is not a RAM reservation, browser RSS or available-memory measurement. Recipe undo holds at most twelve edit records.
 
 A3/A4/A5/A6 are ratio-ambiguous; A4 is the group default. Letter, postcard 100 x 150 mm, original ratio and receipts are available. Receipt widths are 58/80/112 mm or custom, with an explicit 80 mm default. Original ratio assumes 210 mm short side for printing. PDF axes must be 10..5,000 mm. Standard layouts rectify the full crop and fill the page; receipts/original ratio remain proportional. Layout values are not physical measurements.
 
