@@ -236,7 +236,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: calc(16px * var(--scanner-spacing, 1));
 }
-.scanner-range > span {
+.scanner-range > label {
   display: flex;
   justify-content: space-between;
   gap: calc(12px * var(--scanner-spacing, 1));
@@ -1029,6 +1029,30 @@
 .scanner-zoom-controls button:nth-child(2) {
   min-width: 60px;
 }
+.scanner-review-viewer .scanner-viewer-controls {
+  display: grid;
+  grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
+}
+.scanner-review-viewer .scanner-before-control {
+  grid-column: 1;
+  justify-self: start;
+}
+.scanner-review-viewer .scanner-zoom-controls {
+  grid-column: 2;
+  justify-self: center;
+  margin-left: 0;
+}
+.scanner-review-viewer .scanner-hints {
+  grid-column: 3;
+  justify-self: end;
+  width: 44px;
+  gap: calc(2px * var(--scanner-spacing, 1));
+  padding: calc(4px * var(--scanner-spacing, 1));
+}
+.scanner-review-viewer .scanner-hints svg {
+  width: 18px;
+  height: 18px;
+}
 .scanner-image-viewer :focus-visible {
   outline: 3px solid var(--scanner-focus, #995515);
   outline-offset: -3px;
@@ -1046,14 +1070,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: calc(4px * var(--scanner-spacing, 1));
 }
-.scanner-review-utility {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: calc(4px * var(--scanner-spacing, 1));
-}
-.scanner-review-quick button,
-.scanner-review-utility button {
+.scanner-review-quick button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1150,11 +1167,6 @@
   color: var(--scanner-accent);
   box-shadow: inset 0 0 0 1px var(--scanner-accent);
 }
-.scanner-workspace button.scanner-reset-edit {
-  width: 100%;
-  font-size: 12px;
-  margin-top: calc(4px * var(--scanner-spacing, 1));
-}
 .scanner-workspace .scanner-image-controls {
   border: 0;
   padding: 0;
@@ -1176,17 +1188,36 @@
 }
 .scanner-workspace .scanner-range {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr);
+  grid-template-columns: 90px minmax(0, 1fr) 44px;
   align-items: center;
   gap: calc(8px * var(--scanner-spacing, 1));
   margin: calc(4px * var(--scanner-spacing, 1)) 0;
 }
-.scanner-workspace .scanner-range > span {
+.scanner-workspace .scanner-range > label {
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 0;
   gap: calc(4px * var(--scanner-spacing, 1));
   font-size: 12px;
 }
-.scanner-workspace .scanner-lens-modes {
+.scanner-lens-row {
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--scanner-spacing, 1));
   margin-top: calc(6px * var(--scanner-spacing, 1));
+}
+.scanner-lens-row .scanner-lens-modes {
+  flex: 1;
+  min-width: 0;
+}
+.scanner-workspace .scanner-reset-control {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: calc(8px * var(--scanner-spacing, 1));
+  flex: none;
 }
 .scanner-workspace .scanner-lens-modes button {
   flex-direction: column;
@@ -1249,9 +1280,6 @@
 .scanner.scanner-workspace > .scanner-detail-footer {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-.scanner.scanner-workspace > .scanner-detail-footer {
-  grid-template-columns: 1fr 1fr;
 }
 .scanner-detail-footer > button:only-child {
   grid-column: 1 / -1;

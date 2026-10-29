@@ -1,5 +1,5 @@
 import { chooseCaptureWorkflow } from './helpers';
-import { closeAppPanel, openOptions } from './helpers';
+import { closeAppPanel, openOptions, readCornerOriginal } from './helpers';
 import { diagnostics } from './helpers';
 import { test, expect } from './fixtures';
 import { execFileSync } from 'node:child_process';
@@ -89,16 +89,10 @@ test('manual capture uses a full synthetic video frame and releases its tracks',
   await page.getByRole('button', { name: 'Zurück zum Import', exact: true }).click();
   await expect(repeat).toBeFocused();
   expect(await preview()).toEqual(before);
-  await page.getByRole('button', { name: 'Original vergleichen' }).click();
-  await expect
-    .poll(() =>
-      page
-        .getByRole('img', { name: 'Originalaufnahme' })
-        .evaluate((img: HTMLImageElement) => [img.naturalWidth, img.naturalHeight]),
-    )
-    .toEqual([1280, 960]);
+  const original = await readCornerOriginal(page);
+  expect([original.width, original.height]).toEqual([1280, 960]);
   expect(await page.evaluate(() => (window as any).cameraTest.stops)).toBeGreaterThan(0);
-  await page.getByRole('button', { name: 'OK', exact: true }).click();
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
   await page.getByRole('button', { name: /^Seitenübersicht/ }).click();
   await page.getByRole('button', { name: 'Seite 1: Bearbeiten', exact: true }).click();
   await repeat.click();

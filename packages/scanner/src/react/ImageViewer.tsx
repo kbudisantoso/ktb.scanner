@@ -15,6 +15,12 @@ export interface ImageViewerProps {
   /** Optional page gesture, only at fit with one pointer and without held Before. */
   onPageSwipe?: (direction: 'previous' | 'next') => void;
 }
+type ReviewHints = {
+  count: number;
+  disabled: boolean;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  open: () => void;
+};
 type Point = { x: number; y: number };
 type View = { scale: number; x: number; y: number; fit: boolean };
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -27,9 +33,10 @@ export function ImageViewer(props: ImageViewerProps) {
 /** SDK review only; the package entry deliberately does not export this variant. */
 export function ReviewImageViewer({
   motion,
+  hints,
   ...props
-}: ImageViewerProps & { motion: ReviewMotionOptions }) {
-  return <ImageViewerImpl {...props} review={motion} />;
+}: ImageViewerProps & { motion: ReviewMotionOptions; hints?: ReviewHints }) {
+  return <ImageViewerImpl {...props} review={motion} reviewHints={hints} />;
 }
 
 function ImageViewerImpl({
@@ -42,7 +49,8 @@ function ImageViewerImpl({
   className = '',
   onPageSwipe,
   review,
-}: ImageViewerProps & { review?: ReviewMotionOptions }) {
+  reviewHints,
+}: ImageViewerProps & { review?: ReviewMotionOptions; reviewHints?: ReviewHints }) {
   const t = createTranslator(locale, texts);
   const [held, setHeld] = useState(false);
   const ordinaryUrl = useBlobUrl(review ? undefined : image),
@@ -204,7 +212,10 @@ function ImageViewerImpl({
     else if (pageDirection) swipeHandler.current?.(pageDirection);
   };
   return (
-    <div className={`scanner-image-viewer ${className}`} lang={locale ?? 'en'}>
+    <div
+      className={`scanner-image-viewer${review ? ' scanner-review-viewer' : ''} ${className}`}
+      lang={locale ?? 'en'}
+    >
       <div
         ref={surface}
         className="scanner-image-surface"
@@ -434,6 +445,20 @@ function ImageViewerImpl({
             <ToolIcon name="zoom-in" />
           </button>
         </div>
+        {!!reviewHints?.count && (
+          <button
+            ref={reviewHints.buttonRef}
+            className="scanner-hints"
+            disabled={reviewHints.disabled}
+            data-review-tool="quality"
+            aria-label={`${t('Hinweise')}: ${reviewHints.count}`}
+            title={t('Hinweise')}
+            onClick={reviewHints.open}
+          >
+            <ToolIcon name="info" />
+            <span>{reviewHints.count}</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
 import { build } from 'esbuild';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
+import { expectReviewControls, expectRangeReset } from './helpers';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -140,8 +141,23 @@ for (const [width, height] of [
       buffer: Buffer.from(data.split(',')[1], 'base64'),
     });
     await expect(page.getByRole('img', { name: 'Edited page', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Compare original', exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toHaveCount(0);
+    await expectReviewControls(page);
     for (const panel of [undefined, 'Filter', 'Adjust', 'Format']) {
       if (panel) await page.getByRole('button', { name: panel, exact: true }).click();
+      if (panel === 'Filter')
+        await expect(
+          page.getByRole('button', { name: 'Reset optimization', exact: true }),
+        ).toHaveCount(0);
+      if (panel === 'Adjust') {
+        await expectRangeReset(page, 'Brightness', 'Reset brightness');
+        await expect(
+          page.getByRole('button', { name: 'Reset brightness', exact: true }),
+        ).toBeDisabled();
+      }
       const issues = await page.locator('.scanner').evaluate((root) => {
         const issues: string[] = [];
         for (const target of root.querySelectorAll<HTMLElement>(

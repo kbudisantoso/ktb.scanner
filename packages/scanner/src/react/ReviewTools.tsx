@@ -3,17 +3,15 @@ import type { PageDraft, Rotation, FormatSelection } from '../types.ts';
 import type { Translate } from './hooks.ts';
 import { PAPER, cropSize, layoutMm } from '../geometry.ts';
 import { SCAN_PROFILES } from '../profiles.ts';
-import { NEUTRAL_ADJUSTMENTS } from '../adjustments.ts';
 import { ImageControls } from './ImageControls.tsx';
 import { ToolIcon } from './ToolIcon.tsx';
 
-export type ReviewPanel = 'filter' | 'adjust' | 'format' | 'quality' | 'original';
+export type ReviewPanel = 'filter' | 'adjust' | 'format' | 'quality';
 export const REVIEW_TITLES = {
   filter: 'Filter',
   adjust: 'Anpassen',
   format: 'Format',
   quality: 'Hinweise',
-  original: 'Original',
 };
 export function ReviewTools({
   draft,
@@ -24,8 +22,6 @@ export function ReviewTools({
   corners,
   panel,
   setPanel,
-  undo,
-  canUndo,
   discard,
   repeat,
   add,
@@ -38,8 +34,6 @@ export function ReviewTools({
   corners: () => void;
   panel: ReviewPanel | null;
   setPanel: (panel: ReviewPanel | null) => void;
-  undo: () => void;
-  canUndo: boolean;
   discard: () => void;
   repeat: (trigger: HTMLButtonElement) => void;
   add: () => void;
@@ -58,7 +52,6 @@ export function ReviewTools({
   const recipe = (value: PageDraft['recipe']) => change({ recipe: value });
   const automatic = () => recipe({ version: 1, enhancement: 'auto', dewarp: 'auto' });
   const reasons = draft.quality.reasons.filter((r) => r !== 'edges');
-  const count = reasons.length + Number(!!draft.edgesUncertain);
   const format = (value: string) => {
     const selected: FormatSelection =
       value === 'receipt'
@@ -107,30 +100,6 @@ export function ReviewTools({
             >
               <ToolIcon name="plus" />
             </button>
-          </div>
-          <div className="scanner-review-utility">
-            <button disabled={busy || !canUndo} onClick={undo}>
-              {t('Rückgängig')}
-            </button>
-            <button
-              disabled={busy}
-              data-review-tool="original"
-              aria-label={t('Original vergleichen')}
-              onClick={() => open('original')}
-            >
-              {t('Original')}
-            </button>
-            {!!count && (
-              <button
-                disabled={busy}
-                data-review-tool="quality"
-                aria-label={t('Hinweise')}
-                onClick={() => open('quality')}
-                className="scanner-hints"
-              >
-                {t('Hinweise')} {count}
-              </button>
-            )}
           </div>
           <div className="scanner-toolstrip" role="group" aria-label={t('Seite bearbeiten')}>
             <button
@@ -199,27 +168,6 @@ export function ReviewTools({
                   </button>
                 ))}
               </div>
-              <button
-                className="scanner-reset-edit"
-                disabled={busy}
-                aria-label={t('Optimierung zurücksetzen')}
-                aria-describedby={`${id}-reset`}
-                onClick={() =>
-                  recipe({
-                    version: 1,
-                    enhancement: 'none',
-                    dewarp: 'off',
-                    adjustments: { ...NEUTRAL_ADJUSTMENTS },
-                  })
-                }
-              >
-                {t('Optimierung zurücksetzen')}
-              </button>
-              <span id={`${id}-reset`} className="scanner-sr-only">
-                {t(
-                  'Setzt alle Bildoptimierungen auf Foto, neutrale Tonwerte und Linse Aus zurück. Ecken, Format und Drehung bleiben erhalten.',
-                )}
-              </span>
             </>
           )}
           {panel === 'adjust' && (

@@ -9,6 +9,8 @@ import {
   showPdf,
   pageActions,
   discardResult,
+  expectReviewControls,
+  expectRangeReset,
 } from './helpers';
 import type { Page } from '@playwright/test';
 import { fixtureInBrowser, type Fixture } from '../fixtures/generate';
@@ -157,11 +159,13 @@ for (const theme of ['forest', 'ink'])
         await expect(
           page.getByRole('button', { name: 'Weitere Aktionen', exact: true }),
         ).toHaveCount(0);
-        await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveText(
-          'Rückgängig',
-        );
+        await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveCount(0);
+        await expect(
+          page.getByRole('button', { name: 'Original vergleichen', exact: true }),
+        ).toHaveCount(0);
+        await expect(page.locator('.scanner-review-utility')).toHaveCount(0);
         await equallyDistributed(page, '.scanner-review-quick');
-        await equallyDistributed(page, '.scanner-review-utility');
+        await expectReviewControls(page);
         await fits(page, '.scanner');
         if (info.project.name === 'mobile-webkit')
           await info.attach('review-actions.png', {
@@ -179,9 +183,29 @@ for (const theme of ['forest', 'ink'])
           await expect(page.getByRole('button', { name: /^Seitenübersicht/ })).toHaveCount(0);
           await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
           await expect(surface).toHaveAttribute('data-zoom', '100');
+          const footer = page.locator('.scanner-detail-footer');
+          await expect(
+            footer.getByRole('button', { name: 'Rückgängig', exact: true }),
+          ).toBeDisabled();
+          await expect(footer.getByRole('button')).toHaveCount(3);
+          await expect(footer.getByRole('button')).toHaveText([
+            'Abbrechen',
+            'Rückgängig',
+            'Übernehmen',
+          ]);
+          await expect(
+            page
+              .locator('.scanner-tool-panel')
+              .getByRole('button', { name: 'Rückgängig', exact: true }),
+          ).toHaveCount(0);
+          if (panel === 'Filter')
+            await expect(
+              page.getByRole('button', { name: 'Optimierung zurücksetzen', exact: true }),
+            ).toHaveCount(0);
           if (panel === 'Anpassen') {
             for (const name of ['Helligkeit', 'Kontrast', 'Schärfe', 'Linse'] as const) {
               await tone(page, name);
+              if (name !== 'Linse') await expectRangeReset(page, name, `${name} zurücksetzen`);
               await fits(page, '.scanner');
             }
             const modes = page.getByRole('group', { name: 'Linsenentzerrung', exact: true });
@@ -189,6 +213,7 @@ for (const theme of ['forest', 'ink'])
             await expect(
               page.getByRole('slider', { name: 'Linsenkorrektur', exact: true }),
             ).toBeEnabled();
+            await expectRangeReset(page, 'Linsenkorrektur', 'Linse zurücksetzen');
           }
           if (panel === 'Format') {
             const portrait = page
@@ -226,6 +251,24 @@ for (const theme of ['forest', 'ink'])
         ).toBeVisible();
         await page.keyboard.up('Space');
         await expect(before).toHaveAttribute('aria-pressed', 'false');
+        const hints = page.getByRole('button', { name: /^Hinweise: [1-9]\d*$/ });
+        if (await hints.count()) {
+          const count = Number((await hints.getAttribute('aria-label'))!.split(': ')[1]);
+          await expect(hints).toHaveText(String(count));
+          await hints.click();
+          await expect(page.locator('.scanner-quality li')).toHaveCount(count);
+          await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
+          await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveCount(
+            0,
+          );
+          await page.getByRole('button', { name: 'OK', exact: true }).click();
+          await expect(hints).toBeFocused();
+          await hints.click();
+          await page.getByRole('dialog').focus();
+          await page.keyboard.press('Escape');
+          await expect(hints).toBeFocused();
+        }
+        await expectReviewControls(page);
       });
       await test.step('Corners, page navigation and tiles', async () => {
         await page.getByRole('button', { name: 'Ecken korrigieren', exact: true }).click();

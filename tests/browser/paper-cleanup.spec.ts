@@ -1,4 +1,4 @@
-import { chooseCaptureWorkflow } from './helpers';
+import { chooseCaptureWorkflow, readCornerOriginal } from './helpers';
 import { acceptPage, closeTool } from './helpers';
 import { chooseProfile, showPdf } from './helpers';
 import { test, expect } from './fixtures';
@@ -125,10 +125,9 @@ test('paper cleanup is optional and reversible with separate source, crop and op
   const crop = await pixelMetric('Unoptimierter Zuschnitt');
   expect(optimized.mean).toBeGreaterThan(crop.mean + 15);
   await page.keyboard.up('Space');
-  await page.getByRole('button', { name: 'Original vergleichen', exact: true }).click();
-  const source = await pixelMetric('Originalaufnahme');
+  const source = await readCornerOriginal(page);
   expect(Buffer.from(source.bytes)).toEqual(Buffer.from(bytes, 'base64'));
-  await closeTool(page);
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
   await chooseProfile(page, 'none');
   expect((await pixelMetric('Bearbeitete Seite')).bytes).toEqual(crop.bytes);
   await chooseProfile(page, 'paper');

@@ -1,5 +1,13 @@
 import { test, expect } from './fixtures';
-import { chooseProfile, closeTool, tool, tone, previewHash, waitForPreview } from './helpers';
+import {
+  chooseProfile,
+  chooseFormat,
+  closeTool,
+  tool,
+  tone,
+  previewHash,
+  waitForPreview,
+} from './helpers';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 
 test('undo and cancelled tools restore actual pixels; zoom, hold comparison and native pinch remain usable', async ({
@@ -23,13 +31,13 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
   await surface.dblclick();
   await expect(surface).toHaveAttribute('data-zoom', '100');
   await chooseProfile(page, 'grayscale');
-  await closeTool(page);
   await expect(surface).toHaveAttribute('data-zoom', '100');
   expect(await hash()).not.toBe(baseline);
   const optimizedPreview = await image.getAttribute('src');
   await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
   await waitForPreview(page, optimizedPreview);
   await expectBaseline();
+  await closeTool(page);
   await tone(page, 'Helligkeit');
   const neutralPreview = await image.getAttribute('src');
   await page.getByRole('slider', { name: 'Helligkeit', exact: true }).press('End');
@@ -39,13 +47,69 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
   await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
   await waitForPreview(page, adjustedPreview);
   await expectBaseline();
-  await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveCount(0);
   await tool(page, 'Filter');
+  await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Auto', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
   await closeTool(page);
+  await test.step('Tool undo never crosses applied filters or rotation, including the twelve-entry cap', async () => {
+    await chooseProfile(page, 'grayscale');
+    await closeTool(page);
+    await page.getByRole('button', { name: '90° drehen', exact: true }).click();
+    await expect(surface).toHaveAttribute('data-zoom', 'fit');
+    await chooseFormat(page, 'receipt');
+    await closeTool(page);
+    await tool(page, 'Format');
+    const formatUndo = page.getByRole('button', { name: 'Rückgängig', exact: true }),
+      width = page.getByRole('spinbutton', { name: 'Bonbreite in mm', exact: true });
+    await expect(formatUndo).toBeDisabled();
+    await expect(width).toHaveValue('80');
+    await page.getByRole('button', { name: '58 mm', exact: true }).click();
+    await expect(width).toHaveValue('58');
+    await formatUndo.click();
+    await expect(width).toHaveValue('80');
+    await expect(formatUndo).toBeDisabled();
+    await width.fill('76');
+    await expect(formatUndo).toBeEnabled();
+    await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    await tool(page, 'Format');
+    await expect(width).toHaveValue('80');
+    await expect(formatUndo).toBeDisabled();
+    await closeTool(page);
+    const rotated = await hash();
+    await tone(page, 'Helligkeit');
+    const undo = page.getByRole('button', { name: 'Rückgängig', exact: true });
+    await expect(undo).toBeDisabled();
+    const slider = page.getByRole('slider', { name: 'Helligkeit', exact: true });
+    let firstAdjustment = '';
+    for (let index = 0; index < 13; index++) {
+      const previous = await image.getAttribute('src');
+      await slider.press('ArrowRight');
+      await waitForPreview(page, previous);
+      if (index === 0) firstAdjustment = await hash();
+    }
+    for (let index = 0; index < 12; index++) {
+      const previous = await image.getAttribute('src');
+      await undo.click();
+      await waitForPreview(page, previous);
+    }
+    await expect(undo).toBeDisabled();
+    expect(await hash()).toBe(firstAdjustment);
+    await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+    expect(await hash()).toBe(rotated);
+    await tool(page, 'Filter');
+    await expect(undo).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Graustufen', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await closeTool(page);
+  });
+  await surface.press('Enter');
+  await expect(surface).toHaveAttribute('data-zoom', '100');
   const before = page.getByRole('button', {
     name: 'Vorher anzeigen - gedrückt halten',
     exact: true,
@@ -87,11 +151,9 @@ test('undo and cancelled tools restore actual pixels; zoom, hold comparison and 
     await expect(surface).not.toHaveAttribute('data-zoom', 'fit');
     await client.detach();
   }
-  const original = page.getByRole('button', { name: 'Original vergleichen', exact: true });
-  await original.click();
-  await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'OK', exact: true }).click();
-  await expect(original).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Original vergleichen', exact: true })).toHaveCount(
+    0,
+  );
   const corners = page.getByRole('button', { name: 'Ecken korrigieren', exact: true });
   await corners.click();
   await expect(

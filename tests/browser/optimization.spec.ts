@@ -7,6 +7,7 @@ import {
   tone,
   previewHash,
   waitForPreview,
+  expectRangeReset,
 } from './helpers';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
@@ -50,6 +51,9 @@ test('visible automatic optimization, manual controls, reset and export keep the
       .getByRole('group', { name: 'Linsenentzerrung', exact: true })
       .getByRole('button', { name: /^Auto/ }),
   ).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    page.getByRole('button', { name: 'Linse zurücksetzen', exact: true }),
+  ).toBeDisabled();
   const values: Record<string, string> = {};
   for (const name of ['Helligkeit', 'Kontrast', 'Schärfe'] as const) {
     await tone(page, name);
@@ -61,10 +65,13 @@ test('visible automatic optimization, manual controls, reset and export keep the
   for (const name of ['Helligkeit', 'Kontrast', 'Schärfe'] as const) {
     await tone(page, name);
     const reset = page.getByRole('button', { name: `${name} zurücksetzen`, exact: true });
+    await expect(reset).toBeEnabled();
+    await expectRangeReset(page, name, `${name} zurücksetzen`);
     await expect(reset).toHaveAccessibleDescription(
       'Setzt nur diese Anpassung auf 0 zurück. Andere Einstellungen bleiben erhalten.',
     );
     await action(() => reset.click());
+    await expect(reset).toBeDisabled();
     values[name] = '0';
     for (const other of ['Helligkeit', 'Kontrast', 'Schärfe'] as const) {
       await tone(page, other);
@@ -73,6 +80,50 @@ test('visible automatic optimization, manual controls, reset and export keep the
       );
     }
   }
+  await tone(page, 'Helligkeit');
+  const pendingRange = page.getByRole('slider', { name: 'Helligkeit', exact: true }),
+    pendingReset = page.getByRole('button', { name: 'Helligkeit zurücksetzen', exact: true }),
+    unchangedPreview = await preview.getAttribute('src');
+  await pendingRange.focus();
+  await page.keyboard.down('ArrowRight');
+  await expect(pendingRange).toHaveValue('1');
+  await expect(pendingReset).toBeEnabled();
+  await pendingReset.click();
+  await page.keyboard.up('ArrowRight');
+  await expect(pendingRange).toHaveValue('0');
+  await expect(pendingReset).toBeDisabled();
+  await waitForPreview(page);
+  await expect(preview).toHaveAttribute('src', unchangedPreview!);
+  const neutral = await hash();
+  await action(() => pendingRange.press('End'));
+  await expect(pendingRange).toHaveValue('100');
+  const applied = await hash(),
+    appliedPreview = await preview.getAttribute('src');
+  expect(applied).not.toBe(neutral);
+  await page.evaluate(() => {
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (this: Worker, message: any, transfer?: any) {
+      if (message.kind === 'process') {
+        Worker.prototype.postMessage = post;
+        throw new Error('Synthetic slider reset failure');
+      }
+      post.call(this, message, transfer ?? []);
+    };
+  });
+  await pendingReset.click();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
+    'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.',
+  );
+  await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
+  await expect(pendingRange).toHaveValue('100');
+  await expect(pendingReset).toBeEnabled();
+  await expect(preview).toHaveAttribute('src', appliedPreview!);
+  expect(await hash()).toBe(applied);
+  await action(() => pendingReset.click());
+  await expect(pendingRange).toHaveValue('0');
+  await expect(pendingReset).toBeDisabled();
+  await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+  expect(await hash()).toBe(neutral);
   await tone(page, 'Linse');
   await action(() =>
     page
@@ -89,6 +140,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
   await closeTool(page);
   await tone(page, 'Linse');
   const resetLens = page.getByRole('button', { name: 'Linse zurücksetzen', exact: true });
+  await expectRangeReset(page, 'Linsenkorrektur', 'Linse zurücksetzen');
   await action(() => resetLens.click());
   await expect(page.getByRole('slider', { name: 'Linsenkorrektur', exact: true })).toHaveCount(0);
   await expect(
@@ -104,19 +156,28 @@ test('visible automatic optimization, manual controls, reset and export keep the
   await tone(page, 'Linse');
   await expect(lens).toHaveValue('100');
   await action(() => resetLens.click());
-  await closeTool(page);
   await action(() => page.getByRole('button', { name: 'Rückgängig', exact: true }).click());
   expect(await hash()).toEqual(edited);
+  await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
+  await closeTool(page);
   await tone(page, 'Linse');
   await expect(lens).toHaveValue('100');
   for (const name of ['Helligkeit', 'Kontrast', 'Schärfe'] as const) {
     await tone(page, name);
     await expect(page.getByRole('slider', { name, exact: true })).toHaveValue('0');
   }
-  await tool(page, 'Filter');
+  await tone(page, 'Linse');
   await action(() =>
-    page.getByRole('button', { name: 'Optimierung zurücksetzen', exact: true }).click(),
+    page
+      .getByRole('group', { name: 'Linsenentzerrung', exact: true })
+      .getByRole('button', { name: 'Aus', exact: true })
+      .click(),
   );
+  await tool(page, 'Filter');
+  await expect(
+    page.getByRole('button', { name: 'Optimierung zurücksetzen', exact: true }),
+  ).toHaveCount(0);
+  await action(() => chooseProfile(page, 'none'));
   expect(await hash()).toEqual(baseline);
   await tone(page, 'Linse');
   await expect(

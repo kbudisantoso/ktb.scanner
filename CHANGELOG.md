@@ -4,7 +4,7 @@
 
 ### Added
 
-- Individual brightness, contrast, sharpness and lens reset actions in Adjust preserve unrelated page settings.
+- Inline brightness, contrast, sharpness and lens reset icons in Adjust preserve unrelated page settings and are disabled at neutral values.
 - Optional `captureWorkflow: 'continuous'` keeps the camera open for multiple pages, shows extracted-page feedback and opens sequential review from **Review pages (n)**. The SDK default remains `review-each`; both demos expose the choice. Retake replaces the current page, and every page still requires review or explicit discard before export.
 - Finger-following horizontal page swipes at fit in review: the current page slides out and the neighboring page enters with its own proportions, with short-gesture rebound and reduced-motion support. Optional `ImageViewer.onPageSwipe` continues to report host-owned page navigation.
 - **Find edges** (**Kanten finden**) reruns automatic detection from the original in the corner editor while retaining page settings. Preview the proposed corners before applying them; cancelling the editor preserves the previous crop, and unsuccessful detection keeps the current corner selection.
@@ -13,7 +13,8 @@
 
 - Render the Next.js reference host in its selected language from the first HTML response, avoiding the brief English content after refresh.
 - Suppress accidental text selection, touch callouts and native media dragging in scanner/viewer controls while preserving native form editing and image gestures.
-- Put replacement, direct discard and Add page below the review document with equally sized mobile actions; keep Undo visibly labelled.
+- Put replacement, direct discard and Add page below the review document with equally sized mobile actions. Remove the extra Undo/Original row for more image space; retain Undo in the existing Cancel/Apply footer of the current editing tool, remove the extra Filter reset, center zoom, and show counted hints at the viewer's bottom right only when present. The corner editor still shows the complete original; held Before retains the unoptimized crop comparison.
+- Keep the complete filter icon inside its SVG viewBox.
 - Hide the session-close X inside editing tools and make Escape follow local cancellation and focus restoration.
 
 - Imported images now offer **Replace image** (**Bild tauschen**) with a direct single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the previous candidate/page and remaining imports.

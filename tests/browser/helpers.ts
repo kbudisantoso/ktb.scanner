@@ -33,6 +33,95 @@ export async function previewHash(page: Page, previousSrc: string | null = null)
     ).join(','),
   );
 }
+export async function readCornerOriginal(page: Page) {
+  await closeTool(page);
+  await waitForPreview(page);
+  await page.evaluate(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
+    const probe = { descriptor, url: '' };
+    (window as any).cornerOriginalProbe = probe;
+    Object.defineProperty(HTMLImageElement.prototype, 'src', {
+      ...descriptor,
+      set(this: HTMLImageElement, value: string) {
+        if (!this.isConnected && value.startsWith('blob:')) probe.url = value;
+        descriptor.set!.call(this, value);
+      },
+    });
+  });
+  try {
+    await page.getByRole('button', { name: /^(Ecken korrigieren|Adjust corners)$/ }).click();
+    await expect(
+      page.getByRole('button', { name: /^(Zuschnitt übernehmen|Apply crop)$/ }),
+    ).toBeEnabled();
+    return await page.evaluate(async () => {
+      const url = (window as any).cornerOriginalProbe.url;
+      if (!url) throw new Error('The corner editor original image was not observed');
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      return {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        bytes: Array.from(new Uint8Array(await (await fetch(url)).arrayBuffer())),
+      };
+    });
+  } finally {
+    await page.evaluate(() => {
+      Object.defineProperty(
+        HTMLImageElement.prototype,
+        'src',
+        (window as any).cornerOriginalProbe.descriptor,
+      );
+      delete (window as any).cornerOriginalProbe;
+    });
+  }
+}
+export async function expectReviewControls(page: Page) {
+  const geometry = await page.locator('.scanner-review-viewer').evaluate((viewer) => {
+    const root = viewer.getBoundingClientRect(),
+      strip = viewer.querySelector('.scanner-viewer-controls')!.getBoundingClientRect(),
+      zoom = viewer.querySelector('.scanner-zoom-controls')!.getBoundingClientRect(),
+      before = viewer.querySelector('.scanner-before-control')?.getBoundingClientRect(),
+      hints = viewer.querySelector('.scanner-hints')?.getBoundingClientRect(),
+      surface = viewer.querySelector('.scanner-image-surface')!.getBoundingClientRect();
+    return {
+      stripHeight: strip.height,
+      centerDifference: Math.abs(zoom.left + zoom.width / 2 - root.left - root.width / 2),
+      bottomDifference: Math.abs(strip.bottom - root.bottom),
+      surfaceDifference: Math.abs(surface.bottom - strip.top),
+      beforeVerticalDifference: before
+        ? Math.abs(before.top + before.height / 2 - zoom.top - zoom.height / 2)
+        : 0,
+      hintsVerticalDifference: hints
+        ? Math.abs(hints.top + hints.height / 2 - zoom.top - zoom.height / 2)
+        : 0,
+      beforeOverlap: before ? before.right - zoom.left : 0,
+      hintsOverlap: hints ? zoom.right - hints.left : 0,
+    };
+  });
+  expect(geometry.stripHeight).toBe(56);
+  for (const key of [
+    'centerDifference',
+    'bottomDifference',
+    'surfaceDifference',
+    'beforeVerticalDifference',
+    'hintsVerticalDifference',
+  ] as const)
+    expect(geometry[key]).toBeLessThan(1);
+  expect(geometry.beforeOverlap).toBeLessThanOrEqual(0);
+  expect(geometry.hintsOverlap).toBeLessThanOrEqual(0);
+}
+export async function expectRangeReset(page: Page, label: string, resetLabel: string) {
+  const reset = page.getByRole('button', { name: resetLabel, exact: true });
+  await expect(reset.locator('svg')).toHaveCount(1);
+  await expect(reset).toHaveText('');
+  const slider = (await page.getByRole('slider', { name: label, exact: true }).boundingBox())!,
+    button = (await reset.boundingBox())!;
+  expect(button.x).toBeGreaterThanOrEqual(slider.x + slider.width - 1);
+  expect(Math.abs(button.y + button.height / 2 - slider.y - slider.height / 2)).toBeLessThan(1);
+  expect(button.width).toBeGreaterThanOrEqual(44);
+  expect(button.height).toBeGreaterThanOrEqual(44);
+}
 export async function openOptions(page: Page) {
   const button = page.getByRole('button', { name: 'Optionen', exact: true });
   if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click();

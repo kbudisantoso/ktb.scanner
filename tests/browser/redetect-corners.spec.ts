@@ -247,7 +247,7 @@ test('session abort and editor unmount invalidate unfinished searches', async ({
   expect(await page.evaluate(() => (window as any).edgeHarness.applied.length)).toBe(0);
 });
 
-test('real redetection preserves original, rotation, recipe and paper format through Cancel, Apply, Undo and export', async ({
+test('real redetection preserves original, rotation, recipe and paper format through Cancel, repeated Apply and export', async ({
   page,
 }, testInfo) => {
   const source = await page.evaluate(
@@ -332,10 +332,14 @@ test('real redetection preserves original, rotation, recipe and paper format thr
   expect(after.before.recipe.enhancement).toBe('grayscale');
   expect(after.before.recipe.adjustments.brightness).toBe(100);
   expect(after.before.format.preset).toBe('A6');
-  await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
-  await expect(async () => expect(await hash()).toBe(manualHash)).toPass();
+  await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toHaveCount(0);
+  const appliedHash = await hash();
+  await search();
+  await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();
+  await expect(async () => expect(await hash()).toBe(appliedHash)).toPass();
   await search();
   await page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }).click();
+  await expect(async () => expect(await hash()).toBe(appliedHash)).toPass();
   await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
   const result = await page.evaluate(async () => {
     const h = (window as any).edgeHarness;
