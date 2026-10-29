@@ -144,9 +144,15 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
           disabled={running}
           onChange={(event) => ocr.setLanguage(event.target.value)}
         >
-          <option value="deu+eng">{t('Deutsch und Englisch')}</option>
-          <option value="deu">{t('Deutsch')}</option>
-          <option value="eng">{t('Englisch')}</option>
+          <option value="deu+eng" aria-label={t('Deutsch und Englisch')}>
+            DE + EN
+          </option>
+          <option value="deu" aria-label={t('Deutsch')}>
+            Deutsch
+          </option>
+          <option value="eng" aria-label={t('Englisch')}>
+            English
+          </option>
         </select>
         {running ? (
           <button
