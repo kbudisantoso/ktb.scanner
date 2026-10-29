@@ -1,5 +1,5 @@
 import { expect } from './fixtures';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 export async function waitForPreview(page: Page, previousSrc: string | null = null) {
   const image = page.getByRole('img', { name: /^(Edited page|Bearbeitete Seite)$/, exact: true });
   await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
@@ -77,7 +77,10 @@ export async function readCornerOriginal(page: Page) {
   }
 }
 export async function expectReviewControls(page: Page) {
-  const geometry = await page.locator('.scanner-review-viewer').evaluate((viewer) => {
+  await expectViewerControls(page.locator('.scanner-review-viewer'));
+}
+export async function expectViewerControls(viewer: Locator) {
+  const geometry = await viewer.evaluate((viewer) => {
     const root = viewer.getBoundingClientRect(),
       strip = viewer.querySelector('.scanner-viewer-controls')!.getBoundingClientRect(),
       zoom = viewer.querySelector('.scanner-zoom-controls')!.getBoundingClientRect(),

@@ -445,11 +445,11 @@ function ImageViewerImpl({
             <ToolIcon name="zoom-in" />
           </button>
         </div>
-        {!!reviewHints?.count && (
+        {reviewHints && (
           <button
             ref={reviewHints.buttonRef}
             className="scanner-hints"
-            disabled={reviewHints.disabled}
+            disabled={reviewHints.disabled || reviewHints.count === 0}
             data-review-tool="quality"
             aria-label={`${t('Hinweise')}: ${reviewHints.count}`}
             title={t('Hinweise')}

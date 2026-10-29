@@ -10,6 +10,7 @@ import {
   pageActions,
   discardResult,
   expectReviewControls,
+  expectViewerControls,
   expectRangeReset,
 } from './helpers';
 import type { Page } from '@playwright/test';
@@ -179,6 +180,7 @@ for (const theme of ['forest', 'ink'])
         await expect(surface).toHaveAttribute('data-zoom', '100');
         for (const panel of ['Filter', 'Anpassen', 'Format'] as const) {
           await tool(page, panel);
+          await expect(page.locator('.scanner-hints')).toHaveCount(0);
           await expect(page.locator('.scanner-review-footer')).toHaveCount(0);
           await expect(page.getByRole('button', { name: /^Seitenübersicht/ })).toHaveCount(0);
           await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
@@ -353,7 +355,15 @@ for (const theme of ['forest', 'ink'])
         await expect(
           viewer.getByRole('img', { name: 'Vergrößerte Seite 2', exact: true }),
         ).toBeVisible();
+        const imageViewer = viewer.locator('.scanner-image-viewer');
+        await expect(imageViewer.locator('.scanner-before-control,.scanner-hints')).toHaveCount(0);
+        await expectViewerControls(imageViewer);
         await fits(page, '.result-viewer');
+        if (deep && info.project.name === 'mobile-webkit')
+          await info.attach('result-viewer.png', {
+            body: await page.screenshot(),
+            contentType: 'image/png',
+          });
         await viewer.getByRole('button', { name: '100 Prozent', exact: true }).click();
         await expect(viewer.locator('.scanner-image-surface')).toHaveAttribute('data-zoom', '100');
         await viewer.getByRole('button', { name: 'Vorherige Seite', exact: true }).click();
