@@ -31,3 +31,4 @@ Each record separates context, decision, consequences and evidence. Historical v
 - [0025: Global UI preferences without persistence](0025-ui-preference-notifications.md)
 
 - [0026: Complete reusable UI theme tokens](0026-complete-ui-theme-tokens.md)
+- [0027: Local OCR on confirmed pages](0027-local-ocr-on-confirmed-pages.md)

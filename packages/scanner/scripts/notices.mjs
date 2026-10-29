@@ -21,7 +21,7 @@ export async function packageRoot(name, from) {
 export async function collectNotices() {
   const seen = new Set(),
     inventory = [];
-  async function visit(name, from, optional = false) {
+  async function visit(name, from, optional = false, recurse = true) {
     let root;
     try {
       root = await packageRoot(name, from);
@@ -50,11 +50,18 @@ export async function collectNotices() {
       license: metadata.license ?? 'UNKNOWN',
       notices,
     });
-    for (const dependency of Object.keys(metadata.dependencies ?? {}))
-      await visit(dependency, root);
-    for (const dependency of Object.keys(metadata.optionalDependencies ?? {}))
-      await visit(dependency, root, true);
+    if (recurse) {
+      for (const dependency of Object.keys(metadata.dependencies ?? {}))
+        await visit(dependency, root);
+      for (const dependency of Object.keys(metadata.optionalDependencies ?? {}))
+        await visit(dependency, root, true);
+    }
   }
-  for (const name of ['scanic', 'jspdf']) await visit(name, process.cwd());
+  const manifest = JSON.parse(await readFile('package.json', 'utf8'));
+  for (const name of Object.keys(manifest.dependencies ?? {})) await visit(name, process.cwd());
+  // These build inputs supply copied browser assets, not their Node.js factory/dependency tree.
+  // Bundled worker and native dependencies have their own source-bound third-party supplements.
+  for (const name of ['tesseract.js', 'tesseract.js-core'])
+    await visit(name, process.cwd(), false, false);
   await writeFile('dist/assets/licenses/inventory.json', JSON.stringify(inventory, null, 2));
 }

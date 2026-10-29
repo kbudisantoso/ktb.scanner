@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "repository": "https://github.com/tesseract-ocr/tessdata_fast",
+  "tag": "4.1.0",
+  "commit": "65727574dfcd264acbb0c3e07860e4e9e9b22185",
+  "license": "Apache-2.0",
+  "models": [
+    {
+      "language": "deu",
+      "file": "models/deu.traineddata",
+      "bytes": 1525436,
+      "sha256": "19d219bbb6672c869d20a9636c6816a81eb9a71796cb93ebe0cb1530e2cdb22d",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/deu.traineddata"
+    },
+    {
+      "language": "eng",
+      "file": "models/eng.traineddata",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/65727574dfcd264acbb0c3e07860e4e9e9b22185/eng.traineddata"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 * text=auto
 *.mp3 binary
+*.traineddata binary
 AGENTS.md export-ignore
 CLAUDE.md export-ignore
 **/AGENTS.md export-ignore
@@ -9,3 +10,7 @@ CLAUDE.md export-ignore
 .claude/** export-ignore
 artifacts/local/** export-ignore
 .certificates/** export-ignore
+packages/scanner/third-party/tesseract-wasm/emscripten-4.0.15/LICENSE whitespace=-blank-at-eol,-blank-at-eof
+packages/scanner/third-party/tesseract-wasm/libtiff-b51bb15/COPYRIGHT whitespace=-blank-at-eol
+packages/scanner/third-party/tesseract-wasm/leptonica-4af068b/LICENSE whitespace=-blank-at-eof
+packages/scanner/third-party/tesseract-wasm/libwebp-20ef03e/COPYING whitespace=-blank-at-eof

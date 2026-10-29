@@ -246,6 +246,42 @@ export function ScanButton({ onResult }: { onResult: (result: ScanResult) => voi
 
 Import `@ktb-tools/scanner/styles.css` once and pass `theme` through `ScannerOptions` in either API. The complete [UI styling guide](UI-THEMING.md) inventories the original and extended consumed variables and defaults, explains root/ancestor precedence and captured React options, and provides checked imperative/React examples, light/dark themes, local fonts and a standalone viewer container. It also records theme-token and responsive-layout scope and how to align `locale`/`texts` with the host's existing confirmed-result handler.
 
+## Local OCR and searchable PDF
+
+Unreleased source exports `createSearchablePdf` and its `OcrOptions`, `OcrLanguage`, `OcrProgress`, `OcrPageResult` and `SearchablePdfResult` types from `@ktb-tools/scanner/ocr`. This entry is absent from npm 0.2.0. OCR is a separate operation on confirmed results, after the scanner has closed and released its processing worker. It does not add a `ScannerOptions` field or change `ScanResult`/`ScanPage`.
+
+```ts
+import type { ScanResult } from '@ktb-tools/scanner';
+import type { OcrProgress } from '@ktb-tools/scanner/ocr';
+
+export async function recognizeConfirmed(
+  result: Extract<ScanResult, { status: 'confirmed' }>,
+  signal: AbortSignal,
+  onProgress: (value: OcrProgress) => void,
+) {
+  const { createSearchablePdf } = await import('@ktb-tools/scanner/ocr');
+  return createSearchablePdf({
+    pages: result.pages,
+    assetBaseUrl: '/scanner-assets/',
+    languages: ['deu', 'eng'],
+    signal,
+    onProgress,
+  });
+}
+```
+
+For imperative integrations, await `scanner.open()` and finish its cleanup before calling OCR. For React integrations, close/unmount the scanner before starting recognition in the result view. The host may replace its displayed PDF only after the OCR promise succeeds; retain the original confirmed images/PDF for cancellation and retry. The returned `pages` contain matching IDs/revisions, text and an engine confidence from 0 to 100. Empty text is valid; confidence is not a readability certificate. A new invocation uses its supplied image revisions; there is no persistent OCR cache or session-level reuse contract.
+
+Languages accept `deu`, `eng`, or both (the default). This selects recognition models, independently of UI locale; it is not automatic language classification. Tesseract uses automatic page segmentation without OSD or an additional image rotation. It recognizes already cropped, corrected and rotated final JPEG/PNG images. The invisible PDF text page is mapped to that exact image/layout box. Text selection and reading order can still contain recognition errors; searchable PDF does not imply invoice fields, semantic tags or PDF/UA.
+
+`onProgress` reports `{ stage, page, pages, progress }`: `loading` and `assembling` have concrete 0/1 endpoints and `page: 0`; `recognizing` uses a one-based page number and per-page engine progress from 0 to 1. These are not a synthesized whole-document percentage. Observer failures are isolated. Abort through the supplied signal terminates startup/recognition/assembly and rejects with `AbortError`; it never returns a partial successful PDF. Other failures use existing scanner error codes. OCR runs serially in one worker, terminates it, then starts the PDF assembly worker.
+
+The existing optional `limits` budgets cover page count, final image dimensions/pixels, estimated working memory and result bytes. Valid processed PNGs are not subject to a new 20-MiB original-import cap. Retained images/optional originals, pixel/engine estimates, UTF-8 text, intermediate text PDFs and assembled bytes count toward the appropriate phases. There is no silent downsampling, available-RAM measurement, constant-memory PDF promise or general phone-quality guarantee.
+
+Copy the **complete** asset tree, including `ocr/`, `ocr-pdf.worker.js`, model provenance/hashes and all notices. The build pins Tesseract.js/Core 7.0.0 and official German/English Fast models and copies verified local inputs without network downloads. Runtime requests fetch those assets from the host only after OCR starts, with no CDN fallback. The library disables Tesseract's persistent model cache; ordinary HTTP asset caching remains a host/browser concern. This does not provide offline/PWA behavior. Existing same-origin worker and WASM CSP considerations apply.
+
+The Next.js result view demonstrates explicit Start/Cancel/Retry, language selection, a native selectable Text tab and reuse of its existing PDF preview/download link. Its canvas PDF preview does not itself offer text selection; the Text tab and downloaded searchable PDF do. During OCR the PDF preview is unmounted to release its decoder/canvases, then resumes in the same tab after completion or cancellation. Leaving/replacing the result invalidates active OCR and prevents late results from replacing the current document. Downloads, filenames, storage and any backend remain host responsibilities.
+
 ## Use confirmed results
 
 The host owns returned blobs and any URLs it creates. Trigger downloads only through explicit user actions and revoke URLs when their views are removed.

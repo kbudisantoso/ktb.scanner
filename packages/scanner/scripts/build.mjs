@@ -1,5 +1,6 @@
 import { instrumentScanic } from './instrument-scanic.mjs';
 import { collectNotices } from './notices.mjs';
+import { copyOcrAssets } from './ocr-assets.mjs';
 import { build } from 'esbuild';
 import { cp, copyFile, mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -17,7 +18,13 @@ const common = {
 };
 await build({
   ...common,
-  entryPoints: ['src/index.ts', 'src/react/index.tsx', 'src/scanic.ts', 'src/export.ts'],
+  entryPoints: [
+    'src/index.ts',
+    'src/react/index.tsx',
+    'src/scanic.ts',
+    'src/export.ts',
+    'src/ocr.ts',
+  ],
   outdir: 'dist',
   splitting: true,
   external: ['react', 'react-dom/client', 'react/jsx-runtime', 'scanic', 'jspdf'],
@@ -57,6 +64,12 @@ await build({
   entryPoints: ['src/pdf.worker.ts'],
   outfile: 'dist/assets/pdf.worker.js',
 });
+await build({
+  ...common,
+  entryPoints: ['src/ocr-pdf.worker.ts'],
+  outfile: 'dist/assets/ocr-pdf.worker.js',
+});
+await copyOcrAssets();
 await copyFile('src/react/styles.css', 'dist/styles.css');
 await writeFile(
   'dist/assets/versions.json',
@@ -67,6 +80,12 @@ await writeFile(
       detector: 'classical',
       scanicInstrumentation: 'candidate-selection-and-debug-v2',
       jspdf: '4.2.1',
+      ocr: {
+        tesseract: '7.0.0',
+        core: '7.0.0',
+        models: 'tessdata_fast@4.1.0',
+        modelCommit: '65727574dfcd264acbb0c3e07860e4e9e9b22185',
+      },
     },
     null,
     2,

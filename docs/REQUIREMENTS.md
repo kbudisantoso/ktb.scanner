@@ -1,6 +1,6 @@
 # Product requirements
 
-Version 0.9, updated 29 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
+Version 0.10, updated 29 October 2026. This is the required scope, not a declaration that every device has passed acceptance. [Decisions](DECISIONS.md) resolve the initial version; the [implementation contract](SPECIFICATION.md) and [test status](testing/STATUS.md) distinguish implementation from evidence. The [evaluation](../EVALUATION.md) is historical research, not authorization for additional features.
 
 ## Purpose and boundary
 
@@ -8,7 +8,7 @@ People should capture readable document images directly in a host web applicatio
 
 The project is positioned as a complete embeddable document-scanning workflow built on Scanic. Its value to host developers covers four areas: capture workflow, editing, integration and consistent output. One integration provides the path from capture/import through review and page management to confirmed images, an optional PDF and structured metadata. Scanic and jsPDF retain their detection/correction and PDF-generation roles; the position does not claim a generally superior detection engine. See D-039 in [decisions](DECISIONS.md).
 
-The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. The host owns authentication, permissions, business records, uploads and subsequent OCR/extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
+The scanner owns capture/import, document geometry, reversible image processing, quality hints, page ordering and image/PDF export. Optional local OCR processes confirmed results through a separate library entry. The host owns authentication, permissions, business records, uploads, backend OCR and business-field extraction. There is no booking, reimbursement or legal approval inside the scanner. The project source license is AGPLv3; third-party licenses remain separate.
 
 Distribution uses the public npm package name `@ktb-tools/scanner`, with explicit versioned GitHub releases and checked build artifacts. The current requirements include the 0.2.0 SDK additions; the published 0.1.0 release remains immutable. Preparing a source version does not establish registry availability. Registry verification remains explicit in the [publishing guide](PUBLISHING.md#registry-release).
 
@@ -37,14 +37,14 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-17 | MUST | Hand off a non-empty, fully confirmed ordered collection of image blobs and serializable metadata. |
 | F-18 | MUST | Show evidence-based blur, lighting or edge hints; represent unknown causes honestly. |
 | F-19 | MUST | Auto-capture once after a configurable measured stability duration, default 1,000 ms, using fresh sharp evidence. Configure through the library or override per open; the reference app exposes experimental duration choices. Unknown sharpness blocks Auto and explicitly suggests manual capture. The manual shutter remains available. |
-| F-20 | OPTIONAL | Add local sample OCR or SDK readability analysis only under a separate decision and comparison test. |
-| F-21 | CONDITIONAL | If F-20 is introduced, run asynchronously, mark uncertainty, invalidate stale results and allow manual acceptance. |
+| F-20 | OPTIONAL | Provide explicitly invoked local OCR of confirmed final image revisions, returning per-page text/confidence and a searchable PDF with the same page order, images and layouts. Bundle pinned German/English models, defaulting to both; no automatic language-classification or readability guarantee. See D-057. |
+| F-21 | CONDITIONAL | OCR must run asynchronously and serially after scanning ends, with progress, immediate startup/recognition cancellation and stale-result invalidation. Terminate OCR before PDF assembly. Failure/cancellation preserves the confirmed images and existing PDF; hosts retain manual control and may retry. |
 | F-22 | OPTIONAL | Add reliable geometric paper flattening under a separate decision; visible folds alone are not a rejection. |
 | F-23 | MUST | Smooth only the displayed live contour, confirm isolated jumps and bridge short losses for bounded time. Raw evidence still governs capture; display smoothing never determines the final crop. |
 | F-24 | MUST | Secure the complete original, then independently detect/refine its edges. The live contour is an acquisition indicator, not final crop authority: it must neither force an inner crop nor veto a plausible independently detected still. Missing still geometry requires explicit confirmation. Camera and import share the same source-coordinate processing. |
 | F-25 | MUST | Expose Auto/Manual; switching to Manual invalidates pending automatic triggers immediately while retaining live detection and processing. |
 | F-26 | MUST | Animate the green contour during the same measured stability window that triggers capture. Pause bounded uncertainty without counting it; reset on movement/loss. Provide a text alternative and avoid repeated spoken percentages. |
-| F-27 | MUST | Build one multi-page browser raster PDF from all confirmed images, without OCR; no partial successful handoff on an export failure. |
+| F-27 | MUST | Build one multi-page browser raster PDF from all confirmed images by default; optional F-20 adds a text layer afterward without modifying those images. No partial successful handoff on an export failure. |
 | F-28 | MUST | Offer JPEG quality 0.92 and PNG. Standard formats correct both crop axes and fill the chosen PDF page; receipts/original ratio remain proportional. No output clipping or artificial upscaling. |
 | F-29 | MUST | Provide Next.js image/PDF previews, actual downloads, themes, contexts, synthetic samples and manifest, plus Astro using the same built package. |
 | F-30 | MUST | Diagnostics are off by default in library and reference. Explicitly enabled collection spans sessions, exports raw/intermediate/final data locally and respects a 512 MiB budget and deletion deadlines. |
@@ -94,6 +94,6 @@ Primary targets are current and previous supported iPhone Safari and Android Chr
 
 ## Exclusions and acceptance
 
-No required native app, physical millimeter measurement, PDF import/editor, invoice-field extraction, automatic multi-document splitting, receipt panorama stitching, semantic text rotation, OCR layer, full paper flattening or durable crash recovery. TIFF/HEIC, persistence, full lens calibration and backend integration remain separate work.
+No required native app, physical millimeter measurement, PDF import/editor, invoice-field extraction, automatic multi-document splitting, receipt panorama stitching, semantic text rotation, full paper flattening or durable crash recovery. TIFF/HEIC, persistence, full lens calibration and backend integration remain separate work. Optional OCR recognizes existing pixels; it does not reconstruct text or add document semantics/PDF accessibility certification.
 
 All MUST requirements need evidence. Optional work counts as delivered only when separately authorized and tested. The [traceability tests](SPECIFICATION.md#tests-and-traceability) map requirements to expectations. Vendor claims and synthetic tests alone cannot establish physical-device acceptance.

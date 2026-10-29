@@ -15,6 +15,24 @@ test('built core is safe to import without browser globals', () => {
   assert.match(output, /SSR safe/);
 });
 
+test('built OCR entry imports without DOM, worker construction or asset requests', () => {
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+globalThis.Worker=class { constructor(){throw new Error('Unexpected worker during import');} };
+globalThis.fetch=()=>{throw new Error('Unexpected asset request during import');};
+const {createSearchablePdf}=await import('./packages/scanner/dist/ocr.js');
+console.log(typeof createSearchablePdf);
+`,
+    ],
+    { encoding: 'utf8', timeout: 15_000 },
+  );
+  assert.match(output, /function/);
+});
+
 test('built React entry renders closed without browser globals', () => {
   const output = execFileSync(
     process.execPath,

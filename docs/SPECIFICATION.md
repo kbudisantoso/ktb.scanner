@@ -1,12 +1,12 @@
 # Implementation contract
 
-Version 0.9, updated 28 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.10, updated 29 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
 The delivery is a complete embeddable scanning workflow covering capture workflow, editing, integration and consistent output (D-039). The package encapsulates the session and review path around Scanic and jsPDF so host developers receive confirmed files and metadata through one integration. Vendor engine responsibilities and ktb.scanner's workflow responsibilities remain explicit; this positioning introduces no additional runtime scope or detection-quality claim.
 
-One TypeScript package provides the DOM-free `@ktb-tools/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
+One TypeScript package provides the DOM-free `@ktb-tools/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. Unreleased source adds an independently invoked `/ocr` entry. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
 
 The npm namespace is `ktb-tools` (D-042). GitHub releases with matching semantic-version tags on main run the existing complete checks before distributing the inspected archive via npm OIDC; the initial 0.1.0 bootstrap is complete. This contract targets 0.2.0, including direct camera entry, preference notifications and complete UI themes. Source-version preparation does not establish registry availability. Stable releases use `latest`, prereleases `next`. Package preparation, GitHub source publication, npm availability and app deployment are separate states. See the [release procedure](PUBLISHING.md#registry-release).
 
@@ -101,6 +101,16 @@ A-series sizes are indistinguishable from ratio alone; A4 is the group default. 
 
 Export pages serially and embed the exact exported JPEG/PNG blobs in jsPDF without a lossy intermediary or UI screenshot. Mixed page layouts are allowed. Validate both PDF dimensions in 10..5,000 mm; one capture is one PDF page. Any page/encoding/PDF error prevents confirmation.
 
+## Optional local OCR
+
+After scanning has closed, `createSearchablePdf` from `/ocr` takes confirmed `ScanPage[]`, the scanner asset base URL and optional languages, abort signal, progress observer and existing resource limits. It returns a new PDF plus ordered `{ id, revision, text, confidence }` results. `ScannerOptions`, `ScanResult`, page images and the default raster export remain unchanged. Module imports create no worker, fetch or storage access. The Next.js result view invokes OCR explicitly and preserves its previous result on failure/cancellation.
+
+Recognize the actual final JPEG/PNG images, including their applied crop, format and rotation. Snapshot/validate identities, revisions, metadata, actual header dimensions and layout. Support `deu`, `eng` or both (default); this selects models rather than detecting a document's language. Run one pinned Tesseract.js/Core 7.0.0 worker serially with local Fast data, LSTM-only mode, automatic page segmentation and no OSD/image rotation. Do not persist models or document data; all runtime paths are same-origin. The private version-pinned worker protocol makes termination available during initialization, language loading and recognition.
+
+Collect text and Tesseract's single-page `pdfTextOnly` output; terminate the OCR worker before starting the separate pdf-lib assembly worker. Embed final image bytes without lossy recompression and overlay the invisible text page on the same layout box as raster export, converting PDF axes without another rotation. Build a fresh document in input order; no partial successful PDF on any error. Text confidence is an engine score, not a readability or semantic-data guarantee. Blank recognized text is valid. Text selection is offered separately in the reference result view; its canvas PDF preview alone does not provide a selectable PDF text layer.
+
+The existing page, result, output-dimension/pixel and working budgets apply without silently downsampling. Count retained input images/optional originals, pixel/engine estimates, intermediate text PDFs and UTF-8 text; check actual assembled bytes. Original import `fileBytes`/`originalBytes` do not become a new cap on valid processed PNGs. These estimates do not measure available RAM or native/WASM/RSS peaks. Callback failures cannot corrupt the operation; abort/timeout/error ends pending work and late progress/results are ignored. See [ADR 0027](adr/0027-local-ocr-on-confirmed-pages.md) and [integration](INTEGRATION.md#local-ocr-and-searchable-pdf).
+
 ## Limits and lifetime
 
 | Resource | Default |
@@ -165,7 +175,7 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-09 | Adding/editing/ordering, source-aware DE/EN replacement and direct picker, cancellation/failure/required-crop rollback, retained import queue and atomic accepted-page replacement | F-09, F-15, F-16 |
 | T-10 | No partial confirmation after export error/abort | F-17, F-27, I-03 |
 | T-11 | Sharpness, lighting, unknown and honest quality claims | F-18, N-01 |
-| T-12 | Local OCR/flattening remain outside commissioned scope | F-20, F-21, F-22 |
+| T-12 | Optional local OCR: lazy assets, selected DE/EN models, real Unicode text/position/order, image-render equivalence, startup/recognition abort, failure/retry/stale isolation and resource cleanup; flattening remains separate | F-20, F-21, F-22 |
 | T-13 | Track/worker/bitmap/URL lifetime and late answers | N-02, N-03 |
 | T-14 | No uploads, persistence or CDN fallback | N-04, I-04 |
 | T-15 | Themes, narrow views, focus, corners and ordering | I-02, N-05 |
