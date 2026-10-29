@@ -16,7 +16,7 @@ function ResetControl({
 }: {
   action: ResetAction;
   disabled: boolean;
-  prepare?: React.PointerEventHandler<HTMLButtonElement>;
+  prepare?: React.MouseEventHandler<HTMLButtonElement>;
 }) {
   const description = useId();
   return (
@@ -26,7 +26,7 @@ function ResetControl({
         disabled={disabled}
         aria-label={action.label}
         aria-describedby={description}
-        onPointerDown={prepare}
+        onMouseDown={prepare}
         onClick={action.apply}
       >
         <ToolIcon name="reset" />
@@ -108,6 +108,7 @@ export function RangeControl({
           },
         }}
         disabled={disabled || (!reset.enabled && local === 0)}
+        // Keep range focus until reset without cancelling WebKit's touch click.
         prepare={(event) => event.preventDefault()}
       />
     </div>
