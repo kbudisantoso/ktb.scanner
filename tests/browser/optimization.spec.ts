@@ -12,9 +12,11 @@ import {
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 import { DEFAULT_LIMITS } from '../../packages/scanner/src/session';
+import type { Locator } from '@playwright/test';
 
 test('visible automatic optimization, manual controls, reset and export keep the same confirmed pixels', async ({
   page,
+  hasTouch,
 }, testInfo) => {
   await page.goto('/');
   const source = await page.evaluate(fixtureInBrowser, fixtures[1]);
@@ -32,6 +34,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
     expect(box!.y + box!.height).toBeLessThan(page.viewportSize()!.height);
   }
   const hash = () => previewHash(page);
+  const activateReset = (button: Locator) => (hasTouch ? button.tap() : button.click());
   const action = async (fn: () => Promise<unknown>) => {
     const old = await preview.getAttribute('src');
     await fn();
@@ -70,7 +73,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
     await expect(reset).toHaveAccessibleDescription(
       'Setzt nur diese Anpassung auf 0 zurück. Andere Einstellungen bleiben erhalten.',
     );
-    await action(() => reset.click());
+    await action(() => activateReset(reset));
     await expect(reset).toBeDisabled();
     values[name] = '0';
     for (const other of ['Helligkeit', 'Kontrast', 'Schärfe'] as const) {
@@ -88,7 +91,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
   await page.keyboard.down('ArrowRight');
   await expect(pendingRange).toHaveValue('1');
   await expect(pendingReset).toBeEnabled();
-  await pendingReset.click();
+  await activateReset(pendingReset);
   await page.keyboard.up('ArrowRight');
   await expect(pendingRange).toHaveValue('0');
   await expect(pendingReset).toBeDisabled();
@@ -110,7 +113,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
       post.call(this, message, transfer ?? []);
     };
   });
-  await pendingReset.click();
+  await activateReset(pendingReset);
   await expect(page.getByRole('dialog').getByRole('alert')).toHaveText(
     'Verarbeitung fehlgeschlagen. Bitte erneut versuchen.',
   );
@@ -119,7 +122,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
   await expect(pendingReset).toBeEnabled();
   await expect(preview).toHaveAttribute('src', appliedPreview!);
   expect(await hash()).toBe(applied);
-  await action(() => pendingReset.click());
+  await action(() => activateReset(pendingReset));
   await expect(pendingRange).toHaveValue('0');
   await expect(pendingReset).toBeDisabled();
   await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
@@ -141,7 +144,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
   await tone(page, 'Linse');
   const resetLens = page.getByRole('button', { name: 'Linse zurücksetzen', exact: true });
   await expectRangeReset(page, 'Linsenkorrektur', 'Linse zurücksetzen');
-  await action(() => resetLens.click());
+  await action(() => activateReset(resetLens));
   await expect(page.getByRole('slider', { name: 'Linsenkorrektur', exact: true })).toHaveCount(0);
   await expect(
     page
@@ -155,7 +158,7 @@ test('visible automatic optimization, manual controls, reset and export keep the
   expect(await hash()).toEqual(edited);
   await tone(page, 'Linse');
   await expect(lens).toHaveValue('100');
-  await action(() => resetLens.click());
+  await action(() => activateReset(resetLens));
   await action(() => page.getByRole('button', { name: 'Rückgängig', exact: true }).click());
   expect(await hash()).toEqual(edited);
   await expect(page.getByRole('button', { name: 'Rückgängig', exact: true })).toBeDisabled();
