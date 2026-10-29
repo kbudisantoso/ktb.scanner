@@ -9,7 +9,7 @@ test.beforeAll(async () => {
       resolveDir: process.cwd(),
       contents: `
 import {createSearchablePdf} from './packages/scanner/dist/ocr.js';
-import {metadataFor} from './packages/scanner/dist/index.js';
+import {metadataFor,fitImage} from './packages/scanner/dist/index.js';
 import {WorkerClient} from './packages/scanner/src/worker-client.ts';
 import * as pdfjs from './apps/demo-next/node_modules/pdfjs-dist/build/pdf.mjs';
 import {PDFDocument} from './packages/scanner/node_modules/pdf-lib/es/index.js';
@@ -18,7 +18,7 @@ import {createRoot} from './apps/demo-next/node_modules/react-dom/client.js';
 import Results from './apps/demo-next/app/Results.tsx';
 import {DemoLocaleProvider} from './apps/demo-next/app/i18n.tsx';
 pdfjs.GlobalWorkerOptions.workerSrc='/pdf.worker.min.mjs';
-window.ocrHarness={createSearchablePdf,metadataFor,WorkerClient,pdfjs,PDFDocument,
+window.ocrHarness={createSearchablePdf,metadataFor,fitImage,WorkerClient,pdfjs,PDFDocument,
  showResults(result,locale){
   const h=window.ocrHarness;
   if(!h.root){const mount=document.createElement('main');mount.className='has-result';document.body.replaceChildren(mount);h.root=createRoot(mount);}
@@ -132,12 +132,81 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
     const beforeStorage = await storage();
     const NativeWorker = window.Worker;
     const events: { type: string; url: string }[] = [];
+    const textLayers: Uint8Array<ArrayBuffer>[] = [];
+    const paddedImages: Promise<{
+      width: number;
+      height: number;
+      sameInterior: boolean;
+      whiteBorder: boolean;
+    }>[] = [];
     window.Worker = class extends NativeWorker {
       readonly recordedUrl: string;
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
         this.recordedUrl = new URL(String(url), location.href).href;
         events.push({ type: 'create', url: this.recordedUrl });
+        if (this.recordedUrl.endsWith('/ocr/worker.min.js'))
+          this.addEventListener('message', ({ data }) => {
+            if (data.action === 'recognize' && data.status === 'resolve')
+              textLayers.push(new Uint8Array(data.data.pdf));
+          });
+      }
+      postMessage(message: any, transfer?: Transferable[] | StructuredSerializeOptions) {
+        if (this.recordedUrl.endsWith('/ocr/worker.min.js') && message.action === 'recognize') {
+          const encoded = new Blob([new Uint8Array(message.payload.image)], { type: 'image/png' });
+          const source = h.pages[paddedImages.length].image;
+          paddedImages.push(
+            (async () => {
+              const original = await createImageBitmap(source);
+              let padded: ImageBitmap | undefined;
+              const full = document.createElement('canvas');
+              const inner = document.createElement('canvas');
+              try {
+                padded = await createImageBitmap(encoded);
+                full.width = padded.width;
+                full.height = padded.height;
+                const ctx = full.getContext('2d')!;
+                ctx.drawImage(padded, 0, 0);
+                const all = ctx.getImageData(0, 0, full.width, full.height).data;
+                let whiteBorder = true;
+                for (let y = 0; y < full.height; y++)
+                  for (let x = 0; x < full.width; x++) {
+                    if (x >= 10 && x < original.width + 10 && y >= 10 && y < original.height + 10)
+                      continue;
+                    const offset = (y * full.width + x) * 4;
+                    if (
+                      all[offset] !== 255 ||
+                      all[offset + 1] !== 255 ||
+                      all[offset + 2] !== 255 ||
+                      all[offset + 3] !== 255
+                    )
+                      whiteBorder = false;
+                  }
+                const pixels = ctx.getImageData(10, 10, original.width, original.height).data;
+                inner.width = original.width;
+                inner.height = original.height;
+                inner.getContext('2d')!.drawImage(original, 0, 0);
+                const originalPixels = inner
+                  .getContext('2d')!
+                  .getImageData(0, 0, inner.width, inner.height).data;
+                return {
+                  width: padded.width,
+                  height: padded.height,
+                  whiteBorder,
+                  sameInterior:
+                    pixels.length === originalPixels.length &&
+                    pixels.every((value, index) => value === originalPixels[index]),
+                };
+              } finally {
+                original.close();
+                padded?.close();
+                full.width = full.height = inner.width = inner.height = 1;
+              }
+            })(),
+          );
+        }
+        if (Array.isArray(transfer)) super.postMessage(message, transfer);
+        else super.postMessage(message, transfer);
       }
       terminate() {
         events.push({ type: 'terminate', url: this.recordedUrl });
@@ -162,7 +231,7 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
           throw new Error('Synthetic host progress failure');
         },
       });
-      const inspect = async (blob: Blob) => {
+      const inspect = async (blob: Blob, render = true) => {
         const loading = h.pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
         const documentPdf = await loading.promise;
         const pages = [];
@@ -172,9 +241,11 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
             const natural = pdfPage.getViewport({ scale: 1 });
             const viewport = pdfPage.getViewport({ scale: 500 / natural.width });
             const canvas = document.createElement('canvas');
-            canvas.width = Math.ceil(viewport.width);
-            canvas.height = Math.ceil(viewport.height);
-            await pdfPage.render({ canvas, viewport }).promise;
+            if (render) {
+              canvas.width = Math.ceil(viewport.width);
+              canvas.height = Math.ceil(viewport.height);
+              await pdfPage.render({ canvas, viewport }).promise;
+            }
             const text = await pdfPage.getTextContent();
             const items = text.items.filter((item: any) => typeof item.str === 'string');
             const first = items.find((item: any) => /ERSTE|SECOND/.test(item.str));
@@ -182,13 +253,11 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
               width: natural.width,
               height: natural.height,
               text: items.map((item: any) => item.str).join(' '),
-              position: first
-                ? {
-                    x: first.transform[4] / natural.width,
-                    y: 1 - first.transform[5] / natural.height,
-                  }
-                : null,
-              pixels: canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data,
+              anchor: first ? { x: first.transform[4], y: first.transform[5] } : null,
+              mediaBox: pdfPage.view as number[],
+              pixels: render
+                ? canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data
+                : new Uint8ClampedArray(),
             });
             canvas.width = canvas.height = 1;
           }
@@ -199,6 +268,9 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
       };
       const plain = await inspect(rasterPdf!);
       const searchable = await inspect(recognized.pdf);
+      const rawLayers: typeof searchable = [];
+      for (const layer of textLayers)
+        rawLayers.push((await inspect(new Blob([layer], { type: 'application/pdf' }), false))[0]);
       const pdfPages = searchable.map((entry, index) => {
         const other = plain[index];
         if (entry.pixels.length !== other.pixels.length)
@@ -210,11 +282,34 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
           difference += delta;
           if (delta > 10) changed++;
         }
+        const metadata = h.pages[index].metadata;
+        const source = metadata.outputSizePx;
+        const box =
+          metadata.format.kind === 'standard'
+            ? { x: 0, y: 0, ...metadata.outputLayoutMm }
+            : h.fitImage(source, metadata.outputLayoutMm);
+        const raw = rawLayers[index];
+        if (!raw?.anchor || !entry.anchor) throw new Error('Missing positioned OCR text');
+        const [left, bottom, right, top] = raw.mediaBox;
+        const cropLeft = left + ((right - left) * 10) / (source.width + 20);
+        const cropBottom = bottom + ((top - bottom) * 10) / (source.height + 20);
+        const cropWidth = ((right - left) * source.width) / (source.width + 20);
+        const cropHeight = ((top - bottom) * source.height) / (source.height + 20);
+        const pt = 72 / 25.4;
+        const expected = {
+          x: box.x * pt + ((raw.anchor.x - cropLeft) * box.width * pt) / cropWidth,
+          y:
+            (metadata.outputLayoutMm.height - box.y - box.height) * pt +
+            ((raw.anchor.y - cropBottom) * box.height * pt) / cropHeight,
+        };
         return {
           width: entry.width,
           height: entry.height,
           text: entry.text,
-          position: entry.position,
+          positionErrorPt: {
+            x: Math.abs(entry.anchor.x - expected.x),
+            y: Math.abs(entry.anchor.y - expected.y),
+          },
           meanDifference: difference / entry.pixels.length,
           changedFraction: changed / entry.pixels.length,
         };
@@ -237,6 +332,7 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
         afterStorage: await storage(),
         progress,
         events,
+        paddedImages: await Promise.all(paddedImages),
       };
     } finally {
       window.Worker = NativeWorker;
@@ -262,9 +358,8 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
   for (const [index, pdf] of result.pdfPages.entries()) {
     expect(pdf.width).toBeCloseTo((result.layouts[index].width * 72) / 25.4, 2);
     expect(pdf.height).toBeCloseTo((result.layouts[index].height * 72) / 25.4, 2);
-    expect(pdf.position).not.toBeNull();
-    expect(Math.abs(pdf.position!.x - 1 / 15)).toBeLessThan(0.035);
-    expect(Math.abs(pdf.position!.y - (index === 0 ? 120 / 848 : 100 / 1500))).toBeLessThan(0.04);
+    expect(pdf.positionErrorPt.x).toBeLessThan(0.02);
+    expect(pdf.positionErrorPt.y).toBeLessThan(0.02);
     expect(pdf.meanDifference).toBeLessThan(0.5);
     expect(pdf.changedFraction).toBeLessThan(0.01);
     expect(Number.isFinite(result.pages[index].confidence)).toBe(true);
@@ -277,6 +372,10 @@ test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicod
   ]);
   expect(result.sameImages).toBe(true);
   expect(result.sameMetadata).toBe(true);
+  expect(result.paddedImages).toEqual([
+    { width: 1220, height: 868, whiteBorder: true, sameInterior: true },
+    { width: 620, height: 1520, whiteBorder: true, sameInterior: true },
+  ]);
   expect(result.afterStorage).toEqual(result.beforeStorage);
   expect(result.progress.some((value) => value.stage === 'assembling')).toBe(true);
   for (const number of [1, 2])

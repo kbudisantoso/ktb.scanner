@@ -14,7 +14,9 @@ Use exact Tesseract.js and Core 7.0.0 with official `tessdata_fast` German/Engli
 
 A private version-pinned adapter controls the native worker from construction through `load`, `loadLanguage`, `initialize`, `setParameters` and serial `recognize` calls. This avoids waiting for the public factory's asynchronous initialization before obtaining a termination handle. Match jobs explicitly, bound waiting, terminate on cancellation/errors and isolate observer failures.
 
-Reuse Tesseract's invisible `pdfTextOnly` page to retain its baseline, font and Unicode mapping. After terminating OCR, a separate pdf-lib worker builds a fresh document from unchanged final JPEG/PNG images and the corresponding text overlays. Both use the existing image/layout box and PDF coordinate conversion; no extra rotation or lossy image conversion. This avoids implementing PDF text/font placement from bounding boxes.
+Recognize a temporary unscaled PNG copy with a fixed 10-pixel white margin. This prevents tight image borders from hiding text during automatic layout analysis without forcing a single text block and breaking multiple-column reading order. Release preparation resources and include the padded raster and actual encoded bytes in phase-specific memory estimates.
+
+Reuse Tesseract's invisible `pdfTextOnly` page to retain its baseline, font and Unicode mapping. After terminating OCR, a separate pdf-lib worker builds a fresh document from unchanged final JPEG/PNG images and the corresponding text overlays. Crop the text page's MediaBox proportionally to remove the working margin, including its origin; both image and text then use the existing image/layout box and PDF coordinate conversion. No extra rotation or lossy conversion of the final image. This avoids implementing PDF text/font placement from glyph bounding boxes.
 
 ## Consequences
 

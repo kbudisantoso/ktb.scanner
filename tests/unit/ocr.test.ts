@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { setImmediate as tick } from 'node:timers/promises';
 import { OcrClient } from '../../packages/scanner/src/ocr-client.ts';
 import { createSearchablePdf } from '../../packages/scanner/src/ocr.ts';
+import { prepareOcrImage } from '../../packages/scanner/src/ocr-image.ts';
 import { metadataFor } from '../../packages/scanner/src/session.ts';
 import type { PageDraft, ScanPage } from '../../packages/scanner/src/types.ts';
 
@@ -43,7 +44,47 @@ class FakeWorker {
     FakeWorker.events.push(`terminate:${this.url.pathname}`);
   }
 }
-const globals = ['Worker', 'document', 'location'] as const;
+function png(width: number, height: number, length = 24) {
+  const bytes = new Uint8Array(length);
+  bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
+  bytes.set([73, 72, 68, 82], 12);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width);
+  view.setUint32(20, height);
+  return new Blob([bytes], { type: 'image/png' });
+}
+class FakeBitmap {
+  width = 2;
+  height = 2;
+  closed = 0;
+  close() {
+    this.closed++;
+  }
+}
+const raster = {
+  decodeCalls: 0,
+  canvases: [] as FakeCanvas[],
+  decode: async (): Promise<FakeBitmap> => new FakeBitmap(),
+  encode: async (canvas: FakeCanvas): Promise<Blob> => png(canvas.width, canvas.height),
+};
+class FakeCanvas {
+  width: number;
+  height: number;
+  encodings = 0;
+  constructor(width: number, height: number) {
+    this.width = width;
+    this.height = height;
+    raster.canvases.push(this);
+  }
+  getContext() {
+    return { fillStyle: '', fillRect() {}, drawImage() {} };
+  }
+  convertToBlob() {
+    this.encodings++;
+    return raster.encode(this);
+  }
+}
+const globals = ['Worker', 'document', 'location', 'createImageBitmap', 'OffscreenCanvas'] as const;
 const originals = globals.map(
   (key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)] as const,
 );
@@ -51,7 +92,19 @@ beforeEach(() => {
   FakeWorker.instances = [];
   FakeWorker.onPost = undefined;
   FakeWorker.events = [];
+  raster.decodeCalls = 0;
+  raster.canvases = [];
+  raster.decode = async () => new FakeBitmap();
+  raster.encode = async (canvas) => png(canvas.width, canvas.height);
   Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker });
+  Object.defineProperty(globalThis, 'createImageBitmap', {
+    configurable: true,
+    value: () => {
+      raster.decodeCalls++;
+      return raster.decode();
+    },
+  });
+  Object.defineProperty(globalThis, 'OffscreenCanvas', { configurable: true, value: FakeCanvas });
   Object.defineProperty(globalThis, 'document', {
     configurable: true,
     value: { baseURI: 'http://localhost/' },
@@ -90,13 +143,7 @@ const recognized = () => ({
 
 function confirmedPage(): ScanPage {
   // Header validation is tested here; the browser case exercises real PNG decoding.
-  const bytes = new Uint8Array(24);
-  bytes.set([137, 80, 78, 71, 13, 10, 26, 10], 0);
-  bytes.set([73, 72, 68, 82], 12);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(16, 2);
-  view.setUint32(20, 2);
-  const image = new Blob([bytes], { type: 'image/png' });
+  const image = png(2, 2);
   const draft = {
     id: 'confirmed',
     revision: 5,
@@ -373,4 +420,92 @@ test('OCR output budget failure discards partial layers and a subsequent invocat
   assert.equal(result.pages.length, 1);
   assert.equal(result.pages[0].revision, 5);
   assert(FakeWorker.instances.every((worker) => worker.terminated === 1));
+});
+
+test('OCR padding aborts decode and encoding promptly, closes late bitmaps and terminates recognition', async (context) => {
+  for (const phase of ['decode', 'encode'] as const) {
+    answerWorkers();
+    let started!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const bitmap = new FakeBitmap();
+    let releaseDecode!: (bitmap: FakeBitmap) => void;
+    let releaseEncode!: (blob: Blob) => void;
+    raster.decode =
+      phase === 'decode'
+        ? () =>
+            new Promise((resolve) => {
+              releaseDecode = resolve;
+              started();
+            })
+        : async () => bitmap;
+    raster.encode = () =>
+      new Promise((resolve) => {
+        releaseEncode = resolve;
+        started();
+      });
+    const abort = new AbortController();
+    const pending = createSearchablePdf({
+      pages: [confirmedPage()],
+      assetBaseUrl: '/scanner-assets/',
+      signal: abort.signal,
+    });
+    const rejected = assert.rejects(pending, { name: 'AbortError' });
+    await entered;
+    abort.abort();
+    await rejected;
+    assert(FakeWorker.instances.every((worker) => worker.terminated === 1));
+    assert(
+      FakeWorker.instances.every((worker) => worker.url.pathname.endsWith('/ocr/worker.min.js')),
+    );
+    if (phase === 'decode') releaseDecode(bitmap);
+    else releaseEncode(png(22, 22));
+    await tick();
+    assert(bitmap.closed > 0);
+    assert(raster.canvases.every((canvas) => canvas.width === 1 && canvas.height === 1));
+    assert(
+      FakeWorker.instances.every((worker) =>
+        worker.messages.every((message) => message.action !== 'recognize'),
+      ),
+    );
+  }
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  let release!: (bitmap: FakeBitmap) => void;
+  raster.decode = () =>
+    new Promise((resolve) => {
+      release = resolve;
+    });
+  const pending = prepareOcrImage(png(2, 2), { width: 2, height: 2 });
+  const rejected = assert.rejects(pending, { code: 'PROCESSING_TIMEOUT' });
+  context.mock.timers.tick(300_000);
+  await rejected;
+  const late = new FakeBitmap();
+  release(late);
+  await tick();
+  assert(late.closed > 0);
+});
+
+test('OCR working limits include the border before decode and actual PNG bytes before recognition', async () => {
+  const options = { pages: [confirmedPage()], assetBaseUrl: '/scanner-assets/' };
+  const reserve = 64 * 1024 ** 2;
+  await assert.rejects(
+    createSearchablePdf({ ...options, limits: { workingBytes: reserve + 1000 } }),
+    { code: 'LIMIT_EXCEEDED' },
+  );
+  assert.equal(raster.decodeCalls, 0);
+  assert.equal(FakeWorker.instances.length, 0);
+  answerWorkers();
+  raster.encode = async (canvas) => png(canvas.width, canvas.height, 4096);
+  await assert.rejects(
+    createSearchablePdf({ ...options, limits: { workingBytes: reserve + 20_000 } }),
+    { code: 'LIMIT_EXCEEDED' },
+  );
+  assert.equal(raster.decodeCalls, 1);
+  assert.equal(raster.canvases[0].encodings, 1);
+  assert.equal(raster.canvases[0].width, 1);
+  assert.equal(raster.canvases[0].height, 1);
+  assert.equal(FakeWorker.instances.length, 1);
+  assert.equal(FakeWorker.instances[0].terminated, 1);
+  assert(FakeWorker.instances[0].messages.every((message) => message.action !== 'recognize'));
 });

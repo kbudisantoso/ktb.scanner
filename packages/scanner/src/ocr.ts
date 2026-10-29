@@ -4,6 +4,7 @@ import { resolveLimits } from './session.ts';
 import { imageHeader } from './image-header.ts';
 import { validateMetadata } from './validation.ts';
 import { WorkerClient, assetUrl } from './worker-client.ts';
+import { ocrImageSize, prepareOcrImage } from './ocr-image.ts';
 
 export type OcrLanguage = 'deu' | 'eng';
 export interface OcrProgress {
@@ -156,8 +157,9 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
       Math.max(header.width, header.height) > limits.outputDimension
     )
       throw limitError();
-    // A raster/engine estimate, not a native or browser RSS measurement.
-    if (retainedBytes + page.image.size + pixels * 32 + ENGINE_RESERVE > limits.workingBytes)
+    // The border is a working image, not an enlarged scan output. Encoding bytes are checked later.
+    const padded = ocrImageSize(header);
+    if (retainedBytes + padded.width * padded.height * 32 + ENGINE_RESERVE > limits.workingBytes)
       throw limitError();
   }
   if (typeof Worker === 'undefined' || typeof document === 'undefined')
@@ -190,16 +192,29 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
       aborted(signal);
       for (const [index, page] of snapshot.entries()) {
         activePage = index + 1;
-        const pageWorkingBytes =
-          retainedBytes +
-          page.image.size +
-          page.metadata.outputSizePx.width * page.metadata.outputSizePx.height * 32 +
-          ENGINE_RESERVE;
-        if (pageWorkingBytes + layerBytes + textBytes > limits.workingBytes) throw limitError();
+        const size = page.metadata.outputSizePx;
+        const padded = ocrImageSize(size);
+        const paddedPixels = padded.width * padded.height;
+        const preparationBytes = Math.max(
+          4 * (size.width * size.height + paddedPixels),
+          16 * paddedPixels,
+        );
+        if (
+          retainedBytes + layerBytes + textBytes + preparationBytes + ENGINE_RESERVE >
+          limits.workingBytes
+        )
+          throw limitError();
         recognizing = true;
         notify('recognizing', activePage, 0);
         aborted(signal);
-        const result = await client.recognize(page.image, signal);
+        let prepared: Blob | undefined = await prepareOcrImage(page.image, size, signal);
+        aborted(signal);
+        const pageWorkingBytes =
+          retainedBytes + paddedPixels * 32 + 2 * prepared.size + ENGINE_RESERVE;
+        if (pageWorkingBytes + layerBytes + textBytes > limits.workingBytes) throw limitError();
+        const result = await client.recognize(prepared, signal).finally(() => {
+          prepared = undefined;
+        });
         recognizing = false;
         aborted(signal);
         textBytes += new TextEncoder().encode(result.text).byteLength;

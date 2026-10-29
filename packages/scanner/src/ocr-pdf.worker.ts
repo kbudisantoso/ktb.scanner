@@ -4,6 +4,7 @@ import { fitImage } from './geometry.ts';
 import { ScannerError } from './errors.ts';
 import { imageHeader } from './image-header.ts';
 import { validateMetadata } from './validation.ts';
+import { OCR_BORDER_PX, ocrImageSize } from './ocr-image.ts';
 
 type AssemblyPage = Pick<ScanPage, 'id' | 'revision' | 'image' | 'metadata'> & {
   textPdf: Uint8Array;
@@ -86,8 +87,30 @@ worker.onmessage = async ({ data }) => {
       const textSource = await PDFDocument.load(page.textPdf, { updateMetadata: false });
       if (textSource.getPageCount() !== 1)
         throw new ScannerError('EXPORT_FAILED', 'Each OCR layer must contain exactly one page.');
-      const [text] = await pdf.embedPdf(textSource, [0]);
-      if (!(text.width > 0 && text.height > 0))
+      const sourcePage = textSource.getPage(0);
+      const media = sourcePage.getMediaBox();
+      if (
+        !Object.values(media).every(Number.isFinite) ||
+        media.width <= 0 ||
+        media.height <= 0 ||
+        sourcePage.getRotation().angle % 360 !== 0
+      )
+        throw new ScannerError('EXPORT_FAILED', 'Invalid OCR page dimensions or rotation.');
+      const padded = ocrImageSize(page.metadata.outputSizePx);
+      const crop = {
+        left: media.x + (media.width * OCR_BORDER_PX) / padded.width,
+        bottom: media.y + (media.height * OCR_BORDER_PX) / padded.height,
+        right: media.x + (media.width * (padded.width - OCR_BORDER_PX)) / padded.width,
+        top: media.y + (media.height * (padded.height - OCR_BORDER_PX)) / padded.height,
+      };
+      if (
+        !Object.values(crop).every(Number.isFinite) ||
+        crop.right <= crop.left ||
+        crop.top <= crop.bottom
+      )
+        throw new ScannerError('EXPORT_FAILED', 'Invalid OCR page crop.');
+      const text = await pdf.embedPage(sourcePage, crop);
+      if (![text.width, text.height].every((value) => Number.isFinite(value) && value > 0))
         throw new ScannerError('EXPORT_FAILED', 'Invalid OCR page dimensions.');
       target.drawPage(text, placement);
     }
