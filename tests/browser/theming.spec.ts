@@ -2,7 +2,7 @@ import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
 import type { Locator } from '@playwright/test';
-import { expectReviewControls, previewHash, waitForPreview } from './helpers';
+import { expectReviewControls, expectViewerControls, previewHash, waitForPreview } from './helpers';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -193,7 +193,13 @@ for (const api of ['controller', 'react']) {
         await dialog.locator('input[type=file][multiple]').setInputFiles(file);
         await waitForPreview(page);
         const hash = await previewHash(page);
-        await expect(dialog.locator('.scanner-hints')).toHaveCount(0);
+        const hintLabel = locale === 'de' ? 'Hinweise' : 'Hints';
+        const emptyHints = dialog.getByRole('button', { name: `${hintLabel}: 0`, exact: true });
+        await expect(emptyHints).toBeVisible();
+        await expect(emptyHints).toBeDisabled();
+        await expect(emptyHints).toHaveText('0');
+        await expect(emptyHints.locator('svg')).toHaveCount(1);
+        const emptyBounds = (await emptyHints.boundingBox())!;
         await expectReviewControls(page);
         if (locale === 'de' && ['chromium', 'mobile-webkit'].includes(info.project.name))
           await info.attach('review-0-hints-390.png', {
@@ -210,12 +216,17 @@ for (const api of ['controller', 'react']) {
         await waitForPreview(page, previous);
         expect(await previewHash(page)).toBe(hash);
         const hints = dialog.getByRole('button', {
-          name: `${locale === 'de' ? 'Hinweise' : 'Hints'}: 3`,
+          name: `${hintLabel}: 3`,
           exact: true,
         });
+        await expect(hints).toBeVisible();
+        await expect(hints).toBeEnabled();
         await expect(hints).toHaveText('3');
         await expect(hints.locator('svg')).toHaveCount(1);
         await expectReviewControls(page);
+        const hintBounds = (await hints.boundingBox())!;
+        for (const axis of ['x', 'y', 'width', 'height'] as const)
+          expect(Math.abs(hintBounds[axis] - emptyBounds[axis])).toBeLessThan(1);
         if (locale === 'de' && ['chromium', 'mobile-webkit'].includes(info.project.name))
           await info.attach('review-3-hints-390.png', {
             contentType: 'image/png',
@@ -365,6 +376,8 @@ test('standalone viewer consumes inherited font, palette, radius and focus; abse
   }, data);
   await expect(page.getByRole('img', { name: 'Synthetic page' })).toBeVisible();
   const viewer = page.locator('.scanner-image-viewer');
+  await expect(viewer.locator('.scanner-before-control,.scanner-hints')).toHaveCount(0);
+  await expectViewerControls(viewer);
   expect(
     await viewer.evaluate((e) => ({
       font: getComputedStyle(e).fontFamily,
@@ -505,6 +518,9 @@ test('scanner chrome and standalone viewer resist native selection while host te
   const viewer = page.locator('.scanner-image-viewer');
   const image = viewer.getByRole('img', { name: 'Standalone synthetic page', exact: true });
   await expect(image).toBeVisible();
+  await expect(viewer.locator('.scanner-before-control')).toHaveCount(1);
+  await expect(viewer.locator('.scanner-hints')).toHaveCount(0);
+  await expectViewerControls(viewer);
   expect(await viewer.evaluate((e) => getComputedStyle(e).userSelect)).toBe('none');
   await viewer.getByRole('button', { name: 'Hold to view before', exact: true }).dblclick();
   expect(await selected()).toBe('');
