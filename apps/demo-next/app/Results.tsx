@@ -3,7 +3,11 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ScanPage, ScanResult } from '@ktb-tools/scanner';
 import { useUrl } from './blob-url';
 import { useDemoLocale } from './i18n';
-import OcrControls, { useResultOcr } from './OcrControls';
+import OcrControls, {
+  useResultOcr,
+  type HostOcrOptions,
+  type OcrLanguageChoice,
+} from './OcrControls';
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const ImageViewer = lazy(() =>
   import('@ktb-tools/scanner/react').then((module) => ({ default: module.ImageViewer })),
@@ -142,12 +146,16 @@ export default function Results({
   scan,
   hidden,
   back,
+  ocrOptions,
+  onOcrLanguageChange,
 }: {
   result: Result;
   reset: () => void;
   scan: () => void;
   hidden: boolean;
   back: () => void;
+  ocrOptions?: HostOcrOptions;
+  onOcrLanguageChange?: (language: OcrLanguageChoice) => void;
 }) {
   const { t } = useDemoLocale();
   const [index, setIndex] = useState(0),
@@ -161,7 +169,7 @@ export default function Results({
     setDetails(false);
     infoTrigger.current?.focus();
   };
-  const ocr = useResultOcr(result, hidden);
+  const ocr = useResultOcr(result, hidden, ocrOptions, onOcrLanguageChange);
   const recognizing = ocr.state?.phase === 'running';
   const pdf = ocr.output?.pdf ?? result.pdf;
   const text = ocr.output?.pages.find(

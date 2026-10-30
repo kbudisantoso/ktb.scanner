@@ -4,7 +4,7 @@
 
 ### Added
 
-- Optional local OCR of confirmed pages through `@ktb-tools/scanner/ocr`, with German/English models, per-page text, progress/cancellation and a searchable PDF preserving the final image layouts. The Next.js result view offers explicit recognition and selectable text; the default scanner/raster export stays unchanged.
+- Optional local OCR of confirmed pages through `@ktb-tools/scanner/ocr`, with German/English models, per-page text, progress/cancellation and a searchable PDF preserving the final image layouts. The Next.js host offers language selection, manual recognition, an opt-in automatic run after the confirmed batch and selectable text; the default scanner/raster export stays unchanged.
 - Inline brightness, contrast, sharpness and lens reset icons in Adjust preserve unrelated page settings and are disabled at neutral values.
 - Optional `captureWorkflow: 'continuous'` keeps the camera open for multiple pages, shows extracted-page feedback and opens sequential review from **Review pages (n)**. The SDK default remains `review-each`; both demos expose the choice. Retake replaces the current page, and every page still requires review or explicit discard before export.
 - Finger-following horizontal page swipes at fit in review: the current page slides out and the neighboring page enters with its own proportions, with short-gesture rebound and reduced-motion support. Optional `ImageViewer.onPageSwipe` continues to report host-owned page navigation.

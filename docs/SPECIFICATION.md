@@ -1,6 +1,6 @@
 # Implementation contract
 
-Version 0.10, updated 29 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.10, updated 30 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
@@ -103,7 +103,7 @@ Export pages serially and embed the exact exported JPEG/PNG blobs in jsPDF witho
 
 ## Optional local OCR
 
-After scanning has closed, `createSearchablePdf` from `/ocr` takes confirmed `ScanPage[]`, the scanner asset base URL and optional languages, abort signal, progress observer and existing resource limits. It returns a new PDF plus ordered `{ id, revision, text, confidence }` results. `ScannerOptions`, `ScanResult`, page images and the default raster export remain unchanged. Module imports create no worker, fetch or storage access. The Next.js result view invokes OCR explicitly and preserves its previous result on failure/cancellation.
+After scanning has closed, `createSearchablePdf` from `/ocr` takes confirmed `ScanPage[]`, the scanner asset base URL and optional languages, abort signal, progress observer and existing resource limits. It returns a new PDF plus ordered `{ id, revision, text, confidence }` results. `ScannerOptions`, `ScanResult`, page images and the default raster export remain unchanged. Module imports create no worker, fetch or storage access. The Next.js host offers manual invocation and an automatic-after-scan opt-in, off by default and captured before opening. Run once for the newly confirmed batch after scanner cleanup, using the same OCR path; cancellation/failure, hidden/visible transitions and language/locale changes cannot automatically retry. Share the host's language choice between Options and results, retain manual retry and preserve previous results on failure/cancellation. Host preferences stay in RAM.
 
 Recognize the actual final JPEG/PNG images, including their applied crop, format and rotation. Snapshot/validate identities, revisions, metadata, actual header dimensions and layout. Support `deu`, `eng` or both (default); this selects models rather than detecting a document's language. Run one pinned Tesseract.js/Core 7.0.0 worker serially with local Fast data, LSTM-only mode, automatic page segmentation and no OSD/image rotation. Do not persist models or document data; all runtime paths are same-origin. The private version-pinned worker protocol makes termination available during initialization, language loading and recognition.
 

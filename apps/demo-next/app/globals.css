@@ -185,6 +185,20 @@ h1 {
   border-radius: 6px;
   font-size: 16px;
 }
+.setup .ocr-toggle {
+  grid-column: 1 / -1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.ocr-toggle input {
+  width: 22px;
+  height: 22px;
+  accent-color: var(--accent);
+  flex: none;
+}
 .diagnostics p {
   font-size: 12px;
   line-height: 1.5;

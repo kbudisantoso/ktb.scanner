@@ -252,18 +252,19 @@ Unreleased source exports `createSearchablePdf` and its `OcrOptions`, `OcrLangua
 
 ```ts
 import type { ScanResult } from '@ktb-tools/scanner';
-import type { OcrProgress } from '@ktb-tools/scanner/ocr';
+import type { OcrLanguage, OcrProgress } from '@ktb-tools/scanner/ocr';
 
 export async function recognizeConfirmed(
   result: Extract<ScanResult, { status: 'confirmed' }>,
   signal: AbortSignal,
   onProgress: (value: OcrProgress) => void,
+  languages: readonly OcrLanguage[] = ['deu', 'eng'],
 ) {
   const { createSearchablePdf } = await import('@ktb-tools/scanner/ocr');
   return createSearchablePdf({
     pages: result.pages,
     assetBaseUrl: '/scanner-assets/',
-    languages: ['deu', 'eng'],
+    languages,
     signal,
     onProgress,
   });
@@ -272,7 +273,9 @@ export async function recognizeConfirmed(
 
 For imperative integrations, await `scanner.open()` and finish its cleanup before calling OCR. For React integrations, close/unmount the scanner before starting recognition in the result view. The host may replace its displayed PDF only after the OCR promise succeeds; retain the original confirmed images/PDF for cancellation and retry. The returned `pages` contain matching IDs/revisions, text and an engine confidence from 0 to 100. Empty text is valid; confidence is not a readability certificate. A new invocation uses its supplied image revisions; there is no persistent OCR cache or session-level reuse contract.
 
-Languages accept `deu`, `eng`, or both (the default). This selects recognition models, independently of UI locale; it is not automatic language classification. Tesseract uses automatic page segmentation without OSD or an additional image rotation. It recognizes already cropped, corrected and rotated final JPEG/PNG images. A temporary, unscaled OCR copy adds a 10-pixel white margin so tightly cropped text remains detectable; the final scan image stays unchanged. The margin is removed from the invisible text page's coordinate mapping before it is placed on the exact original image/layout box. Text selection and reading order can still contain recognition errors; searchable PDF does not imply invoice fields, semantic tags or PDF/UA.
+To recognize automatically, capture the host's opt-in before opening and invoke the same function once for a new confirmed result after cleanup. This means after **Finish** for the reviewed batch, rather than after each camera shot. A cancelled scan does not start OCR. The SDK has no additional auto-start option: the host controls when it calls `/ocr`. The Next.js Options panel demonstrates this with **Recognize text automatically after scanning**, off by default, and a shared OCR language selection. Cancelled/failed OCR, returning to retained results or changing language does not automatically retry; use the existing manual action. Preferences stay in host memory.
+
+Languages accept `deu`, `eng`, or both (the default); pass `['deu']` for German only. This selects recognition models before OCR, independently of UI locale; it is not automatic language classification. Tesseract uses automatic page segmentation without OSD or an additional image rotation. It recognizes already cropped, corrected and rotated final JPEG/PNG images. A temporary, unscaled OCR copy adds a 10-pixel white margin so tightly cropped text remains detectable; the final scan image stays unchanged. The margin is removed from the invisible text page's coordinate mapping before it is placed on the exact original image/layout box. Text selection and reading order can still contain recognition errors; searchable PDF does not imply invoice fields, semantic tags or PDF/UA.
 
 `onProgress` reports `{ stage, page, pages, progress }`: `loading` and `assembling` have concrete 0/1 endpoints and `page: 0`; `recognizing` uses a one-based page number and per-page engine progress from 0 to 1. These are not a synthesized whole-document percentage. Observer failures are isolated. Abort through the supplied signal terminates startup/recognition/assembly and rejects with `AbortError`; it never returns a partial successful PDF. Other failures use existing scanner error codes. OCR runs serially in one worker, terminates it, then starts the PDF assembly worker.
 

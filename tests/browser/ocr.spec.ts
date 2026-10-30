@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import type { ScanPage } from '../../packages/scanner/src/types';
+import type { HostOcrOptions } from '../../apps/demo-next/app/OcrControls';
 
 let harness: string;
 test.beforeAll(async () => {
@@ -16,20 +17,27 @@ import {PDFDocument} from './packages/scanner/node_modules/pdf-lib/es/index.js';
 import React from './apps/demo-next/node_modules/react/index.js';
 import {createRoot} from './apps/demo-next/node_modules/react-dom/client.js';
 import Results from './apps/demo-next/app/Results.tsx';
-import {DemoLocaleProvider} from './apps/demo-next/app/i18n.tsx';
+import {DemoLocaleProvider,useDemoLocale} from './apps/demo-next/app/i18n.tsx';
 pdfjs.GlobalWorkerOptions.workerSrc='/pdf.worker.min.mjs';
+function HostResults(props){
+ const h=window.ocrHarness;
+ h.changeLocale=useDemoLocale().setLocale;
+ React.useEffect(()=>{h.effectSetups++;return()=>h.effectCleanups++;},[]);
+ return React.createElement(Results,props);
+}
 window.ocrHarness={createSearchablePdf,metadataFor,fitImage,WorkerClient,pdfjs,PDFDocument,
- showResults(result,locale){
+ effectSetups:0,effectCleanups:0,
+ showResults(result,locale,options={}){
   const h=window.ocrHarness;
   if(!h.root){const mount=document.createElement('main');mount.className='has-result';document.body.replaceChildren(mount);h.root=createRoot(mount);}
-  h.root.render(React.createElement(DemoLocaleProvider,{initialLocale:locale},React.createElement(Results,{result,hidden:false,reset(){},scan(){},back(){}})));
+  h.root.render(React.createElement(React.StrictMode,null,React.createElement(DemoLocaleProvider,{initialLocale:locale},React.createElement(HostResults,{result,hidden:false,reset(){},scan(){},back(){},...options}))));
  }};`,
     },
     bundle: true,
     format: 'esm',
     target: 'es2022',
     write: false,
-    define: { 'process.env.NODE_ENV': '"production"' },
+    define: { 'process.env.NODE_ENV': '"development"' },
   });
   harness = compiled.outputFiles[0].text;
 });
@@ -102,6 +110,107 @@ async function confirmedPages(): Promise<void> {
     canvas.width = canvas.height = 1;
   }
   h.pages = pages;
+}
+
+type ResultHostArgs = {
+  locale: 'en' | 'de';
+  ocrOptions?: HostOcrOptions;
+  batch?: boolean;
+};
+async function controlledResultHost({
+  locale,
+  ocrOptions,
+  batch = false,
+}: ResultHostArgs): Promise<void> {
+  const h = (window as any).ocrHarness;
+  const pages = batch ? h.pages : h.pages.slice(0, 1);
+  const raster = new h.WorkerClient(new URL('/scanner-assets/pdf.worker.js', location.href));
+  let pdf: Blob;
+  try {
+    pdf = await raster.run({ pages, maxBytes: 16 * 1024 ** 2 });
+  } finally {
+    raster.destroy();
+  }
+  const overlay = await h.PDFDocument.create();
+  overlay.addPage([1200, 848]).drawText('Synthetic OCR layer', { opacity: 0 });
+  h.textPdf = await overlay.save();
+  h.behavior = 'hold';
+  h.held = [];
+  h.ocrWorkers = [];
+  h.languages = [];
+  h.recognitions = 0;
+  const NativeWorker = window.Worker;
+  h.NativeWorker = NativeWorker;
+  window.Worker = class extends NativeWorker {
+    readonly controlled: boolean;
+    constructor(url: string | URL, options?: WorkerOptions) {
+      super(url, options);
+      this.controlled = String(url).endsWith('/ocr/worker.min.js');
+      if (this.controlled) h.ocrWorkers.push({ worker: this, terminated: false });
+    }
+    postMessage(message: any, transfer?: Transferable[] | StructuredSerializeOptions) {
+      if (!this.controlled) {
+        if (Array.isArray(transfer)) super.postMessage(message, transfer);
+        else super.postMessage(message, transfer);
+        return;
+      }
+      const listener = this.onmessage;
+      if (h.behavior === 'hold') {
+        h.held.push({ listener, worker: this, message });
+        return;
+      }
+      if (message.action === 'loadLanguage') h.languages.push(message.payload.langs);
+      if (message.action === 'recognize') h.recognitions++;
+      queueMicrotask(() => {
+        const reject = h.behavior === 'reject' && message.action === 'loadLanguage';
+        listener?.call(
+          this,
+          new MessageEvent('message', {
+            data: {
+              ...message,
+              status: reject ? 'reject' : 'resolve',
+              data:
+                message.action === 'recognize'
+                  ? {
+                      text: 'Synthetic Grüße from the current page.',
+                      confidence: 93,
+                      pdf: h.textPdf.slice(),
+                    }
+                  : reject
+                    ? 'Synthetic missing model'
+                    : {},
+            },
+          }),
+        );
+      });
+    }
+    terminate() {
+      const owned = h.ocrWorkers.find((entry: any) => entry.worker === this);
+      if (owned) owned.terminated = true;
+      super.terminate();
+    }
+  };
+  h.result = {
+    status: 'confirmed',
+    schemaVersion: 1,
+    sessionId: 'current',
+    pages,
+    pdf: pdf!,
+  };
+  h.hostOptions = ocrOptions;
+  h.hidden = false;
+  h.renderHost = () =>
+    h.showResults(h.result, locale, {
+      hidden: h.hidden,
+      ocrOptions: h.hostOptions,
+      onOcrLanguageChange: ocrOptions
+        ? (language: HostOcrOptions['language']) => {
+            h.hostOptions = { ...h.hostOptions, language };
+            h.renderHost();
+          }
+        : undefined,
+    });
+  h.renderHost();
 }
 
 test('local OCR preserves final DE/EN images, ordered layouts, searchable Unicode and rendered pixels @worker-only', async ({
@@ -446,81 +555,7 @@ test('result OCR cancels, retries and ignores stale results while preserving dow
   await page.addScriptTag({ type: 'module', content: harness });
   await expect.poll(() => page.evaluate(() => !!(window as any).ocrHarness)).toBe(true);
   await page.evaluate(confirmedPages);
-  await page.evaluate(async (locale) => {
-    const h = (window as any).ocrHarness;
-    const raster = new h.WorkerClient(new URL('/scanner-assets/pdf.worker.js', location.href));
-    let pdf: Blob;
-    try {
-      pdf = await raster.run({ pages: h.pages.slice(0, 1), maxBytes: 16 * 1024 ** 2 });
-    } finally {
-      raster.destroy();
-    }
-    const overlay = await h.PDFDocument.create();
-    overlay.addPage([1200, 848]).drawText('Synthetic OCR layer', { opacity: 0 });
-    h.textPdf = await overlay.save();
-    h.behavior = 'hold';
-    h.held = [];
-    h.ocrWorkers = [];
-    h.languages = [];
-    const NativeWorker = window.Worker;
-    h.NativeWorker = NativeWorker;
-    window.Worker = class extends NativeWorker {
-      readonly controlled: boolean;
-      constructor(url: string | URL, options?: WorkerOptions) {
-        super(url, options);
-        this.controlled = String(url).endsWith('/ocr/worker.min.js');
-        if (this.controlled) h.ocrWorkers.push({ worker: this, terminated: false });
-      }
-      postMessage(message: any, transfer?: Transferable[] | StructuredSerializeOptions) {
-        if (!this.controlled) {
-          if (Array.isArray(transfer)) super.postMessage(message, transfer);
-          else super.postMessage(message, transfer);
-          return;
-        }
-        const listener = this.onmessage;
-        if (h.behavior === 'hold') {
-          h.held.push({ listener, worker: this, message });
-          return;
-        }
-        if (message.action === 'loadLanguage') h.languages.push(message.payload.langs);
-        queueMicrotask(() => {
-          const reject = h.behavior === 'reject' && message.action === 'loadLanguage';
-          listener?.call(
-            this,
-            new MessageEvent('message', {
-              data: {
-                ...message,
-                status: reject ? 'reject' : 'resolve',
-                data:
-                  message.action === 'recognize'
-                    ? {
-                        text: 'Synthetic Grüße from the current page.',
-                        confidence: 93,
-                        pdf: h.textPdf.slice(),
-                      }
-                    : reject
-                      ? 'Synthetic missing model'
-                      : {},
-              },
-            }),
-          );
-        });
-      }
-      terminate() {
-        const owned = h.ocrWorkers.find((entry: any) => entry.worker === this);
-        if (owned) owned.terminated = true;
-        super.terminate();
-      }
-    };
-    h.result = {
-      status: 'confirmed',
-      schemaVersion: 1,
-      sessionId: 'current',
-      pages: h.pages.slice(0, 1),
-      pdf: pdf!,
-    };
-    h.showResults(h.result, locale);
-  }, locale);
+  await page.evaluate<void, ResultHostArgs>(controlledResultHost, { locale });
   const download = page.getByRole('link', { name: names.pdf, exact: true });
   const image = page.getByRole('link', { name: names.image, exact: true });
   await expect(download).toHaveAttribute('href', /^blob:/);
@@ -629,6 +664,178 @@ test('result OCR cancels, retries and ignores stale results while preserving dow
       (window as any).ocrHarness.ocrWorkers.every((entry: any) => entry.terminated),
     ),
   ).toBe(true);
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.root.unmount();
+    window.Worker = h.NativeWorker;
+  });
+});
+
+test('automatic result OCR is opt-in and runs once per batch through StrictMode and later host updates', async ({
+  page,
+}) => {
+  await page.goto('/?lang=en');
+  await page.getByRole('button', { name: 'Options', exact: true }).click();
+  const automatic = page.getByRole('checkbox', {
+    name: 'Recognize text automatically after scanning',
+    exact: true,
+  });
+  const optionLanguages = page.getByRole('combobox', { name: 'Text languages', exact: true });
+  await expect(automatic).not.toBeChecked();
+  await expect(optionLanguages).toHaveValue('deu+eng');
+  await optionLanguages.selectOption('eng');
+  await automatic.check();
+  await expect(automatic).toBeChecked();
+  await expect(optionLanguages).toHaveValue('eng');
+  await page.getByRole('button', { name: 'Close options', exact: true }).click();
+  await page.addScriptTag({ type: 'module', content: harness });
+  await expect.poll(() => page.evaluate(() => !!(window as any).ocrHarness)).toBe(true);
+  await page.evaluate(confirmedPages);
+  await page.evaluate<void, ResultHostArgs>(controlledResultHost, {
+    locale: 'en',
+    batch: true,
+    ocrOptions: { automatic: true, language: 'eng' },
+  });
+  const ocrCount = () => page.evaluate(() => (window as any).ocrHarness.ocrWorkers.length);
+  const settled = () =>
+    page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+  await expect.poll(() => page.evaluate(() => (window as any).ocrHarness.held.length)).toBe(1);
+  await expect(
+    page.getByRole('button', { name: 'Cancel text recognition', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'PDF', exact: true })).toBeDisabled();
+  expect(
+    await page.evaluate(() => ({
+      setups: (window as any).ocrHarness.effectSetups,
+      cleanups: (window as any).ocrHarness.effectCleanups,
+    })),
+  ).toEqual({ setups: 2, cleanups: 1 });
+  const image = page.getByRole('link', { name: 'Download image', exact: true });
+  await expect(image).toHaveAttribute('href', /^blob:/);
+  const imageUrl = await image.getAttribute('href');
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.hostOptions = { ...h.hostOptions, language: 'deu' };
+    h.renderHost();
+    h.changeLocale('de');
+  });
+  await expect(
+    page.getByRole('button', { name: 'Texterkennung abbrechen', exact: true }),
+  ).toBeVisible();
+  await settled();
+  expect(await ocrCount()).toBe(1);
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.changeLocale('en');
+    h.behavior = 'success';
+    const held = h.held[0];
+    held.listener.call(
+      held.worker,
+      new MessageEvent('message', { data: { ...held.message, status: 'resolve', data: {} } }),
+    );
+  });
+  await expect(page.getByRole('button', { name: 'Text', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).ocrHarness.recognitions)).toBe(2);
+  expect(await page.evaluate(() => (window as any).ocrHarness.languages)).toEqual(['eng']);
+  await expect(image).toHaveAttribute('href', imageUrl!);
+
+  await page.getByRole('combobox', { name: 'Text languages', exact: true }).selectOption('deu+eng');
+  await expect(page.getByRole('combobox', { name: 'Text languages', exact: true })).toHaveValue(
+    'deu+eng',
+  );
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.hidden = true;
+    h.renderHost();
+  });
+  await expect(
+    page.getByRole('button', { name: 'Recognize text again', exact: true }),
+  ).toBeHidden();
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.hidden = false;
+    h.renderHost();
+  });
+  await expect(
+    page.getByRole('button', { name: 'Recognize text again', exact: true }),
+  ).toBeVisible();
+  await settled();
+  expect(await ocrCount()).toBe(1);
+
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.behavior = 'reject';
+    h.result = { ...h.result, sessionId: 'next-batch' };
+    h.renderHost();
+  });
+  await expect(page.getByRole('alert')).toBeVisible();
+  expect(await ocrCount()).toBe(2);
+  expect(await page.evaluate(() => (window as any).ocrHarness.languages)).toEqual([
+    'eng',
+    'deu+eng',
+  ]);
+  const pdf = page.getByRole('link', { name: 'Download PDF', exact: true });
+  await expect(pdf).toHaveAttribute('href', /^blob:/);
+  const rasterUrl = await pdf.getAttribute('href');
+  await page.getByRole('combobox', { name: 'Text languages', exact: true }).selectOption('eng');
+  for (const automatic of [false, true]) {
+    await page.evaluate((automatic) => {
+      const h = (window as any).ocrHarness;
+      h.hostOptions = { ...h.hostOptions, automatic };
+      h.renderHost();
+    }, automatic);
+    await settled();
+    expect(await ocrCount()).toBe(2);
+  }
+  await expect(pdf).toHaveAttribute('href', rasterUrl!);
+  await expect(image).toHaveAttribute('href', imageUrl!);
+
+  await page.evaluate(() => {
+    (window as any).ocrHarness.behavior = 'hold';
+  });
+  await page.getByRole('button', { name: 'Retry text recognition', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any).ocrHarness.held.length)).toBe(2);
+  expect(await ocrCount()).toBe(3);
+  await page.getByRole('button', { name: 'Cancel text recognition', exact: true }).click();
+  for (const hidden of [true, false]) {
+    await page.evaluate((hidden) => {
+      const h = (window as any).ocrHarness;
+      h.hidden = hidden;
+      h.renderHost();
+    }, hidden);
+    await settled();
+  }
+  await expect(
+    page.getByRole('button', { name: 'Retry text recognition', exact: true }),
+  ).toBeVisible();
+  expect(await ocrCount()).toBe(3);
+  await expect(pdf).toHaveAttribute('href', rasterUrl!);
+  expect(
+    await page.evaluate(() =>
+      (window as any).ocrHarness.ocrWorkers.every((entry: any) => entry.terminated),
+    ),
+  ).toBe(true);
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.result = { ...h.result, sessionId: 'initially-hidden-batch' };
+    h.hidden = true;
+    h.renderHost();
+  });
+  await settled();
+  expect(await ocrCount()).toBe(3);
+  await page.evaluate(() => {
+    const h = (window as any).ocrHarness;
+    h.hidden = false;
+    h.renderHost();
+  });
+  await expect(page.getByRole('button', { name: 'Recognize text', exact: true })).toBeVisible();
+  await settled();
+  expect(await ocrCount()).toBe(3);
   await page.evaluate(() => {
     const h = (window as any).ocrHarness;
     h.root.unmount();

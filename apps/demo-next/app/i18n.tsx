@@ -6,6 +6,7 @@ import { demoTitle } from './locale';
 const HOST_ENGLISH_TEXTS: Record<string, string> = {
   Texterkennung: 'Text recognition',
   Texterkennungssprachen: 'Text languages',
+  'Text nach dem Scan automatisch erkennen': 'Recognize text automatically after scanning',
   'Deutsch und Englisch': 'German and English',
   Deutsch: 'German',
   Englisch: 'English',
