@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@ktb-tools/scanner": "workspace:*",
-    "astro": "7.4.1",
+    "astro": "7.4.2",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   }
