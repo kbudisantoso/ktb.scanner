@@ -8,7 +8,7 @@ import {
 import { DEFAULT_LIMITS } from '../../packages/scanner/src/session.ts';
 import type { Quad } from '../../packages/scanner/src/types.ts';
 
-test('processing geometry preserves existing scaling and Scanic pixel-center rounding', () => {
+test('a fractional crop within output limits preserves source sampling and Scanic rounding', () => {
   const source = { width: 1001, height: 2001 };
   const corners: Quad = [
     { x: 0.1, y: 0.05 },
@@ -28,14 +28,40 @@ test('processing geometry preserves existing scaling and Scanic pixel-center rou
     limits: DEFAULT_LIMITS,
     lensCorrection: { status: 'off', strength: 0, supportedEdges: 0 },
   });
-  // Existing crop limiting floors 800.8 to 800 before scaling the complete source.
-  assert.deepEqual(plan.workingSize, { width: 1000, height: 1999 });
-  // In that working frame the longest edges are 799.2 and sqrt(49.95² + 1698.3²).
-  const workingExtraction = { width: 799, height: 1699 };
-  assert.deepEqual(plan.normalExtractionSize, workingExtraction);
-  assert.deepEqual(plan.correctedExtractionSize, workingExtraction);
-  assert.deepEqual(plan.renderSize, workingExtraction);
+  assert.deepEqual(plan.workingSize, source);
+  assert.deepEqual(plan.normalExtractionSize, expected);
+  assert.deepEqual(plan.correctedExtractionSize, expected);
+  assert.deepEqual(plan.renderSize, expected);
   assert.deepEqual(plan.mappedCorners, corners);
+});
+
+test('binding pixel and dimension caps still bound near-full output without a budget downscale', () => {
+  const source = { width: 4096, height: 3072 };
+  const corners: Quad = [
+    { x: 0.01, y: 0.01 },
+    { x: 0.99, y: 0.01 },
+    { x: 0.99, y: 0.99 },
+    { x: 0.01, y: 0.99 },
+  ];
+  for (const outputDimension of [DEFAULT_LIMITS.outputDimension, 1024]) {
+    const limits = { ...DEFAULT_LIMITS, outputDimension };
+    const plan = planProcessingMemory({
+      source,
+      corners,
+      format: { kind: 'original-ratio', origin: 'user' },
+      recipe: { version: 1, enhancement: 'none', dewarp: 'off' },
+      limits,
+      lensCorrection: { status: 'off', strength: 0, supportedEdges: 0 },
+    });
+    assert(plan.workingSize.width < source.width);
+    assert(plan.workingSize.height < source.height);
+    assert(plan.renderSize.width * plan.renderSize.height <= limits.outputPixels);
+    assert(Math.max(plan.renderSize.width, plan.renderSize.height) <= outputDimension);
+    assert(plan.peakBytes < limits.workingBytes - 16 * 1024 ** 2);
+    if (outputDimension === DEFAULT_LIMITS.outputDimension)
+      assert(plan.renderSize.width * plan.renderSize.height > 7_900_000);
+    else assert(Math.max(plan.renderSize.width, plan.renderSize.height) >= 1022);
+  }
 });
 
 test('applied lens geometry reserves the larger original crop needed by Before', () => {

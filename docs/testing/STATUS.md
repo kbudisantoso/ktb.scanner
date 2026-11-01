@@ -1,6 +1,12 @@
 # Implementation and verification status
 
-Updated 27 October 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 1 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+
+## Preserve source detail before perspective extraction, 1 November 2026
+
+Output-limit scaling now precedes integer rounding, preserving decoded source pixels when a fractional crop already fits the configured limits. Natural Scanic extraction dimensions, actual geometry-based memory accounting and the existing output caps remain. The correction adds no OCR model, public option or document-content transformation.
+
+Local verification passed: full library/Next.js/Astro build, 192 native tests and two built-package SSR checks, ten release-workflow tests, public typechecking, formatting, documentation links, a clean 189-file package archive, license inventory, delivered notices and diff checks. All 26 targeted optimization/lifecycle browser cases passed without skips or retries across Chromium, Firefox, WebKit and mobile WebKit. The dense synthetic regression compares the real worker's complete PNG pixel hash with a single direct public Scanic extraction from the original pixels; existing 12 MP filters, retained-memory rejection/recovery, lens comparison and cancellation checks remain. Audio output was muted by the shared fixture. These checks do not establish physical-phone OCR accuracy or a universally optimal output raster. No release or publication is included.
 
 ## 0.2.0 release preparation, 27 October 2026
 
