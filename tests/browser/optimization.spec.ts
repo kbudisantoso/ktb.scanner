@@ -254,6 +254,100 @@ test('visible automatic optimization, manual controls, reset and export keep the
   expect(result.metadata.lensCorrection).toMatchObject({ status: 'applied', strength: 0.18 });
 });
 
+test(
+  'a fitting fractional crop preserves dense synthetic detail through one Scanic extraction',
+  { tag: '@worker-only' },
+  async ({ page }) => {
+    await page.goto('/');
+    const result = await page.evaluate(async (limits) => {
+      const width = 1001,
+        height = 2001,
+        canvas = new OffscreenCanvas(width, height),
+        context = canvas.getContext('2d')!;
+      context.fillStyle = '#fbfbf5';
+      context.fillRect(0, 0, width, height);
+      context.font = '9px monospace';
+      for (let row = 0; row < 108; row++) {
+        context.fillStyle = row % 3 === 0 ? '#999999' : '#252525';
+        for (const x of [180, 520])
+          context.fillText(`SYNTHETIC ${row} 0123456789 12,34 EUR`, x, 180 + row * 14);
+      }
+      const original = await canvas.convertToBlob({ type: 'image/png' });
+      const source = context.getImageData(0, 0, width, height);
+      const corners = [
+        { x: 0.1, y: 0.05 },
+        { x: 0.9, y: 0.05 },
+        { x: 0.85, y: 0.9 },
+        { x: 0.15, y: 0.9 },
+      ];
+      const scanic = await import(new URL('/scanner-assets/scanic.js', location.href).href);
+      const direct = await scanic.extractDocument(
+        source,
+        Object.fromEntries(
+          ['topLeft', 'topRight', 'bottomRight', 'bottomLeft'].map((key, i) => [
+            key,
+            { x: corners[i].x * (width - 1), y: corners[i].y * (height - 1) },
+          ]),
+        ),
+        { output: 'imagedata' },
+      );
+      if (!direct.success || !(direct.output instanceof ImageData))
+        throw new Error('Direct Scanic extraction failed');
+      const sha = async (pixels: ImageData['data']) =>
+        Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', pixels))).join(',');
+      const expectedPixelHash = await sha(direct.output.data);
+      const worker = new Worker('/scanner-assets/processing.worker.js', { type: 'module' });
+      let bitmap: ImageBitmap | undefined;
+      try {
+        const processed: any = await new Promise((resolve, reject) => {
+          worker.onmessage = ({ data }) => {
+            if (data.id !== 1 || data.diagnostic) return;
+            if (data.error) reject(new Error(data.error.code));
+            else resolve(data.result);
+          };
+          worker.onerror = reject;
+          worker.postMessage({
+            id: 1,
+            kind: 'process',
+            request: {
+              original,
+              corners,
+              limits,
+              rotation: 0,
+              revision: 1,
+              mime: 'image/png',
+              format: { kind: 'original-ratio', origin: 'user' },
+              recipe: { version: 1, enhancement: 'none', dewarp: 'off' },
+              previewComparison: false,
+            },
+          });
+        });
+        bitmap = await createImageBitmap(processed.preview);
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        context.drawImage(bitmap, 0, 0);
+        return {
+          sourceSize: processed.size,
+          outputSize: processed.outputSize,
+          decodedSize: { width: canvas.width, height: canvas.height },
+          expectedSize: { width: direct.output.width, height: direct.output.height },
+          pixelHash: await sha(context.getImageData(0, 0, canvas.width, canvas.height).data),
+          expectedPixelHash,
+        };
+      } finally {
+        bitmap?.close();
+        worker.terminate();
+        canvas.width = canvas.height = 1;
+      }
+    }, DEFAULT_LIMITS);
+    expect(result.sourceSize).toEqual({ width: 1001, height: 2001 });
+    expect(result.expectedSize).toEqual({ width: 800, height: 1701 });
+    expect(result.outputSize).toEqual(result.expectedSize);
+    expect(result.decodedSize).toEqual(result.expectedSize);
+    expect(result.pixelHash).toBe(result.expectedPixelHash);
+  },
+);
+
 test('real worker straightens a radial grid and retains the truly unoptimized crop', async ({
   page,
 }) => {

@@ -50,8 +50,12 @@ export function planProcessingMemory({
   previewComparison?: boolean;
 }) {
   const crop = cropSize(corners, source);
-  const desired = limitedSize(crop, limits.outputPixels, limits.outputDimension);
-  const scale = Math.min(1, desired.width / crop.width, desired.height / crop.height);
+  // Rounding the crop first would resample even a source that already fits the limits.
+  const scale = Math.min(
+    1,
+    Math.sqrt(limits.outputPixels / (crop.width * crop.height)),
+    limits.outputDimension / Math.max(crop.width, crop.height),
+  );
   const workingSize = {
     width: Math.max(2, Math.floor(source.width * scale)),
     height: Math.max(2, Math.floor(source.height * scale)),
