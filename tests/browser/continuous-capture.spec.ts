@@ -126,6 +126,25 @@ async function prepare(page: Page) {
         source instanceof HTMLVideoElement && streams.has(source) ? canvas : source,
         ...args,
       ])) as typeof bitmap;
+    // The facade presents frames independently of detector polling, just as a live camera
+    // keeps presenting an unchanged scene. Native callbacks cannot run on its fake stream.
+    const presentations = new Map<
+      number,
+      { video: HTMLVideoElement; callback: VideoFrameRequestCallback }
+    >();
+    let presentationId = 0;
+    const requestFrame = HTMLVideoElement.prototype.requestVideoFrameCallback,
+      cancelFrame = HTMLVideoElement.prototype.cancelVideoFrameCallback;
+    HTMLVideoElement.prototype.requestVideoFrameCallback = function (callback) {
+      if (!streams.has(this)) return requestFrame.call(this, callback);
+      const id = --presentationId;
+      presentations.set(id, { video: this, callback });
+      return id;
+    };
+    HTMLVideoElement.prototype.cancelVideoFrameCallback = function (id) {
+      if (presentations.get(id)?.video === this) presentations.delete(id);
+      else cancelFrame?.call(this, id);
+    };
     Object.defineProperty(navigator, 'mediaDevices', {
       configurable: true,
       value: {
@@ -133,6 +152,7 @@ async function prepare(page: Page) {
           if (constraints.audio !== false) throw new Error('Unexpected microphone');
           h.requests++;
           let stopped = false;
+          let timer: ReturnType<typeof setInterval>;
           const track = {
             get readyState() {
               return stopped ? 'ended' : 'live';
@@ -140,6 +160,9 @@ async function prepare(page: Page) {
             stop: () => {
               if (!stopped) {
                 stopped = true;
+                clearInterval(timer);
+                for (const [id, pending] of presentations)
+                  if (streams.get(pending.video) === stream) presentations.delete(id);
                 h.stops++;
               }
             },
@@ -153,7 +176,30 @@ async function prepare(page: Page) {
               }
             },
           };
-          return { synthetic: true, getTracks: () => [track], getVideoTracks: () => [track] };
+          const stream = {
+            synthetic: true,
+            getTracks: () => [track],
+            getVideoTracks: () => [track],
+          };
+          let frames = 0;
+          timer = setInterval(() => {
+            frames++;
+            const now = performance.now();
+            for (const [id, pending] of [...presentations]) {
+              if (streams.get(pending.video) !== stream) continue;
+              presentations.delete(id);
+              pending.callback(now, {
+                mediaTime: frames / 30,
+                presentedFrames: frames,
+                width: 600,
+                height: 800,
+                expectedDisplayTime: now,
+                presentationTime: now,
+                processingDuration: 0,
+              });
+            }
+          }, 1000 / 30);
+          return stream;
         },
         enumerateDevices: async () => {
           h.enumCalls = (h.enumCalls ?? 0) + 1;

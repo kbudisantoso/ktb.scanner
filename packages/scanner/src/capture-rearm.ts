@@ -1,5 +1,6 @@
 import { area, quadDrift, validQuad } from './geometry.ts';
 import type { Quad, Size } from './types.ts';
+import { INTERVAL_CREDIT_MS, RESULT_FRESHNESS_MS, SOURCE_CONTINUITY_MS } from './live-evidence.ts';
 
 /** Internal 8 x 8 descriptor, never a retained source frame or public event payload. */
 export type CaptureFingerprint = readonly number[];
@@ -47,7 +48,7 @@ function difference(a: CaptureFingerprint | null, b: CaptureFingerprint | null):
 }
 type Change = {
   reason: 'content' | 'geometry' | 'lost';
-  since: number;
+  credit: number;
   fingerprint: CaptureFingerprint | null;
   quad: Quad | null;
 };
@@ -99,14 +100,16 @@ export class CaptureRearm {
       !Number.isFinite(receivedNow) ||
       timestamp < 0 ||
       receivedNow < timestamp ||
-      receivedNow - timestamp > 400 ||
+      receivedNow - timestamp > RESULT_FRESHNESS_MS ||
       timestamp <= this.seen ||
       receivedNow < this.received
     ) {
       this.interrupt();
       return false;
     }
-    if (timestamp - this.seen > 400 || receivedNow - this.received > 400) this.interrupt();
+    const interval = timestamp - this.seen;
+    if (interval > SOURCE_CONTINUITY_MS || receivedNow - this.received > SOURCE_CONTINUITY_MS)
+      this.interrupt();
     this.seen = timestamp;
     this.received = receivedNow;
     const current = fingerprintOf(fingerprint),
@@ -141,13 +144,14 @@ export class CaptureRearm {
     ) {
       this.pending = {
         reason,
-        since: timestamp,
+        credit: 0,
         fingerprint: current?.slice() ?? null,
         quad: copyQuad(currentQuad),
       };
       return false;
     }
-    if (timestamp - pending.since < (reason === 'lost' ? 1000 : 600)) return false;
+    pending.credit += Math.min(INTERVAL_CREDIT_MS, interval);
+    if (pending.credit < (reason === 'lost' ? 1000 : 600)) return false;
     this.reset();
     return true;
   }

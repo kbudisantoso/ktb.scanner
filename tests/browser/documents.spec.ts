@@ -139,7 +139,17 @@ test('manual photo cancels a pending live job and independently detects the full
           }
         };
         draw();
+        // captureStream's rate is a maximum; an unchanged canvas needs new paints
+        // to present distinct video frames rather than repeated reads of one image.
+        const timer = setInterval(draw, 50);
         const stream = canvas.captureStream(20);
+        for (const track of stream.getTracks()) {
+          const stop = track.stop.bind(track);
+          track.stop = () => {
+            clearInterval(timer);
+            stop();
+          };
+        }
         return stream;
       },
     });

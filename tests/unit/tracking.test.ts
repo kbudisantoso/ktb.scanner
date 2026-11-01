@@ -124,15 +124,18 @@ test('a consistent new position is adopted after two observations', () => {
   assert.equal(tracker.update(frame(125, shifted(0.1)), 125).corners, null);
   assert.deepEqual(tracker.update(frame(250, shifted(0.102)), 250).corners, shifted(0.102));
   assert.equal(tracker.reason, 'confirmed-change');
+  assert.deepEqual(tracker.view(250).corners, shifted(0.102));
+  assert.equal(tracker.view(250).animate, false);
 });
 test('loss holds briefly, fades and expires; held geometry is never capture evidence', () => {
   const tracker = new LiveTracker();
   tracker.update(frame(0), 0);
   assert.equal(tracker.update(frame(125, null), 125).corners, null);
-  assert.equal(tracker.view(300).opacity, 1);
-  assert.equal(tracker.view(500).opacity, 0.5);
-  assert.equal(tracker.view(600).corners, null);
-  assert.deepEqual(tracker.update(frame(900, shifted(0.1)), 900).corners, shifted(0.1));
+  assert.equal(tracker.view(800).opacity, 1);
+  assert.equal(tracker.view(800).animate, false);
+  assert.equal(tracker.view(900).opacity, 0.5);
+  assert.equal(tracker.view(1000).corners, null);
+  assert.deepEqual(tracker.update(frame(1300, shifted(0.1)), 1300).corners, shifted(0.1));
 });
 test('jitter is smoothed for display but raw corners remain available for stability checks', () => {
   const tracker = new LiveTracker();
@@ -141,6 +144,8 @@ test('jitter is smoothed for display but raw corners remain available for stabil
   assert.equal(tracker.update(frame(125, raw), 125).corners, raw);
   const shown = tracker.view(125).corners!;
   assert(shown[0].x > quad[0].x && shown[0].x < raw[0].x);
+  assert.equal(tracker.view(125).animate, true);
+  assert.equal(tracker.view(526).animate, false);
   assert.equal(tracker.update(frame(125, shifted(0.1)), 130).corners, null);
   assert.equal(tracker.update(frame(200), 650).corners, null);
 });

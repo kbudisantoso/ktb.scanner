@@ -2,6 +2,14 @@
 
 Updated 1 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Presented-frame capture and bounded contour motion, 1 November 2026
+
+The camera now uses distinct presented video frames, a shared bitmap for detection/fingerprinting and generation-safe intrinsic-format changes. Result freshness remains 400 ms; bounded measured-pair credit removes the 400/401 ms progress dead zone for slower observations. Continuous scene rearming also counts compatible pairs. Display-only interpolation is limited to 120 ms; target changes, hidden/unmounted views and reduced motion cancel it. Display hold/fade ends by 1,000 ms and contributes no capture evidence. See D-057 and the implementation contract.
+
+Local verification passed: full library/Next.js/Astro build, 204 native tests and two built-package SSR checks, ten release-workflow tests, public typechecking, formatting, documentation links, a clean 195-file package archive, license inventory, delivered notices and diff checks. Across the targeted camera, shutter, outline, continuous, lifecycle and React suites, final coverage is 128 passed cases and 16 existing WebKit canvas-stream skips. The affected 24-case continuous suite passed after its synthetic stream gained independent presentations; the fixture previously exposed static dimensions without any native video frames. Product guards and assertions were retained. Audio output was muted by the shared fixture. Physical camera/device timing remains separate.
+
+The [rendered synthetic frame](../images/live-outline-interpolation.png) shows the shared white/green display geometry. Timed browser assertions check interpolation completion, progress-only rerenders, scene changes and cancellation; a single image does not establish motion. The library API, detector model and synchronous full-frame shutter are unchanged. No release or publication is included.
+
 ## Preserve source detail before perspective extraction, 1 November 2026
 
 Output-limit scaling now precedes integer rounding, preserving decoded source pixels when a fractional crop already fits the configured limits. Natural Scanic extraction dimensions, actual geometry-based memory accounting and the existing output caps remain. The correction adds no OCR model, public option or document-content transformation.
