@@ -179,7 +179,7 @@ test('overlay smoothing does not retain a lost contour', () => {
   const shown = smoothQuad(quad, next, 180)!;
   assert(shown[0].x > quad[0].x && shown[0].x < next[0].x);
 });
-for (const problem of ['blur', 'unknown', 'loss', 'gap', 'stale', 'duplicate'] as const)
+for (const problem of ['blur', 'unknown', 'loss', 'stale', 'duplicate'] as const)
   test(`capture pauses without counting uncertain time for ${problem}`, () => {
     const gate = new AutoCapture();
     prime(gate);
@@ -188,13 +188,13 @@ for (const problem of ['blur', 'unknown', 'loss', 'gap', 'stale', 'duplicate'] a
         ? detection(1000, null)
         : problem === 'blur' || problem === 'unknown'
           ? detection(1000, quad, problem)
-          : detection(problem === 'gap' ? 1401 : problem === 'duplicate' ? 950 : 1000);
+          : detection(problem === 'duplicate' ? 950 : 1000);
     const response = gate.update(value, problem === 'stale' ? 1500 : value.timestamp);
     assert.equal(response.capture, false);
     assert.equal(response.progress, 0.95);
     const next = Math.max(value.timestamp, problem === 'stale' ? 1500 : 1000) + 100;
-    assert.equal(gate.update(detection(next), next).capture, problem === 'gap');
-    assert.equal(gate.update(detection(next + 100), next + 100).capture, problem !== 'gap');
+    assert.equal(gate.update(detection(next), next).capture, false);
+    assert.equal(gate.update(detection(next + 100), next + 100).capture, true);
   });
 test('manual switch invalidates in-flight detections and starts fresh on return', () => {
   const gate = new AutoCapture();

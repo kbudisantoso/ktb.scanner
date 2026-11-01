@@ -88,13 +88,31 @@ test('changing noise, transient content and observation gaps cannot accumulate a
   assert.equal(rearm.observe(other, quad, 2200, 2200), false);
   assert.equal(rearm.observe(original, quad, 2500, 2500), false);
   rearm.lock(original, quad);
-  for (const timestamp of [0, 500, 600, 700, 800, 900, 1000])
+  for (const timestamp of [0, 900, 1000, 1100, 1200, 1300, 1400])
     assert.equal(rearm.observe(other, quad, timestamp, timestamp), false);
-  for (const timestamp of [1000, 800, NaN, Infinity, -1])
-    assert.equal(rearm.observe(other, quad, timestamp, 1000), false);
-  for (let timestamp = 1100; timestamp < 1700; timestamp += 100)
+  for (const timestamp of [1400, 1200, NaN, Infinity, -1])
+    assert.equal(rearm.observe(other, quad, timestamp, 1400), false);
+  for (let timestamp = 1500; timestamp < 2100; timestamp += 100)
     assert.equal(rearm.observe(other, quad, timestamp, timestamp), false);
-  assert.equal(rearm.observe(other, quad, 1700, 1700), true);
+  assert.equal(rearm.observe(other, quad, 2100, 2100), true);
+});
+
+test('sparse scene change uses capped pair credit rather than releasing after one long interval', () => {
+  for (const period of [401, 600, 800]) {
+    const rearm = new CaptureRearm();
+    rearm.lock(original, quad);
+    assert.equal(rearm.observe(other, quad, 0, 30), false);
+    assert.equal(rearm.observe(other, quad, period, period + 30), false);
+    assert.equal(rearm.observe(other, quad, period * 2, period * 2 + 30), true);
+    assert.equal(rearm.observe(other, quad, period * 3, period * 3 + 30), false);
+    rearm.lock(original, quad);
+    for (let index = 0; index < 3; index++)
+      assert.equal(rearm.observe(null, null, index * period, index * period + 30), false);
+    assert.equal(rearm.observe(null, null, period * 3, period * 3 + 30), true);
+    rearm.lock(original, quad);
+    for (let time = 0; time <= 6000; time += 801)
+      assert.equal(rearm.observe(other, quad, time, time + 30), false);
+  }
 });
 
 test('a delayed final frame cannot release a locked scene and valid evidence still accepts the freshness boundary', () => {

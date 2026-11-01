@@ -1,6 +1,12 @@
 import type { CaptureMode, LiveDetection, Quad } from './types.ts';
 import { area, quadDrift, validQuad } from './geometry.ts';
 import { ScannerError } from './errors.ts';
+import {
+  INTERVAL_CREDIT_MS,
+  RESULT_FRESHNESS_MS,
+  SOURCE_CONTINUITY_MS,
+  UNCERTAINTY_EXPIRY_MS,
+} from './live-evidence.ts';
 
 export const DEFAULT_AUTO_CAPTURE_STABILITY_MS = 1000;
 export const AUTO_CAPTURE_STABILITY_PRESETS_MS = [400, 600, 800, 1000, 1200, 1500, 2000] as const;
@@ -21,6 +27,8 @@ export class AutoCapture {
   private anchor: Quad | null = null;
   private previous: Quad | null = null;
   private stableMs = 0;
+  private inliers = 0;
+  private sparse = false;
   private last = -Infinity;
   private seen = -Infinity;
   private interrupted = true;
@@ -44,27 +52,33 @@ export class AutoCapture {
   private clearWindow(): void {
     this.anchor = this.previous = null;
     this.stableMs = 0;
+    this.inliers = 0;
+    this.sparse = false;
     this.last = -Infinity;
     this.interrupted = true;
   }
   /** Absence may pause/reset evidence, but never invalidate a job or trigger capture. */
   poll(now: number): { progress: number; capture: boolean } {
-    if (now - this.last > 1200) return this.pause(now, 'waiting-for-evidence');
+    if (now - this.last > UNCERTAINTY_EXPIRY_MS) return this.pause(now, 'waiting-for-evidence');
     // A pending job can still return a fresh sample. Polling must not invalidate that interval.
-    if (now - this.last > 400) this.decisionReason = 'waiting-for-evidence';
+    if (now - this.last > RESULT_FRESHNESS_MS) this.decisionReason = 'waiting-for-evidence';
     return {
-      progress: this.armed && this.mode === 'auto' ? this.stableMs / this.stabilityMs : 0,
+      progress: this.armed && this.mode === 'auto' ? this.progress() : 0,
       capture: false,
     };
   }
   private pause(now: number, reason: string): { progress: number; capture: boolean } {
     this.interrupted = true;
-    if (now - this.last > 1200) this.clearWindow();
+    if (now - this.last > UNCERTAINTY_EXPIRY_MS) this.clearWindow();
     this.decisionReason = reason;
     return {
-      progress: this.armed && this.mode === 'auto' ? this.stableMs / this.stabilityMs : 0,
+      progress: this.armed && this.mode === 'auto' ? this.progress() : 0,
       capture: false,
     };
+  }
+  private progress(): number {
+    // Sparse short windows need more than a single widely separated pair. Keep green open until claim.
+    return Math.min(this.sparse && this.inliers < 4 ? 0.985 : 1, this.stableMs / this.stabilityMs);
   }
   setMode(mode: CaptureMode): void {
     this.mode = mode;
@@ -96,7 +110,7 @@ export class AutoCapture {
     }
     if (
       now < detection.timestamp ||
-      now - detection.timestamp > 400 ||
+      now - detection.timestamp > RESULT_FRESHNESS_MS ||
       detection.timestamp <= this.seen
     )
       return this.pause(
@@ -122,7 +136,9 @@ export class AutoCapture {
     const restart =
       !this.anchor || !this.previous
         ? 'acquiring'
-        : detection.timestamp - this.last > 1200
+        : now - this.last > UNCERTAINTY_EXPIRY_MS ||
+            detection.timestamp - this.last >
+              (this.interrupted ? UNCERTAINTY_EXPIRY_MS : SOURCE_CONTINUITY_MS)
           ? 'measurement-gap'
           : quadDrift(q, this.anchor) > 0.05
             ? 'anchor-drift'
@@ -135,13 +151,20 @@ export class AutoCapture {
     if (restart) {
       this.anchor = structuredClone(q);
       this.stableMs = 0;
-    } else if (!this.interrupted && detection.timestamp - this.last <= 400) {
-      this.stableMs += detection.timestamp - this.last;
+      this.inliers = 1;
+      this.sparse = false;
+    } else {
+      this.inliers++;
+      if (!this.interrupted) {
+        const interval = detection.timestamp - this.last;
+        this.sparse ||= interval > INTERVAL_CREDIT_MS;
+        this.stableMs += Math.min(INTERVAL_CREDIT_MS, interval);
+      }
     }
     this.previous = structuredClone(q);
     this.last = detection.timestamp;
     this.interrupted = false;
-    const progress = Math.min(1, this.stableMs / this.stabilityMs);
+    const progress = this.progress();
     if (progress >= 1) {
       this.armed = false;
       this.decisionReason = 'captured';

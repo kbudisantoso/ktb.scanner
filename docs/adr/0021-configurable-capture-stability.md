@@ -17,4 +17,6 @@ The one-second trial was a fixed constant. Comparing shorter and longer capture 
 
 ## Consequences
 
+Unreleased extension, 1 November 2026 (D-057): keep the 400 ms result-age limit separate from an 800 ms maximum uninterrupted observation interval. Credit at most 400 ms per valid pair; require at least four valid observations when a capture window contains a pair longer than 400 ms. Short durations on faster observations retain their existing behavior. Polling, repeated reads of one video frame, animation and invalid observations add no time. This fixes fresh sparse measurements remaining at zero progress, without a claim of continuously observed stillness between samples.
+
 The reference choices focus on 400-2,000 ms. Independently, library guardrails permit any integer from 100 through 5,000 ms, including values outside the reference choices; out-of-range values are rejected rather than silently clamped. At roughly eight detection jobs per second, the claim can arrive after the selected minimum because another fresh measurement is required. Device trials should compare false captures and image quality as well as speed. The one-second default remains until a separate decision changes it. Physical phone timing is not established by synthetic tests.

@@ -7,6 +7,8 @@ import { CaptureRearm, sampleFingerprintFromPixels } from '../capture-rearm.ts';
 import type { CaptureOutcome } from './capture-queue.ts';
 import { AutoCapture } from '../capture.ts';
 import { LiveTracker } from '../tracking.ts';
+import { RESULT_FRESHNESS_MS, UNCERTAINTY_EXPIRY_MS } from '../live-evidence.ts';
+import { capturePresentedFrame, VideoFrameIdentity } from '../video-frame.ts';
 import { CaptureOutline } from './CaptureOutline.tsx';
 import { CameraIcon } from './CameraIcon.tsx';
 import { createScanicAdapter } from '../scanic.ts';
@@ -87,6 +89,7 @@ export function CameraView({
     camera = useRef(new Camera()),
     gate = useRef(new AutoCapture(mode, stabilityMs));
   const [quad, setQuad] = useState<Quad | null>(null),
+    [animateOutline, setAnimateOutline] = useState(false),
     [opacity, setOpacity] = useState(1),
     [waiting, setWaiting] = useState(false),
     [progress, setProgress] = useState(0),
@@ -115,6 +118,8 @@ export function CameraView({
       diagnostics,
     );
     const rearm = new CaptureRearm();
+    const frameIdentity = new VideoFrameIdentity();
+    const previewElement = video.current;
     const fingerprintCanvas = document.createElement('canvas');
     fingerprintCanvas.width = fingerprintCanvas.height = 32;
     const fingerprintContext = fingerprintCanvas.getContext('2d', { willReadFrequently: true })!;
@@ -142,15 +147,51 @@ export function CameraView({
     let detectionAbort = new AbortController(),
       detectionEpoch = 0;
     let latest: { detection: LiveDetection; frameSize: Size } | undefined;
+    let latestFingerprint: ReturnType<typeof sampleFingerprintFromPixels> = null;
+    let observedFrameGeneration = frameIdentity.generation;
+    let frameSize: Size | undefined;
+    let cameraStarted = false;
+    let rebaseScene = false;
     let tracker = new LiveTracker(),
       lastEvidence = performance.now(),
-      frameAspect = 0,
       watchdogState = '';
     const showTracking = (now: number) => {
       const view = tracker.view(now);
       setQuad(view.corners);
       setOpacity(view.opacity);
+      setAnimateOutline(view.animate);
       return view;
+    };
+    const resetEvidence = (size: Size) => {
+      detectionEpoch++;
+      detectionAbort.abort();
+      detectionAbort = new AbortController();
+      engine?.destroy();
+      engine = createScanicAdapter(assetBaseUrl, diagnostics);
+      gate.current.reset();
+      tracker = new LiveTracker();
+      latest = undefined;
+      latestFingerprint = null;
+      rearm.interrupt();
+      rebaseScene ||= rearm.blocked;
+      frameSize = size;
+      setPreviewSize(size);
+      setQuad(null);
+      setAnimateOutline(false);
+      setProgress(0);
+      setWaiting(false);
+      setAutoBlock('');
+    };
+    const resized = () => {
+      if (!active || pendingShot || !cameraStarted || !video.current) return;
+      const size = { width: video.current.videoWidth, height: video.current.videoHeight };
+      if (!size.width || !size.height) return;
+      if (frameSize?.width === size.width && frameSize.height === size.height) return;
+      frameIdentity.reset();
+      observedFrameGeneration = frameIdentity.generation;
+      resetEvidence(size);
+      clearTimeout(timer);
+      timer = setTimeout(() => void tick(), 0);
     };
     gate.current.rearm();
     setTaking(false);
@@ -161,6 +202,7 @@ export function CameraView({
     setWaiting(false);
     setAutoBlock('');
     setQuad(null);
+    setAnimateOutline(false);
     setError('');
     setHasTorch(false);
     setTorch(false);
@@ -173,7 +215,11 @@ export function CameraView({
         const view = showTracking(now);
         const status = gate.current.poll(now);
         const state =
-          now - lastEvidence > 1200 ? 'expired' : now - lastEvidence > 400 ? 'waiting' : 'fresh';
+          now - lastEvidence > UNCERTAINTY_EXPIRY_MS
+            ? 'expired'
+            : now - lastEvidence > RESULT_FRESHNESS_MS
+              ? 'waiting'
+              : 'fresh';
         if (state !== watchdogState && state !== 'fresh')
           diagnose(diagnostics, 'live-watchdog', {
             state,
@@ -187,7 +233,7 @@ export function CameraView({
         watchdogState = state;
         setProgress(status.progress);
         if (state === 'expired') setAutoBlock('');
-        if (now - lastEvidence > 400) setWaiting(status.progress > 0);
+        if (now - lastEvidence > RESULT_FRESHNESS_MS) setWaiting(status.progress > 0);
       }
     }, 100);
     const capture = async (automatic = false) => {
@@ -318,7 +364,7 @@ export function CameraView({
         if (active) {
           handedOff = false;
           if (callbacks.current.continuous && !rearm.blocked && video.current)
-            rearm.lock(fingerprint(video.current), evidence?.detection.corners ?? null);
+            rearm.lock(latestFingerprint, evidence?.detection.corners ?? null);
           if (callbacks.current.continuous && !engine)
             engine = createScanicAdapter(assetBaseUrl, diagnostics);
           diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
@@ -350,51 +396,79 @@ export function CameraView({
       if (gate.current.claimManual()) void capture();
     };
     const tick = async () => {
-      const started = performance.now(),
-        epoch = detectionEpoch;
+      const started = performance.now();
+      let epoch = detectionEpoch,
+        observedAt = started;
       if (!active || pendingShot || !video.current) return;
       if (video.current.readyState < 2) {
         timer = setTimeout(() => void tick(), 125);
         return;
       }
       try {
-        const frameSize = { width: video.current.videoWidth, height: video.current.videoHeight };
-        const aspect = frameSize.width / frameSize.height;
-        if (frameAspect && Math.abs(Math.log(aspect / frameAspect)) > 0.01) {
-          tracker = new LiveTracker();
-          gate.current.reset();
-        }
-        frameAspect = aspect;
-        const generation = gate.current.generation;
-        const frameFingerprint = callbacks.current.continuous ? fingerprint(video.current) : null;
-        const frameLighting = lighting.current,
-          frameLightRevision = lightRevision.current;
-        const image = await createImageBitmap(video.current, {
-          resizeWidth: Math.max(
-            1,
-            Math.round(
-              (800 * video.current.videoWidth) /
-                Math.max(video.current.videoWidth, video.current.videoHeight),
-            ),
-          ),
-          resizeHeight: Math.max(
-            1,
-            Math.round(
-              (800 * video.current.videoHeight) /
-                Math.max(video.current.videoWidth, video.current.videoHeight),
-            ),
-          ),
-        });
-        if (!active || pendingShot || epoch !== detectionEpoch) {
-          image.close();
+        if (
+          frameSize?.width !== video.current.videoWidth ||
+          frameSize.height !== video.current.videoHeight
+        ) {
+          resized();
+          if (active && !pendingShot && epoch === detectionEpoch)
+            timer = setTimeout(() => void tick(), 125);
           return;
         }
-        const detection = await engine!.detect(image, started, detectionAbort.signal);
-        if (!active || pendingShot || epoch !== detectionEpoch) return;
+        let generation = gate.current.generation;
+        const frameLighting = lighting.current,
+          frameLightRevision = lightRevision.current;
+        const frame = await capturePresentedFrame(
+          video.current,
+          frameIdentity,
+          detectionAbort.signal,
+        );
+        if (!frame) {
+          if (active && !pendingShot && epoch === detectionEpoch)
+            timer = setTimeout(() => void tick(), 125);
+          return;
+        }
+        const { image } = frame;
+        observedAt = frame.timestamp;
+        if (
+          !active ||
+          pendingShot ||
+          epoch !== detectionEpoch ||
+          generation !== gate.current.generation
+        ) {
+          image.close();
+          if (active && !pendingShot && epoch === detectionEpoch)
+            timer = setTimeout(() => void tick(), 125);
+          return;
+        }
+        if (frame.generation !== observedFrameGeneration) {
+          observedFrameGeneration = frame.generation;
+          resetEvidence(frame.frameSize);
+          epoch = detectionEpoch;
+          generation = gate.current.generation;
+        }
+        let frameFingerprint: ReturnType<typeof sampleFingerprintFromPixels>;
+        try {
+          frameFingerprint = callbacks.current.continuous ? fingerprint(image) : null;
+        } catch (error) {
+          image.close();
+          throw error;
+        }
+        const detection = await engine!.detect(image, frame.timestamp, detectionAbort.signal);
+        if (!active || pendingShot || epoch !== detectionEpoch || !video.current) return;
+        if (
+          video.current.videoWidth !== frame.frameSize.width ||
+          video.current.videoHeight !== frame.frameSize.height
+        ) {
+          resized();
+          if (active && !pendingShot && epoch === detectionEpoch)
+            timer = setTimeout(() => void tick(), 125);
+          return;
+        }
         latest = {
           detection,
-          frameSize,
+          frameSize: frame.frameSize,
         };
+        latestFingerprint = frameFingerprint;
         const now = performance.now();
         lastEvidence = detection.timestamp;
         const evidence = tracker.update(detection, now);
@@ -402,10 +476,11 @@ export function CameraView({
         if (callbacks.current.continuous) {
           if (frameLighting || lighting.current || frameLightRevision !== lightRevision.current)
             rearm.interrupt();
-          else if (now >= detection.timestamp && now - detection.timestamp <= 400) {
-            if (observedLightRevision !== frameLightRevision) {
+          else if (now >= detection.timestamp && now - detection.timestamp <= RESULT_FRESHNESS_MS) {
+            if (observedLightRevision !== frameLightRevision || rebaseScene) {
               if (rearm.blocked) rearm.lock(frameFingerprint, detection.corners);
               observedLightRevision = frameLightRevision;
+              rebaseScene = false;
             } else if (rearm.observe(frameFingerprint, detection.corners, detection.timestamp, now))
               gate.current.rearm();
           } else rearm.interrupt();
@@ -420,7 +495,7 @@ export function CameraView({
         diagnose(diagnostics, 'live-decision', {
           ...detection,
           receivedAtMs: now,
-          latencyMs: now - started,
+          latencyMs: now - frame.timestamp,
           displayedCorners: view.corners,
           displayOpacity: view.opacity,
           trackingReason: tracker.reason,
@@ -443,6 +518,7 @@ export function CameraView({
           gate.current.reset();
           tracker = new LiveTracker();
           setQuad(null);
+          setAnimateOutline(false);
           setProgress(0);
           diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
           if (!active || abort.signal.aborted) return;
@@ -450,7 +526,7 @@ export function CameraView({
         }
       }
       if (active && !pendingShot && epoch === detectionEpoch)
-        timer = setTimeout(() => void tick(), Math.max(0, 125 - (performance.now() - started)));
+        timer = setTimeout(() => void tick(), Math.max(0, 125 - (performance.now() - observedAt)));
     };
     const start = async () => {
       try {
@@ -473,7 +549,9 @@ export function CameraView({
           videoHeight: video.current!.videoHeight,
         });
         if (!active || abort.signal.aborted) return;
-        setPreviewSize({ width: video.current!.videoWidth, height: video.current!.videoHeight });
+        frameSize = { width: video.current!.videoWidth, height: video.current!.videoHeight };
+        setPreviewSize(frameSize);
+        cameraStarted = true;
         setRunning(true);
         setHasTorch(camera.current.supportsTorch);
         void tick();
@@ -499,10 +577,12 @@ export function CameraView({
       lightRevision.current++;
       lighting.current = false;
       active = false;
+      cameraStarted = false;
       abort.abort();
       detectionAbort.abort();
       clearTimeout(timer);
       clearInterval(watchdog);
+      previewElement?.removeEventListener('resize', resized);
       for (const item of waits) {
         clearTimeout(item.timer);
         item.resolve();
@@ -520,6 +600,7 @@ export function CameraView({
     };
     signal.addEventListener('abort', release, { once: true });
     document.addEventListener('visibilitychange', pause);
+    previewElement?.addEventListener('resize', resized);
     void start();
     return () => {
       diagnose(diagnostics, 'camera-stop', {});
@@ -607,7 +688,14 @@ export function CameraView({
           hidden={phase === 'live'}
         />
         {quad && phase === 'live' && (
-          <CaptureOutline corners={quad} size={previewSize} progress={progress} opacity={opacity} />
+          <CaptureOutline
+            corners={quad}
+            size={previewSize}
+            progress={progress}
+            opacity={opacity}
+            animate={animateOutline}
+            generation={gate.current.generation}
+          />
         )}
         {phase !== 'live' && phase !== 'feedback' && (
           <>
