@@ -505,6 +505,7 @@ test('unsupported or unsuitable native photos use the secured frame and honor ev
     );
     const limits = {
       ...DEFAULT_LIMITS,
+      ...(failure === 'pixels' ? { inputPixels: 1_000_000 } : {}),
       ...(failure === 'file' ? { fileBytes: 20 } : {}),
       ...(failure === 'original' ? { originalBytes: 20 } : {}),
       ...(failure === 'memory' ? { workingBytes: 4_000_000 } : {}),

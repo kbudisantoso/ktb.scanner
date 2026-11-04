@@ -11,7 +11,7 @@ import type {
 } from './types.ts';
 import { selectDocumentCandidate, compareCaptureHint, candidateQuad } from './candidates.ts';
 import type { DocumentCandidate } from './candidates.ts';
-import { imageHeader } from './image-header.ts';
+import { readImageSource, decodeImageSource } from './image-source.ts';
 import {
   validQuad,
   limitedSize,
@@ -30,7 +30,12 @@ import { correctLens, estimateLens } from './lens.ts';
 import { grayscale, blackAndWhite } from './color-profiles.ts';
 import { WorkerTrace } from './diagnostics.worker.ts';
 import { ScannerError } from './errors.ts';
-import { sourceMemoryPeak, planProcessingMemory } from './processing-memory.ts';
+import {
+  sourceMemoryPeak,
+  fitSourceMemory,
+  planProcessingMemory,
+  fitProcessingMemory,
+} from './processing-memory.ts';
 const worker = globalThis as unknown as {
   onmessage: (event: MessageEvent) => void;
   postMessage: (message: unknown) => void;
@@ -161,31 +166,48 @@ async function process(
   );
   if (original.size > limits.fileBytes)
     throw new ScannerError('LIMIT_EXCEEDED', 'Die Bilddatei ist zu groß.');
-  const header = imageHeader(new Uint8Array(await original.arrayBuffer()));
+  // Other retained resources are already subtracted by the caller. This job owns its original.
+  const workingBudget = limits.workingBytes - original.size - 1024 ** 2;
   const checkMemory = (bytes: number) => {
-    if (!Number.isFinite(bytes) || bytes > limits.workingBytes)
+    if (!Number.isFinite(bytes) || bytes > workingBudget)
       throw new ScannerError(
         'LIMIT_EXCEEDED',
         'Das Bild überschreitet das Pixel- oder Arbeitsspeicherlimit.',
       );
   };
-  if (header.width < 2 || header.height < 2 || header.width * header.height > limits.inputPixels)
+  checkMemory(0);
+  const info = await readImageSource(original);
+  const size = info.size;
+  if (size.width < 2 || size.height < 2 || size.width * size.height > limits.inputPixels)
     throw new ScannerError(
       'LIMIT_EXCEEDED',
       'Das Bild überschreitet das Pixel- oder Arbeitsspeicherlimit.',
     );
-  checkMemory(sourceMemoryPeak(header, { engineBuffers, trace: !!trace }));
-  const bitmap = await createImageBitmap(new Blob([original], { type: header.mime }), {
-    imageOrientation: 'from-image',
-  });
+  const sourceOptions = { engineBuffers, trace: !!trace };
+  const decodeSize = fitSourceMemory(size, workingBudget, sourceOptions);
+  checkMemory(sourceMemoryPeak(decodeSize, sourceOptions));
+  const bitmap = await decodeImageSource(original, info, decodeSize);
   let source: OffscreenCanvas | undefined;
   let output: OffscreenCanvas | undefined;
   let thumbnailCanvas: OffscreenCanvas | undefined;
   try {
-    if (bitmap.width * bitmap.height > limits.inputPixels)
+    const decodedSize = { width: bitmap.width, height: bitmap.height };
+    if (
+      decodedSize.width !== decodeSize.width ||
+      decodedSize.height !== decodeSize.height ||
+      decodedSize.width < 2 ||
+      decodedSize.height < 2
+    )
       throw new ScannerError('LIMIT_EXCEEDED', 'Zu viele dekodierte Bildpunkte.');
-    const size = { width: bitmap.width, height: bitmap.height };
-    checkMemory(sourceMemoryPeak(size, { engineBuffers, trace: !!trace }));
+    checkMemory(sourceMemoryPeak(decodedSize, sourceOptions));
+    trace?.event('input-normalization', {
+      sourceSize: size,
+      decodedSize,
+      reason:
+        decodedSize.width === size.width && decodedSize.height === size.height
+          ? 'unchanged'
+          : 'working-budget',
+    });
     // A comparable live hint may seed manual correction, never automatic still geometry.
     const editorHint =
       request.captureHint?.stable === true &&
@@ -417,16 +439,32 @@ async function process(
             strength: request.recipe.dewarp === 'manual' ? request.recipe.lensStrength! : 0,
             supportedEdges: 0,
           };
-    const plan = planProcessingMemory({
-      source: size,
+    const planning = {
+      source: decodedSize,
       corners,
       format,
       recipe: request.recipe,
       limits,
       lensCorrection,
       previewComparison: request.previewComparison,
-    });
+    };
+    const normalPlan = planProcessingMemory(planning);
+    const plan = fitProcessingMemory(planning, workingBudget);
     checkMemory(plan.peakBytes);
+    trace?.event('processing-scale', {
+      sourceSize: size,
+      decodedSize,
+      workingSize: plan.workingSize,
+      outputSize: plan.renderSize,
+      reason:
+        plan.workingSize.width !== normalPlan.workingSize.width ||
+        plan.workingSize.height !== normalPlan.workingSize.height
+          ? 'working-budget'
+          : plan.workingSize.width !== decodedSize.width ||
+              plan.workingSize.height !== decodedSize.height
+            ? 'output-limits'
+            : 'unchanged',
+    });
     small.width = small.height = 1;
     data = undefined;
     sourcePixels = undefined;

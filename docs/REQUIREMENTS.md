@@ -21,7 +21,7 @@ Primary journeys: capture an invoice, collect an expense receipt, import an exis
 | F-01 | MUST | Open lazily from the host and close through a documented interface. |
 | F-02 | MUST | Capture in a permission-controlled browser, prioritizing phones, without microphone access. |
 | F-03 | MUST | Prefer the rear camera; retain import after denied/unavailable camera access and support restart. |
-| F-04 | MUST | Import JPEG, PNG and WebP through the same review pipeline as camera captures. |
+| F-04 | MUST | Import JPEG, PNG and WebP through the same review pipeline as camera captures. Accept high-resolution photos within configurable source limits, requesting a bounded decoded raster before large working surfaces when needed. Preserve original bytes, full oriented source metadata and normalized corner coordinates. |
 | F-05 | MUST | Suggest document corners and allow direct correction plus explicit redetection from the original. Preserve current rotation, recipe and format; automatic proposals require Apply, and failure keeps manual corners. Missing/conflicting detection requires explicit corner confirmation before review acceptance/export; never substitute the entire original as a scan. |
 | F-06 | MUST | Correct approximately planar perspective, crop at the actual paper boundary and preserve content. No universal polygon inset/outset as a substitute for edge evidence. |
 | F-07 | MUST | Rotate in 90-degree steps with matching preview, image, metadata and PDF. |
