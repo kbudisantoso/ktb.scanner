@@ -2,6 +2,12 @@
 
 Updated 5 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
 
+## Native camera photo source, 5 November 2026
+
+Unreleased camera acquisition now prefers a supported native photo on the existing track, retaining a synchronous video backup and exactly-once SDK feedback. Source/file/working limits, cancellation and pending hardware requests remain guarded. A fresh scene reference is secured before processing/feedback, so a next sheet placed during those phases does not become the duplicate-capture baseline. SDK cue settings cannot suppress independent browser/OS camera sounds.
+
+Final local package, library/Next.js/Astro build, typecheck, formatting, 246 native tests, three SSR checks, documentation links, notices and release-workflow checks passed. Focused camera coverage passed 48 cases with 12 existing canvas-stream omissions before the final early-page regression was added. That stricter early-page case now passes all four profiles, and the native source handoff verifies actual photo bytes, final pixels and independent corners. A final local Firefox SDK-sound check remains failed: the MP3 decodes but its AudioContext stays suspended, so no cue starts. This result is not reported as passed. The quality change remains on its own local branch for phone comparison; no hosted quality-branch CI, release or publication is claimed.
+
 ## OCR integration verification, 5 November 2026
 
 The OCR-only integration is based on current main, preserving its existing camera and processing changes. The demo now shows indeterminate activity for Paddle recognition, loading and PDF assembly, while Tesseract retains its measured recognition percentages. The public integration guide records the fixed Paddle 8-MP/4,096-pixel input ceiling.

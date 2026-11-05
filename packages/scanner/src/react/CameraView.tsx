@@ -49,7 +49,7 @@ export function CameraView({
   continuous?: boolean;
   canCapture?: boolean;
   onReview: () => void;
-  beforeCapture: (size: Size) => void;
+  beforeCapture: (size: Size) => Limits | void;
   onCancel: () => void;
   onClose: () => void;
   onImport: () => void;
@@ -247,19 +247,24 @@ export function CameraView({
       setTaking(true);
       let handedOff = false;
       try {
-        callbacks.current.beforeCapture({
-          width: video.current.videoWidth,
-          height: video.current.videoHeight,
-        });
+        const captureLimits =
+          callbacks.current.beforeCapture({
+            width: video.current.videoWidth,
+            height: video.current.videoHeight,
+          }) ?? limits;
         diagnose(diagnostics, 'capture-start', { generation: gate.current.generation });
         if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         let details: CaptureDetails | undefined;
         const blob = await camera.current.capture(
           video.current,
-          limits,
+          captureLimits,
           abort.signal,
           (value) => {
             details = value;
+            if (callbacks.current.continuous && value.photoAttempted) {
+              rearm.interrupt();
+              rebaseScene = rearm.blocked;
+            }
           },
           (value, image) => {
             const canvas = snapshot.current!;
@@ -278,6 +283,65 @@ export function CameraView({
           },
         );
         if (!active) return;
+        if (
+          callbacks.current.continuous &&
+          details?.photoAttempted &&
+          !camera.current.photoPending &&
+          rearm.blocked &&
+          video.current
+        ) {
+          // Anchor the completed photo transition before the next sheet can replace the scene
+          // during still processing or feedback. This is never another capture decision.
+          const baselineAbort = new AbortController();
+          const cancelBaseline = () => baselineAbort.abort();
+          const deadline = setTimeout(cancelBaseline, RESULT_FRESHNESS_MS);
+          abort.signal.addEventListener('abort', cancelBaseline, { once: true });
+          let baselineImage: ImageBitmap | undefined;
+          try {
+            const frame = await capturePresentedFrame(
+              video.current,
+              frameIdentity,
+              baselineAbort.signal,
+            );
+            baselineImage = frame?.image;
+            if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
+            if (frame && performance.now() - frame.timestamp <= RESULT_FRESHNESS_MS) {
+              const descriptor = fingerprint(frame.image);
+              rearm.lock(descriptor, null);
+              rebaseScene = false;
+              frameSize = frame.frameSize;
+              observedFrameGeneration = frame.generation;
+              // Reuse the existing live adapter serially; never reuse the pre-photo quad.
+              const measured = await engine!.detect(
+                frame.image,
+                frame.timestamp,
+                baselineAbort.signal,
+              );
+              if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
+              if (
+                !baselineAbort.signal.aborted &&
+                !camera.current.photoPending &&
+                frameIdentity.generation === frame.generation &&
+                performance.now() - frame.timestamp <= RESULT_FRESHNESS_MS
+              ) {
+                rearm.lock(descriptor, measured.corners);
+                diagnose(diagnostics, 'capture-scene-baseline', {
+                  timestamp: frame.timestamp,
+                  frameSize: frame.frameSize,
+                  corners: measured.corners,
+                });
+              }
+            }
+          } catch {
+            // Missing geometry leaves a secured fingerprint usable; a missing frame
+            // retains the conservative later rebase without invalidating the photo.
+          } finally {
+            baselineImage?.close();
+            clearTimeout(deadline);
+            abort.signal.removeEventListener('abort', cancelBaseline);
+          }
+        }
+        if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         if (!callbacks.current.continuous) camera.current.stop();
         engine?.destroy();
         engine = undefined;
@@ -297,7 +361,11 @@ export function CameraView({
           mime: blob.type,
           details,
           hint,
-          encodingMs: details ? performance.now() - details.capturedAtMs : undefined,
+          captureMs: details ? performance.now() - details.capturedAtMs : undefined,
+          encodingMs:
+            details && !details.photoAttempted
+              ? performance.now() - details.capturedAtMs
+              : undefined,
         });
         if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         handedOff = true;
@@ -354,6 +422,7 @@ export function CameraView({
         tracker = new LiveTracker();
         detectionAbort = new AbortController();
         engine = createScanicAdapter(assetBaseUrl, diagnostics);
+        if (frameSize) setPreviewSize(frameSize);
         pendingShot = false;
         setTaking(false);
         setQuad(null);
@@ -365,8 +434,10 @@ export function CameraView({
           handedOff = false;
           if (callbacks.current.continuous && !rearm.blocked && video.current)
             rearm.lock(latestFingerprint, evidence?.detection.corners ?? null);
-          if (callbacks.current.continuous && !engine)
-            engine = createScanicAdapter(assetBaseUrl, diagnostics);
+          if (callbacks.current.continuous) {
+            rebaseScene ||= rearm.blocked;
+            if (!engine) engine = createScanicAdapter(assetBaseUrl, diagnostics);
+          }
           diagnose(diagnostics, 'camera-error', { message: errorMessage(err) });
           if (!active || abort.signal.aborted) return;
           setError(errorMessage(err));
@@ -416,7 +487,8 @@ export function CameraView({
         }
         let generation = gate.current.generation;
         const frameLighting = lighting.current,
-          frameLightRevision = lightRevision.current;
+          frameLightRevision = lightRevision.current,
+          framePhotoPending = camera.current.photoPending;
         const frame = await capturePresentedFrame(
           video.current,
           frameIdentity,
@@ -474,9 +546,19 @@ export function CameraView({
         const evidence = tracker.update(detection, now);
         const view = showTracking(now);
         if (callbacks.current.continuous) {
-          if (frameLighting || lighting.current || frameLightRevision !== lightRevision.current)
+          if (
+            frameLighting ||
+            lighting.current ||
+            frameLightRevision !== lightRevision.current ||
+            framePhotoPending ||
+            camera.current.photoPending
+          ) {
             rearm.interrupt();
-          else if (now >= detection.timestamp && now - detection.timestamp <= RESULT_FRESHNESS_MS) {
+            rebaseScene ||= rearm.blocked;
+          } else if (
+            now >= detection.timestamp &&
+            now - detection.timestamp <= RESULT_FRESHNESS_MS
+          ) {
             if (observedLightRevision !== frameLightRevision || rebaseScene) {
               if (rearm.blocked) rearm.lock(frameFingerprint, detection.corners);
               observedLightRevision = frameLightRevision;
@@ -507,7 +589,13 @@ export function CameraView({
         });
         if (!active || abort.signal.aborted || pendingShot || epoch !== detectionEpoch) return;
         setProgress(status.progress);
-        setAutoBlock(evidence.corners ? gate.current.decisionReason : '');
+        setAutoBlock(
+          camera.current.photoPending
+            ? 'photo-pending'
+            : evidence.corners
+              ? gate.current.decisionReason
+              : '',
+        );
         setWaiting(status.progress > 0 && (!evidence.corners || evidence.sharpness !== 'sharp'));
         if (status.capture) {
           await capture(true);
@@ -705,7 +793,9 @@ export function CameraView({
                 <span />
               </span>
               <div>
-                <strong>{t('Foto aufgenommen')}</strong>
+                <strong>
+                  {phase === 'encoding' ? t('Aufnahme läuft...') : t('Foto aufgenommen')}
+                </strong>
                 <p>
                   {phase === 'encoding'
                     ? t('Bild wird gesichert...')
@@ -741,17 +831,19 @@ export function CameraView({
             ? t('Seitenlimit erreicht - bitte Seiten prüfen.')
             : !running
               ? t(error ? 'Kamera nicht bereit' : 'Kamera wird gestartet...')
-              : mode === 'auto' && autoBlock === 'sharpness-unknown'
-                ? t('Schärfe nicht beurteilbar - bitte manuell auslösen.')
-                : mode === 'auto' && autoBlock === 'sharpness-blur'
-                  ? t('Bild wirkt unscharf - ruhig halten oder manuell auslösen.')
-                  : waiting
-                    ? t('Erkennung kurz unsicher - ruhig halten')
-                    : progress > 0
-                      ? t('Ruhig halten - automatische Aufnahme')
-                      : mode === 'manual'
-                        ? t('Dokument ausrichten und auslösen')
-                        : t('Dokument vollständig ins Bild halten')}
+              : mode === 'auto' && autoBlock === 'photo-pending'
+                ? t('Kamera verarbeitet noch - warten oder manuell auslösen.')
+                : mode === 'auto' && autoBlock === 'sharpness-unknown'
+                  ? t('Schärfe nicht beurteilbar - bitte manuell auslösen.')
+                  : mode === 'auto' && autoBlock === 'sharpness-blur'
+                    ? t('Bild wirkt unscharf - ruhig halten oder manuell auslösen.')
+                    : waiting
+                      ? t('Erkennung kurz unsicher - ruhig halten')
+                      : progress > 0
+                        ? t('Ruhig halten - automatische Aufnahme')
+                        : mode === 'manual'
+                          ? t('Dokument ausrichten und auslösen')
+                          : t('Dokument vollständig ins Bild halten')}
         </p>
       )}
       <div className="scanner-camera-options" id={optionsId} hidden={!showOptions}>

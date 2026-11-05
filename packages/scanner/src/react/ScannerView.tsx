@@ -312,8 +312,8 @@ export function ScannerView({
     repeatFocus.current = true;
     return true;
   };
-  const replacementLimits = (original: Blob, pageCount = candidateCount()) => {
-    if (continuous) {
+  const replacementLimits = (original: Blob, pageCount = candidateCount(), forCapture = false) => {
+    if (continuous || forCapture) {
       const retained: CaptureCandidate[] = [...retainedPages.current];
       const files: Blob[] = [],
         extraPreviews: Blob[] = [];
@@ -342,6 +342,7 @@ export function ScannerView({
         pageCount,
         extraPreviews,
         camera ? 4_000_000 : 0,
+        forCapture,
       );
     }
 
@@ -1219,10 +1220,10 @@ export function ScannerView({
                 onCapture={(blob, hint) => processInput(blob, 'camera', hint)}
                 onReview={reviewPages}
                 beforeCapture={(size) => {
-                  if (!continuous) return;
                   const remaining = replacementLimits(
                     new Blob(),
                     candidateCount() + (!cameraReplacement.current && !replaceId.current ? 1 : 0),
+                    true,
                   );
                   // Reserve the complete frame canvas and encoding peak before copying pixels.
                   if (size.width * size.height * 8 > remaining.workingBytes)
@@ -1230,6 +1231,7 @@ export function ScannerView({
                       'LIMIT_EXCEEDED',
                       'Datei- oder Sitzungslimit erreicht. Vorhandene Seiten bleiben erhalten.',
                     );
+                  return remaining;
                 }}
                 onCancel={() => {
                   restoreCameraReplacement();

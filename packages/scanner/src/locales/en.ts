@@ -172,6 +172,8 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
   'Kamera nicht verfügbar. Bitte HTTPS oder Bildimport verwenden.':
     'Camera unavailable. Use HTTPS or import an image.',
   'Kamera pausiert. Bitte erneut starten.': 'Camera paused. Restart it to continue.',
+  'Kamera verarbeitet noch - warten oder manuell auslösen.':
+    'Camera is still processing. Wait or capture manually.',
   'Kamera starten': 'Start camera',
   'Kamera wird gestartet...': 'Starting camera...',
   'Kameralicht ist nicht verfügbar.': 'Camera light is unavailable.',
