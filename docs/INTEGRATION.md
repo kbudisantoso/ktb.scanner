@@ -246,6 +246,53 @@ export function ScanButton({ onResult }: { onResult: (result: ScanResult) => voi
 
 Import `@ktb-tools/scanner/styles.css` once and pass `theme` through `ScannerOptions` in either API. The complete [UI styling guide](UI-THEMING.md) inventories the original and extended consumed variables and defaults, explains root/ancestor precedence and captured React options, and provides checked imperative/React examples, light/dark themes, local fonts and a standalone viewer container. It also records theme-token and responsive-layout scope and how to align `locale`/`texts` with the host's existing confirmed-result handler.
 
+## Local OCR and searchable PDF
+
+Unreleased source exports `createSearchablePdf` and its `OcrOptions`, `OcrEngine`, `OcrLanguage`, `OcrProgress`, `OcrPageResult` and `SearchablePdfResult` types from `@ktb-tools/scanner/ocr`. This entry is absent from npm 0.2.0. Run it on confirmed results after the scanner has closed and released its processing worker. It does not change `ScannerOptions`, `ScanResult` or `ScanPage`.
+
+```ts
+import type { ScanResult } from '@ktb-tools/scanner';
+import type { OcrPageResult, OcrProgress } from '@ktb-tools/scanner/ocr';
+
+let previousPages: readonly OcrPageResult[] = [];
+
+export async function recognizeConfirmed(
+  result: Extract<ScanResult, { status: 'confirmed' }>,
+  signal: AbortSignal,
+  onProgress: (value: OcrProgress) => void,
+) {
+  const { createSearchablePdf } = await import('@ktb-tools/scanner/ocr');
+  const recognized = await createSearchablePdf({
+    pages: result.pages,
+    assetBaseUrl: '/scanner-assets/',
+    engine: 'paddle',
+    previousPages,
+    signal,
+    onProgress,
+  });
+  previousPages = recognized.pages;
+  return recognized;
+}
+```
+
+The demo starts recognition only from the manual result action. A production host may invoke this function automatically after **Finish**, once crop, adjustments and rotation are accepted and scanner cleanup is complete. Do not recognize camera previews or overlap scanning and OCR workers on phones. Closing/cancelling a scan must not start OCR. The SDK has no automatic-start setting: the host owns invocation and any persistence.
+
+The API defaults to `engine: 'tesseract'` for compatibility; the Next.js host explicitly defaults to Paddle and offers an engine selector. Tesseract accepts `languages: ['deu']`, `['eng']` or both (default). This selects models, independently of UI locale, rather than detecting language. Paddle uses a fixed Latin model including German and English; `languages` does not select Paddle models. Invalid engine/language values reject before a worker is created. Confidence is an engine-specific score from 0 to 100, not a readability guarantee or a cross-engine ranking.
+
+`previousPages` opts into RAM reuse; pass `[]` on the first call as above. Pass original page-result objects returned by a successful call to reuse matching image Blob identities, IDs, revisions, engine/model/asset configuration and applicable ordered languages. New/edited pages or changed engines/configurations are recognized again; reordered unchanged pages can be reused. Serialized/copied result objects are misses, not reusable persistent artifacts. Omitting `previousPages` disables this hidden retention. The host releases reuse resources by dropping the corresponding result objects. There is no localStorage, cookie, IndexedDB or reload-persistent OCR cache.
+
+One initialized worker processes missing pages serially. All-cached calls create no OCR worker. Recognition ends before a separate worker builds a fresh searchable PDF from every current page, including reused pages, in the current order. Replace the displayed PDF only after success; retain confirmed images and the previous result on cancellation/error. Abort cancels startup, recognition, reuse/assembly work and ignores late progress/results; no partial successful document is returned.
+
+The final scan pixels are not rescaled or recompressed for PDF assembly. Tesseract recognizes an unscaled temporary image with a 10-pixel white margin and maps its text-only PDF back to the original image area. Paddle recognizes the final image and places invisible Unicode text from its line polygons on the same image/layout box. Positioning inside each line is approximate because Paddle supplies line polygons rather than word/glyph boxes. Geometric reading order, recognition and selection can contain errors; this is not spelling correction, structured extraction or PDF/UA.
+
+`onProgress` reports `{ stage, page, pages, progress }`: `loading` and `assembling` have concrete endpoints and `page: 0`; `recognizing` uses the one-based current page and per-page progress. Tesseract provides intermediate recognition percentages; Paddle reports only each page's start/end. The demo shows an indeterminate activity bar for Paddle recognition, loading and assembly, with the current page/count during recognition. It is not a whole-document percentage. Observer errors cannot take over the operation. Resource limits include retained images/originals, reuse geometry, decoded page buffers, engine estimates, text and assembled bytes. They do not measure free RAM or guarantee constant memory. Processed PNGs do not inherit the original-import file cap, and resolution is not silently reduced to pass a guard. Paddle currently accepts final images up to 8 MP and 4,096 pixels per axis; raising host limits does not raise this engine cap.
+
+Copy the **complete** asset tree, including `paddle.worker.js`, `ocr/`, `ocr-pdf.worker.js`, manifests and notices. Builds copy hash-verified local models and pinned runtime inputs without downloading them. Paddle uses SDK 0.4.2, ORT 1.31.1 and OpenCV 4.10.0-release.1; Tesseract.js/Core remain 7.0.0. The pinned Paddle model packages can be reproduced from the source ONNX files listed in [models.json](../packages/scanner/assets/ocr/paddle/models.json) with `python3 packages/scanner/scripts/prepare-paddle-models.py /path/to/reviewed-models`. Model/runtime provenance and third-party licenses remain separate from the scanner's AGPL.
+
+Assets load lazily from the host, without CDN fallback or library-owned persistent caching. Ordinary HTTP caching/offline delivery is a host concern. If the host applies CSP, Paddle's worker response needs the OpenCV runtime's JavaScript `unsafe-eval` plus WASM support and its embedded `data:` runtime fetch; scope those permissions to `paddle.worker.js` rather than granting them to the host page. A same-origin worker URL and model/WASM requests must remain permitted. The ordinary scanner and Tesseract path do not require that Paddle-specific permission.
+
+The Next.js result view provides manual Start/Cancel/Retry, an engine selector, Tesseract language selection, a native selectable Text tab and the existing PDF preview/download. During OCR it unmounts the PDF preview to release decoder/canvases and resumes it after completion/cancellation. Leaving or replacing the result invalidates the active job. Downloads, filenames, storage and backend processing remain host responsibilities.
+
 ## Use confirmed results
 
 The host owns returned blobs and any URLs it creates. Trigger downloads only through explicit user actions and revoke URLs when their views are removed.

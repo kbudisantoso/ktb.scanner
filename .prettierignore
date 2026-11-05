@@ -5,3 +5,6 @@ dist
 public/scanner-assets
 public/pdf.worker.min.mjs
 pnpm-lock.yaml
+packages/scanner/third-party/tesseract-wasm/**
+packages/scanner/third-party/tesseract-worker/**
+packages/scanner/third-party/paddle-ocr/**

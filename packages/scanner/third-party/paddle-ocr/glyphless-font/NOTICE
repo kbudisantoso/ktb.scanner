@@ -1,0 +1,15 @@
+Tesseract GlyphLessFont for the searchable PDF text layer
+
+The unmodified 572-byte pdf.ttf comes from the official tessconfigs repository,
+pinned as the configs submodule of tesseract-ocr/tessdata 4.1.0.
+
+Source: https://github.com/tesseract-ocr/tessconfigs/blob/3decf1c8252ba6dbeef0bf908f4b0aab7f18d113/pdf.ttf
+Upstream license: https://github.com/tesseract-ocr/tessconfigs/blob/3decf1c8252ba6dbeef0bf908f4b0aab7f18d113/LICENSE
+Submodule reference: https://github.com/tesseract-ocr/tessdata/tree/4767ea922bcc460e70b87b1d303ebdfed0897da8
+License: Apache-2.0; the complete upstream text is retained unchanged in LICENSE.
+Font SHA-256: c7845420925a23d88ed830a63957b8af85a66a8daf8d9fc90e843673b2ef1a59
+License SHA-256: c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4
+
+The font/license/provenance are also delivered under assets/ocr/paddle/ as
+pdf.ttf, pdf-font.LICENSE and pdf-font.json. This font belongs to the PDF
+text overlay and is independent of Paddle's model weights and dictionary.

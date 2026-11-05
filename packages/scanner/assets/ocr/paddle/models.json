@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "sdk": "@paddleocr/paddleocr-js@0.4.2",
+  "runtime": "onnxruntime-web@1.31.1",
+  "opencv": "@techstark/opencv-js@4.10.0-release.1",
+  "license": "Apache-2.0",
+  "registry": "https://github.com/RapidAI/RapidOCR/blob/v3.10.0/python/rapidocr/default_models.yaml",
+  "models": [
+    {
+      "name": "PP-OCRv5_mobile_det",
+      "file": "det.tar",
+      "bytes": 4823040,
+      "sha256": "678b9577feca6c8601f2562757621cf5076d8271014c77271a98cc29a1e96796",
+      "sourceFile": "det-mobile.onnx",
+      "sourceSha256": "4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae",
+      "source": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx",
+      "upstream": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det/tree/0d63e78e2b680928f6b1747d76a08db6e645efb7",
+      "modification": "ONNX conversion by RapidAI; deterministic SDK TAR packaging with the local model-configs.json; model weights unchanged."
+    },
+    {
+      "name": "latin_PP-OCRv5_mobile_rec",
+      "file": "rec.tar",
+      "bytes": 7915520,
+      "sha256": "3d4f5e31145197cb7614d202e6de84f71c848ce129c8603ce24d91d19475df78",
+      "sourceFile": "rec-latin-mobile.onnx",
+      "sourceSha256": "b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a",
+      "source": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx",
+      "upstream": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec/tree/08fe4a9d06aca318ebf5b899a034bbfda36496b4",
+      "modification": "ONNX conversion by RapidAI; deterministic SDK TAR packaging with the local model-configs.json; model weights unchanged."
+    }
+  ],
+  "dictionary": {
+    "characters": 502,
+    "sha256": "3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff",
+    "upstreamRevision": "08fe4a9d06aca318ebf5b899a034bbfda36496b4",
+    "source": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec/blob/08fe4a9d06aca318ebf5b899a034bbfda36496b4/inference.yml"
+  },
+  "runtimeFiles": {
+    "ort-wasm-simd-threaded.mjs": {
+      "bytes": 24738,
+      "sha256": "30ed0b5cd1182ede931fea448afb567d4dc705ec957af09f108a2be5f770dac3"
+    },
+    "ort-wasm-simd-threaded.wasm": {
+      "bytes": 14848852,
+      "sha256": "4b884c203b0fa48d057be3332c65513ff85aa3c5bddd6946acc0fab7ecda001d"
+    }
+  }
+}

@@ -9,7 +9,9 @@ Integrate a complete scanner and receive user-confirmed files and structured met
 - **Integration:** a framework-independent core, reusable React UI, theme tokens, localization, typed results, cancellation and resource cleanup.
 - **Consistent output:** ordered images, an optional multi-page raster PDF and serializable metadata from the same confirmed page revisions.
 
-Scanic supplies document detection, perspective correction and the corner editor; jsPDF generates PDFs. ktb.scanner combines these libraries with its session, capture, processing and review workflow. Originals and results remain in memory. There is no built-in upload or OCR text layer, and no general detection-quality advantage over Scanic is claimed.
+Scanic supplies document detection, perspective correction and the corner editor; jsPDF generates the default raster PDFs. ktb.scanner combines these libraries with its session, capture, processing and review workflow. Originals and results remain in memory. There is no built-in upload, and no general detection-quality advantage over Scanic is claimed.
+
+Unreleased source provides optional local OCR of confirmed final images through `/ocr`: per-page text/confidence and a searchable PDF using same-origin assets. Select Paddle or Tesseract; the API retains Tesseract as its default, while the Next.js demo selects Paddle and starts OCR manually. Recognition is serial and abortable, and opt-in RAM reuse skips unchanged page revisions; original images and the existing scanner result stay unchanged. This feature is absent from npm 0.2.0; see [OCR integration](../../docs/INTEGRATION.md#local-ocr-and-searchable-pdf).
 
 This documentation targets library **0.2.0**. Check exact registry availability before installation; a locally built package archive provides the same source-version integration. Direct camera entry, preference notifications and the complete theme tokens were introduced in 0.2.0.
 
@@ -19,6 +21,7 @@ This documentation targets library **0.2.0**. Check exact registry availability 
 - `@ktb-tools/scanner/react`: `createScanner`, themeable `Scanner` and reusable `ImageViewer` components.
 - `@ktb-tools/scanner/scanic`: classic Scanic in an abortable worker.
 - `@ktb-tools/scanner/export`: serial image and PDF creation.
+- `@ktb-tools/scanner/ocr`: unreleased local OCR and searchable PDF creation from confirmed pages.
 - `@ktb-tools/scanner/styles.css`: scoped styles and semantic theme variables.
 
 For all supported CSS variables/defaults, imperative/React themes, light/dark palettes, locally served fonts, viewer inheritance and styling limits, see the [public UI styling guide](https://github.com/kbudisantoso/ktb.scanner/blob/main/docs/UI-THEMING.md).

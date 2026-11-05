@@ -1,0 +1,9 @@
+{
+  "file": "pdf.ttf",
+  "bytes": 572,
+  "sha256": "c7845420925a23d88ed830a63957b8af85a66a8daf8d9fc90e843673b2ef1a59",
+  "source": "https://github.com/tesseract-ocr/tessconfigs/blob/3decf1c8252ba6dbeef0bf908f4b0aab7f18d113/pdf.ttf",
+  "commit": "3decf1c8252ba6dbeef0bf908f4b0aab7f18d113",
+  "license": "Apache-2.0",
+  "via": "tesseract-ocr/tessdata@4.1.0 submodule"
+}

@@ -1,0 +1,58 @@
+Supplemental notices for the PaddleOCR browser worker
+
+The scanner bundles @paddleocr/paddleocr-js 0.4.2 from its main ESM entry,
+onnxruntime-web/common 1.31.1 from the WASM entry, and
+@techstark/opencv-js 4.10.0-release.1 inside its own worker. These packages are
+build inputs; their installed JavaScript dependency notices are collected in
+dist/assets/licenses. The separately prebuilt PaddleOCR worker is not shipped:
+its ORT 1.24.3 dependency graph and CDN defaults do not describe this build.
+
+PaddleOCR.js, Apache-2.0
+  npm gitHead: e5046169b225bcdfbe25d45b4e809ff0f1a69c2c
+  Source/build inputs:
+  https://github.com/PaddlePaddle/PaddleOCR/tree/e5046169b225bcdfbe25d45b4e809ff0f1a69c2c/paddleocr-js
+  Original license, omitted from the npm package:
+  paddleocr-js-0.4.2/LICENSE
+  https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/e5046169b225bcdfbe25d45b4e809ff0f1a69c2c/LICENSE
+
+ONNX Runtime 1.31.1, MIT and retained third-party notices
+  Source/build inputs:
+  https://github.com/microsoft/onnxruntime/tree/v1.31.1
+  Native dependency source URLs and revisions:
+  https://github.com/microsoft/onnxruntime/blob/v1.31.1/cmake/deps.txt
+  onnxruntime-1.31.1/LICENSE
+  https://raw.githubusercontent.com/microsoft/onnxruntime/v1.31.1/LICENSE
+  onnxruntime-1.31.1/NOTICE-ThirdPartyNotices.txt retains unchanged:
+  https://raw.githubusercontent.com/microsoft/onnxruntime/v1.31.1/ThirdPartyNotices.txt
+  This upstream aggregate also describes native providers and components that
+  are not part of the selected CPU-WASM runtime. Preserving it is not a claim
+  that, for example, Intel MKL or TensorRT is shipped in the browser worker.
+
+Clipper 6.4.2, Boost Software License 1.0, with Tom Wu JSBN notices
+  npm gitHead: 97a4d5e79671973b457c13432d8e8c4107f8a51d
+  https://github.com/junmer/clipper-lib/tree/97a4d5e79671973b457c13432d8e8c4107f8a51d
+  The package's BSL declaration means Boost, not Business Source License.
+  LICENSE-Boost is the complete https://www.boost.org/LICENSE_1_0.txt
+  NOTICE-original-headers retains the original attribution blocks from clipper.js.
+  Its JSBN subset separately attributes Tom Wu; LICENSE-JSBN preserves the
+  permission and disclaimer from
+  https://github.com/andyperlitch/jsbn/blob/57257b2763b4179e20196fca6714cb5dbc20806d/LICENSE
+  The historical Stanford origin linked by Clipper was unavailable during review;
+  the preserved port copy is not presented as an authenticated historical snapshot.
+
+guid-typescript 1.0.9, ISC
+  The published package supplies its ISC declaration but no full license file.
+  NOTICE-publisher-package.json preserves the exact published package metadata.
+  https://registry.npmjs.org/guid-typescript/1.0.9
+  LICENSE-ISC-standard retains the unmodified standard license text from
+  https://github.com/spdx/license-list-data/blob/3ac5a9c241d97f95b22a5e366c9c841404a35639/text/ISC.txt
+  Its template copyright fields were not invented or attributed to the publisher.
+
+OpenCV's native dependencies and the model/dictionary provenance have separate
+notices in opencv-4.10.0/NOTICE and models/NOTICE. All third-party source and
+weights retain their own terms. Preserve the complete asset notice tree.
+
+The checked npm pins and asset checksums reproduce the selected published inputs,
+not a byte-for-byte recompilation of every upstream native WASM build. These
+source-based notices are not an independently attested complete binary SBOM or
+a warranty of rights in every upstream contribution. No endorsement is implied.

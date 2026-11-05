@@ -1,0 +1,49 @@
+PP-OCRv5 mobile detector and Latin recognizer
+
+The original model weights are released by PaddlePaddle under Apache-2.0.
+The upstream PaddleOCR copyright and full Apache license are retained in
+../paddleocr-js-0.4.2/LICENSE. RapidOCR engineering/conversion source is separately
+licensed under Apache-2.0; its original license is retained in LICENSE-RapidOCR.
+RapidOCR does not acquire ownership of the original weights by converting them.
+
+Explicit model licensing evidence:
+https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det/blob/0d63e78e2b680928f6b1747d76a08db6e645efb7/README.md
+https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec/blob/08fe4a9d06aca318ebf5b899a034bbfda36496b4/README.md
+Both official model cards explicitly declare license: apache-2.0.
+This evidence is separate from the inference SDK's code license.
+
+Converted ONNX distribution and recorded SHA-256 values:
+https://github.com/RapidAI/RapidOCR/blob/v3.10.0/python/rapidocr/default_models.yaml
+
+PP-OCRv5_mobile_det (Rapid distribution name ch_PP-OCRv5_det_mobile.onnx)
+  Source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx
+  Bytes: 4819576
+  SHA-256: 4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae
+
+latin_PP-OCRv5_mobile_rec
+  Source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile.onnx
+  Bytes: 7904513
+  SHA-256: b20bd37c168a570f583afbc8cd7925603890efbcdc000a59e22c269d160b5f5a
+
+Paired 502-character dictionary
+  Source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/paddle/PP-OCRv5/rec/latin_PP-OCRv5_rec_mobile/ppocrv5_latin_dict.txt
+  Bytes: 1634
+  SHA-256: 3c0a8a79b612653c25f765271714f71281e4e955962c153e272b7b8c1d2b13ff
+  The original Paddle configuration contains this same character sequence:
+  https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec/blob/08fe4a9d06aca318ebf5b899a034bbfda36496b4/inference.yml
+  It matches the ONNX embedded dictionary; a newer 836-character configuration
+  is not substituted for this checkpoint.
+
+Conversion/repackaging notice
+
+RapidAI converted official PaddleOCR model representations to ONNX. ktb.scanner
+preserves those ONNX bytes and packages them with an explicit inference
+configuration and dictionary for the browser SDK. The TAR/YAML packaging is a
+downstream adaptation, not an unmodified official Paddle model archive.
+The model identity is checked against the distribution hashes; the original
+training/conversion pipeline has not been independently reproduced.
+
+The current RapidOCR MODEL_LICENSES table lists its default v6/classifier files
+and is not used as a blanket license grant for these v5 weights. The separate
+official v5 model cards above provide the model-specific licensing evidence.
+No dataset, sample image, other model or trademark grant is implied.

@@ -5,3 +5,9 @@ allowBuilds:
   esbuild: true
   sharp: true
   core-js: false
+  protobufjs: false
+  tesseract.js: false
+overrides:
+  onnxruntime-web: 1.31.1
+  onnxruntime-common: 1.31.1
+  '@techstark/opencv-js': 4.10.0-release.1

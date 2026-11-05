@@ -34,6 +34,10 @@
       "types": "./dist/export.d.ts",
       "import": "./dist/export.js"
     },
+    "./ocr": {
+      "types": "./dist/ocr.d.ts",
+      "import": "./dist/ocr.js"
+    },
     "./styles.css": "./dist/styles.css",
     "./assets/*": "./dist/assets/*"
   },
@@ -46,12 +50,18 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
-    "scanic": "1.7.1",
-    "jspdf": "4.2.1"
+    "jspdf": "4.2.1",
+    "pdf-lib": "1.17.1",
+    "scanic": "1.7.1"
   },
   "devDependencies": {
+    "@paddleocr/paddleocr-js": "0.4.2",
+    "@techstark/opencv-js": "4.10.0-release.1",
+    "onnxruntime-web": "1.31.1",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "tesseract.js": "7.0.0",
+    "tesseract.js-core": "7.0.0"
   },
   "description": "Embeddable document-scanning workflow built on Scanic, with a customizable React UI, reversible image processing and browser-side image/PDF export",
   "repository": {

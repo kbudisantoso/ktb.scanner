@@ -8,8 +8,10 @@ import {
   DEFAULT_AUTO_CAPTURE_STABILITY_MS,
 } from '@ktb-tools/scanner';
 import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb-tools/scanner';
+import type { OcrEngine } from '@ktb-tools/scanner/ocr';
 import { useUrl } from './blob-url';
 import Results from './Results';
+import { OcrEngineSelect, OcrLanguageSelect, type OcrLanguageChoice } from './OcrControls';
 import { useDemoLocale } from './i18n';
 const Scanner = lazy(() =>
   import('@ktb-tools/scanner/react').then((module) => ({ default: module.Scanner })),
@@ -29,6 +31,8 @@ export default function Page() {
   const [result, setResult] = useState<Result | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  const [ocrEngine, setOcrEngine] = useState<OcrEngine>('paddle'),
+    [ocrLanguage, setOcrLanguage] = useState<OcrLanguageChoice>('deu+eng');
   const [diagnosticEnabled, setDiagnosticEnabled] = useState(false),
     [engineBuffers, setEngineBuffers] = useState(false),
     [recording, setRecording] = useState<DiagnosticRecording | null>(null),
@@ -224,7 +228,10 @@ export default function Page() {
         <Results
           key={result.sessionId}
           result={result}
-          hidden={!!panel || !resultVisible}
+          hidden={busy || !!panel || !resultVisible}
+          ocrOptions={{ engine: ocrEngine, language: ocrLanguage }}
+          onOcrLanguageChange={setOcrLanguage}
+          onOcrEngineChange={setOcrEngine}
           back={() => setResultVisible(false)}
           reset={() => setResult(null)}
           scan={() => open()}
@@ -309,6 +316,18 @@ export default function Page() {
               ))}
             </select>
           </label>
+          <label>
+            {t('Texterkennungs-Engine')}
+            <OcrEngineSelect value={ocrEngine} onChange={setOcrEngine} disabled={busy} />
+          </label>
+          {ocrEngine === 'tesseract' ? (
+            <label>
+              {t('Texterkennungssprachen')}
+              <OcrLanguageSelect value={ocrLanguage} onChange={setOcrLanguage} disabled={busy} />
+            </label>
+          ) : (
+            <p>{t('Latin-Modell (u. a. DE + EN)')}</p>
+          )}
           <label>
             {t('Aufnahmeablauf')}
             <select

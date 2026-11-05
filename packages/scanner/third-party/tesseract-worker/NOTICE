@@ -1,0 +1,70 @@
+Supplemental notices for the prebundled Tesseract.js 7.0.0 browser worker
+
+The published dist/worker.min.js.map identifies the nine modules listed below
+as embedded worker dependencies. Their versions are taken from the Tesseract.js
+v7.0.0 source lockfile, not from a later install of its semver dependency ranges:
+https://github.com/naptha/tesseract.js/blob/v7.0.0/package-lock.json
+
+The SDK uses the copied browser worker directly. This supplement describes that
+worker, not Tesseract.js's Node.js factory or its unused Node-only dependency
+graph. In particular, node-fetch and tr46 are not inventoried as bundled browser
+worker components. The Tesseract.js package license and the original
+worker.min.js.LICENSE.txt sidecar are supplied separately.
+
+The full original license files below supplement that sidecar, which does not
+contain complete license texts for every identified module. This is source-map
+and source-lock provenance, not a reproducible build or a complete binary SBOM.
+
+Original files, copied without content changes:
+
+buffer 6.0.3 (MIT)
+  Local: buffer-6.0.3/LICENSE
+  Source: https://raw.githubusercontent.com/feross/buffer/v6.0.3/LICENSE
+
+base64-js 1.5.1 (MIT)
+  Local: base64-js-1.5.1/LICENSE
+  Source: https://raw.githubusercontent.com/beatgammit/base64-js/v1.5.1/LICENSE
+
+ieee754 1.2.1 (BSD-3-Clause)
+  Local: ieee754-1.2.1/LICENSE
+  Source: https://raw.githubusercontent.com/feross/ieee754/v1.2.1/LICENSE
+
+The following original files come from their exact npm release archives. Each
+archive was checked against the npm release integrity or shasum before reading
+its license file. The source commit is the release metadata's gitHead.
+
+regenerator-runtime 0.13.11 (MIT)
+  Local: regenerator-runtime-0.13.11/LICENSE
+  Archive path: package/LICENSE
+  Archive: https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz
+  Source: https://github.com/facebook/regenerator/tree/e4b592a44ef0d3a366cc7ad6125c4d9c8f6cc597
+
+zlibjs 0.3.1 (MIT)
+  Local: zlibjs-0.3.1/LICENSE
+  Archive path: package/LICENSE
+  Archive: https://registry.npmjs.org/zlibjs/-/zlibjs-0.3.1.tgz
+  Source: https://github.com/imaya/zlib.js/tree/2701521273ed7a9741c9a7827fa8de51d8843f7f
+
+wasm-feature-detect 1.8.0 (Apache-2.0)
+  Local: wasm-feature-detect-1.8.0/LICENSE
+  Archive path: package/LICENSE
+  Archive: https://registry.npmjs.org/wasm-feature-detect/-/wasm-feature-detect-1.8.0.tgz
+  Source: https://github.com/GoogleChromeLabs/wasm-feature-detect/tree/8bfe6691b0749b53d605f3220f15e68751c4b5b6
+
+bmp-js 0.1.0 (MIT)
+  Local: bmp-js-0.1.0/LICENSE
+  Archive path: package/LICENSE
+  Archive: https://registry.npmjs.org/bmp-js/-/bmp-js-0.1.0.tgz
+  Source: https://github.com/shaozilee/bmp-js/tree/60fa5ad6ac2f0ce0d2d157de187831a82cdb2cd6
+
+is-url 1.2.4 (MIT)
+  Local: is-url-1.2.4/LICENSE-MIT
+  Archive path: package/LICENSE-MIT
+  Archive: https://registry.npmjs.org/is-url/-/is-url-1.2.4.tgz
+  Source: https://github.com/segmentio/is-url/tree/d20482833e861b9a0c5bb3712dfe232efa75c87c
+
+idb-keyval 6.2.1 (Apache-2.0)
+  Local: idb-keyval-6.2.1/LICENCE
+  Archive path: package/LICENCE
+  Archive: https://registry.npmjs.org/idb-keyval/-/idb-keyval-6.2.1.tgz
+  Source: https://github.com/jakearchibald/idb-keyval/tree/6695b178d3e1a6a6252d6d72bf8b1830253aadc1

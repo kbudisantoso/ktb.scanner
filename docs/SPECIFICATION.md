@@ -1,12 +1,12 @@
 # Implementation contract
 
-Version 0.9, updated 28 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
+Version 0.10, updated 30 October 2026. Implements the [requirements](REQUIREMENTS.md) and accepted [decisions](DECISIONS.md). Source code is not acceptance evidence; actual checks and open limitations belong in [test status](testing/STATUS.md).
 
 ## Delivery and architecture
 
 The delivery is a complete embeddable scanning workflow covering capture workflow, editing, integration and consistent output (D-039). The package encapsulates the session and review path around Scanic and jsPDF so host developers receive confirmed files and metadata through one integration. Vendor engine responsibilities and ktb.scanner's workflow responsibilities remain explicit; this positioning introduces no additional runtime scope or detection-quality claim.
 
-One TypeScript package provides the DOM-free `@ktb-tools/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
+One TypeScript package provides the DOM-free `@ktb-tools/scanner` core and separate `/react`, `/scanic`, `/export` and `/styles.css` entry points. Unreleased source adds an independently invoked `/ocr` entry. React/React DOM are peers. The reference Next.js application and smaller Astro host consume the built package and copied same-origin assets. No domain models, backend endpoints or implementation code from another product are copied.
 
 The npm namespace is `ktb-tools` (D-042). GitHub releases with matching semantic-version tags on main run the existing complete checks before distributing the inspected archive via npm OIDC; the initial 0.1.0 bootstrap is complete. This contract targets 0.2.0, including direct camera entry, preference notifications and complete UI themes. Source-version preparation does not establish registry availability. Stable releases use `latest`, prereleases `next`. Package preparation, GitHub source publication, npm availability and app deployment are separate states. See the [release procedure](PUBLISHING.md#registry-release).
 
@@ -101,6 +101,18 @@ A-series sizes are indistinguishable from ratio alone; A4 is the group default. 
 
 Export pages serially and embed the exact exported JPEG/PNG blobs in jsPDF without a lossy intermediary or UI screenshot. Mixed page layouts are allowed. Validate both PDF dimensions in 10..5,000 mm; one capture is one PDF page. Any page/encoding/PDF error prevents confirmation.
 
+## Optional local OCR
+
+After scanning has closed, `createSearchablePdf` from `/ocr` takes confirmed `ScanPage[]`, the asset base URL and optional engine, Tesseract languages, prior page results, abort signal, progress observer and existing resource limits. It returns a new PDF plus ordered `{ id, revision, text, confidence }` results. `ScannerOptions`, `ScanResult`, page images and raster export remain unchanged. Imports create no worker, fetch or storage access. The Next.js demo invokes OCR manually, defaults to Paddle and offers Tesseract for comparison. There is no demo automatic OCR trigger; a production host may invoke the same API automatically after reviewed results close. Snapshot the selected engine/configuration when a job starts and retain previous results after cancellation or failure.
+
+Recognize actual final JPEG/PNG images after crop, adjustments and rotation. Validate identities, revisions, metadata, header dimensions and layout. The SDK defaults to `engine: 'tesseract'` for compatibility, using Tesseract.js/Core 7.0.0 and pinned Fast `deu`, `eng` or both. These are selected models, not language classification. Keep the unscaled temporary 10-pixel margin and inverse text-layer crop for Tesseract. `engine: 'paddle'` uses SDK 0.4.2, ONNX Runtime 1.31.1 and OpenCV 4.10.0-release.1 with the pinned V5 mobile detector and 502-character Latin recognizer. It includes German/English without selecting Tesseract models or detecting a language. Use WASM/SIMD with one thread and the unchanged final pixels; initialize once per batch and recognize pages serially, releasing page-specific decode/canvas/Mat resources. All assets are same-origin; no persistent model/document cache or cloud request is introduced.
+
+`previousPages` opts into RAM reuse; an empty array opts in on the initial call. Only original results returned by this SDK instance for identical image Blob, ID, revision, engine/model/asset and applicable ordered language configuration can be reused. Deserialized objects or changed pages/configurations are cache misses. Without this option, result objects retain no hidden reuse images/layers. Cache buffers must not be detached during assembly. Even an all-cached invocation rebuilds the complete current PDF without an OCR worker. This is not persistent reuse across reloads.
+
+Terminate recognition before a separate pdf-lib worker embeds unchanged image bytes and the matching text layer into the same image/layout box as raster export. Tesseract retains its single-page invisible PDF overlay; Paddle uses ordered final-image line polygons with the pinned GlyphLessFont, explicit Unicode mapping and invisible text rendering. Positions within a Paddle line are approximations because the recognizer supplies line polygons, not word/glyph boxes. Reading order is a geometric heuristic; no spelling rewriting is applied. Confidence scores are engine-specific and not comparable readability certificates. Empty text is valid; no partial successful PDF is returned on error.
+
+The page, result, output and estimated working budgets include retained images/optional originals, reuse layers, raster/engine estimates, text and actual assembled bytes. Do not silently downsample or turn original-import file caps into processed-image caps. Estimates are not native/WASM/RSS measurements or allocation guarantees. Callback errors are isolated; abort/timeout/error ends pending work and invalidates late replies. See [ADR 0027](adr/0027-local-ocr-on-confirmed-pages.md) and [integration](INTEGRATION.md#local-ocr-and-searchable-pdf).
+
 ## Limits and lifetime
 
 | Resource | Default |
@@ -165,7 +177,7 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-09 | Adding/editing/ordering, source-aware DE/EN replacement and direct picker, cancellation/failure/required-crop rollback, retained import queue and atomic accepted-page replacement | F-09, F-15, F-16 |
 | T-10 | No partial confirmation after export error/abort | F-17, F-27, I-03 |
 | T-11 | Sharpness, lighting, unknown and honest quality claims | F-18, N-01 |
-| T-12 | Local OCR/flattening remain outside commissioned scope | F-20, F-21, F-22 |
+| T-12 | Optional local OCR: lazy assets, selected DE/EN models, real Unicode text/position/order, image-render equivalence, startup/recognition abort, failure/retry/stale isolation and resource cleanup; flattening remains separate | F-20, F-21, F-22 |
 | T-13 | Track/worker/bitmap/URL lifetime and late answers | N-02, N-03 |
 | T-14 | No uploads, persistence or CDN fallback | N-04, I-04 |
 | T-15 | Themes, narrow views, focus, corners and ordering | I-02, N-05 |

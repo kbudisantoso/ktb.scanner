@@ -1,5 +1,7 @@
 import { instrumentScanic } from './instrument-scanic.mjs';
-import { collectNotices } from './notices.mjs';
+import { collectNotices, packageRoot } from './notices.mjs';
+import { copyOcrAssets } from './ocr-assets.mjs';
+import { copyPaddleAssets } from './paddle-assets.mjs';
 import { build } from 'esbuild';
 import { cp, copyFile, mkdir, readFile, writeFile, readdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -17,7 +19,13 @@ const common = {
 };
 await build({
   ...common,
-  entryPoints: ['src/index.ts', 'src/react/index.tsx', 'src/scanic.ts', 'src/export.ts'],
+  entryPoints: [
+    'src/index.ts',
+    'src/react/index.tsx',
+    'src/scanic.ts',
+    'src/export.ts',
+    'src/ocr.ts',
+  ],
   outdir: 'dist',
   splitting: true,
   external: ['react', 'react-dom/client', 'react/jsx-runtime', 'scanic', 'jspdf'],
@@ -57,6 +65,22 @@ await build({
   entryPoints: ['src/pdf.worker.ts'],
   outfile: 'dist/assets/pdf.worker.js',
 });
+await build({
+  ...common,
+  entryPoints: ['src/ocr-pdf.worker.ts'],
+  outfile: 'dist/assets/ocr-pdf.worker.js',
+});
+await copyOcrAssets();
+await copyPaddleAssets();
+const ortRoot = await packageRoot('onnxruntime-web', process.cwd());
+await build({
+  ...common,
+  entryPoints: ['src/paddle.worker.ts'],
+  outfile: 'dist/assets/paddle.worker.js',
+  minify: true,
+  alias: { 'onnxruntime-web': resolve(ortRoot, 'dist/ort.wasm.min.mjs') },
+  external: ['fs', 'path', 'crypto'],
+});
 await copyFile('src/react/styles.css', 'dist/styles.css');
 await writeFile(
   'dist/assets/versions.json',
@@ -67,6 +91,19 @@ await writeFile(
       detector: 'classical',
       scanicInstrumentation: 'candidate-selection-and-debug-v2',
       jspdf: '4.2.1',
+      ocr: {
+        tesseract: '7.0.0',
+        core: '7.0.0',
+        models: 'tessdata_fast@4.1.0',
+        modelCommit: '65727574dfcd264acbb0c3e07860e4e9e9b22185',
+        paddle: {
+          sdk: '0.4.2',
+          runtime: '1.31.1',
+          detector: 'PP-OCRv5_mobile_det',
+          recognizer: 'latin_PP-OCRv5_mobile_rec',
+          dictionaryCharacters: 502,
+        },
+      },
     },
     null,
     2,

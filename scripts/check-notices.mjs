@@ -22,11 +22,28 @@ const vendorFiles = [
   ...(await walk(`${base}/licenses`)).filter((path) => !path.endsWith('.json')),
   ...(await walk(`${base}/third-party`)),
 ];
+const inventory = JSON.parse(await readFile(`${base}/licenses/inventory.json`, 'utf8'));
+for (const [name, version] of [
+  ['@paddleocr/paddleocr-js', '0.4.2'],
+  ['@techstark/opencv-js', '4.10.0-release.1'],
+  ['onnxruntime-web', '1.31.1'],
+  ['onnxruntime-common', '1.31.1'],
+])
+  assert(
+    inventory.some((item) => item.name === name && item.version === version),
+    name,
+  );
+const fontLicense = await readFile(`${base}/ocr/paddle/pdf-font.LICENSE`, 'utf8');
+assert.equal(
+  fontLicense,
+  await readFile(`${base}/third-party/paddle-ocr/glyphless-font/LICENSE`, 'utf8'),
+);
 for (const app of ['demo-next', 'demo-astro']) {
   const root = `apps/${app}/public`;
   const text = await readFile(`${root}/third-party-notices.txt`, 'utf8');
   assert(text.includes(license) && text.includes(notice), `${app}: project notices missing`);
   assert(text.includes(await readFile(`${base}/CC0-1.0.LICENSE`, 'utf8')));
+  assert(text.includes(fontLicense), `${app}: GlyphLessFont license missing`);
   assert(!text.includes('Pixabay Content License'), `${app}: retired media notices remain`);
   assert.deepEqual(
     (await readdir(`${root}/scanner-assets`)).filter((file) => file.endsWith('.mp3')).sort(),
@@ -52,4 +69,6 @@ for (const app of ['demo-next', 'demo-astro']) {
     assert(text.includes('dist/compiled/react/LICENSE'), 'Next vendored notices missing');
   } else assert(text.includes('astro@'));
 }
-console.log('Both reference hosts preserve project, runtime, vendored and Rust/WASM notices.');
+console.log(
+  'Both reference hosts preserve project, runtime, vendored, OCR and native WASM notices.',
+);

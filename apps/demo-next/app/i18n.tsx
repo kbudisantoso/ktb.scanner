@@ -3,6 +3,32 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { createTranslator, type ScanLocale } from '@ktb-tools/scanner';
 import { demoTitle } from './locale';
 
+const HOST_ENGLISH_TEXTS: Record<string, string> = {
+  Texterkennung: 'Text recognition',
+  'Texterkennungs-Engine': 'Text recognition engine',
+  Texterkennungssprachen: 'Text languages',
+  'Latin-Modell (u. a. DE + EN)': 'Latin model (including DE + EN)',
+  'Deutsch und Englisch': 'German and English',
+  Deutsch: 'German',
+  Englisch: 'English',
+  'Text erkennen': 'Recognize text',
+  'Text erneut erkennen': 'Recognize text again',
+  'Texterkennung abbrechen': 'Cancel text recognition',
+  'Texterkennung erneut versuchen': 'Retry text recognition',
+  'Text erkannt. Bitte vor der Verwendung prüfen.': 'Text recognized. Check it before use.',
+  'Texterkennung fehlgeschlagen. Vorhandene Ergebnisse bleiben erhalten.':
+    'Text recognition failed. Existing results are preserved.',
+  'Texterkennung abgebrochen. Vorhandene Ergebnisse bleiben erhalten.':
+    'Text recognition cancelled. Existing results are preserved.',
+  'Seite {number} von {count} erkennen: {percent} %':
+    'Recognizing page {number} of {count}: {percent}%',
+  'Seite {number} von {count} wird erkannt...': 'Recognizing page {number} of {count}...',
+  'Durchsuchbares PDF wird erstellt...': 'Creating searchable PDF...',
+  'Texterkennung wird geladen...': 'Loading text recognition...',
+  'Erkannter Text: Seite {number}': 'Recognized text: page {number}',
+  'Kein Text auf dieser Seite erkannt.': 'No text recognized on this page.',
+};
+
 const Context = createContext({ locale: 'en' as ScanLocale, setLocale: (_: ScanLocale) => {} });
 export function DemoLocaleProvider({
   children,
@@ -28,5 +54,9 @@ export function DemoLocaleProvider({
 }
 export function useDemoLocale() {
   const { locale, setLocale } = useContext(Context);
-  return { locale, setLocale, t: createTranslator(locale) };
+  return {
+    locale,
+    setLocale,
+    t: createTranslator(locale, locale === 'en' ? HOST_ENGLISH_TEXTS : {}),
+  };
 }

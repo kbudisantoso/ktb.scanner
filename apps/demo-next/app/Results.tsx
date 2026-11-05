@@ -1,8 +1,14 @@
 'use client';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ScanPage, ScanResult } from '@ktb-tools/scanner';
+import type { OcrEngine } from '@ktb-tools/scanner/ocr';
 import { useUrl } from './blob-url';
 import { useDemoLocale } from './i18n';
+import OcrControls, {
+  useResultOcr,
+  type HostOcrOptions,
+  type OcrLanguageChoice,
+} from './OcrControls';
 const PdfPreview = lazy(() => import('./PdfPreview'));
 const ImageViewer = lazy(() =>
   import('@ktb-tools/scanner/react').then((module) => ({ default: module.ImageViewer })),
@@ -141,16 +147,22 @@ export default function Results({
   scan,
   hidden,
   back,
+  ocrOptions,
+  onOcrLanguageChange,
+  onOcrEngineChange,
 }: {
   result: Result;
   reset: () => void;
   scan: () => void;
   hidden: boolean;
   back: () => void;
+  ocrOptions?: HostOcrOptions;
+  onOcrLanguageChange?: (language: OcrLanguageChoice) => void;
+  onOcrEngineChange?: (engine: OcrEngine) => void;
 }) {
   const { t } = useDemoLocale();
   const [index, setIndex] = useState(0),
-    [view, setView] = useState<'image' | 'pdf'>('image'),
+    [view, setView] = useState<'image' | 'pdf' | 'text'>('image'),
     [inspecting, setInspecting] = useState(false),
     [details, setDetails] = useState(false),
     [discard, setDiscard] = useState(false);
@@ -160,7 +172,13 @@ export default function Results({
     setDetails(false);
     infoTrigger.current?.focus();
   };
-  const pdfUrl = useUrl(result.pdf),
+  const ocr = useResultOcr(result, hidden, ocrOptions, onOcrLanguageChange, onOcrEngineChange);
+  const recognizing = ocr.state?.phase === 'running';
+  const pdf = ocr.output?.pdf ?? result.pdf;
+  const text = ocr.output?.pages.find(
+    (page) => page.id === result.pages[index].id && page.revision === result.pages[index].revision,
+  )?.text;
+  const pdfUrl = useUrl(pdf),
     imageUrl = useUrl(result.pages[index].image);
   return (
     <section
@@ -189,10 +207,23 @@ export default function Results({
           >
             {t('Info')}
           </button>
-          <button onClick={scan} aria-label={t('Neues Dokument')}>
+          <button
+            onClick={() => {
+              ocr.cancel();
+              scan();
+            }}
+            aria-label={t('Neues Dokument')}
+          >
             {t('Neu')}
           </button>
-          <button onClick={back}>{t('Zurück')}</button>
+          <button
+            onClick={() => {
+              ocr.cancel();
+              back();
+            }}
+          >
+            {t('Zurück')}
+          </button>
         </div>
       </div>
       {discard && (
@@ -206,15 +237,34 @@ export default function Results({
           <button autoFocus onClick={() => setDiscard(false)}>
             {t('Behalten')}
           </button>
-          <button onClick={reset}>{t('Jetzt verwerfen')}</button>
+          <button
+            onClick={() => {
+              ocr.cancel();
+              reset();
+            }}
+          >
+            {t('Jetzt verwerfen')}
+          </button>
         </div>
       )}
+      <OcrControls ocr={ocr} />
       <div className="result-switch" role="group" aria-label={t('Ergebnisansicht')}>
         <button aria-pressed={view === 'image'} onClick={() => setView('image')}>
           {t('Bilder')}
         </button>
-        <button disabled={!result.pdf} aria-pressed={view === 'pdf'} onClick={() => setView('pdf')}>
+        <button
+          disabled={!pdf || recognizing}
+          aria-pressed={view === 'pdf'}
+          onClick={() => setView('pdf')}
+        >
           PDF
+        </button>
+        <button
+          disabled={!ocr.output}
+          aria-pressed={view === 'text'}
+          onClick={() => setView('text')}
+        >
+          {t('Text')}
         </button>
       </div>
       <div className="result-pager">
@@ -247,15 +297,26 @@ export default function Results({
           />
         ))}
       </div>
-      {result.pdf && view === 'pdf' && !details && !hidden && (
+      {pdf && view === 'pdf' && !details && !hidden && !recognizing && (
         <section
           className="pdf-result"
           hidden={view !== 'pdf' || details}
           aria-label={t('PDF-Vorschau')}
         >
           <Suspense fallback={<p role="status">{t('PDF wird geladen...')}</p>}>
-            <PdfPreview blob={result.pdf} activeIndex={index} />
+            <PdfPreview blob={pdf} activeIndex={index} />
           </Suspense>
+        </section>
+      )}
+      {view === 'text' && ocr.output && !details && (
+        <section className="result-text">
+          <textarea
+            aria-label={t('Erkannter Text: Seite {number}', { number: index + 1 })}
+            readOnly
+            spellCheck={false}
+            value={text ?? ''}
+            placeholder={t('Kein Text auf dieser Seite erkannt.')}
+          />
         </section>
       )}
       <div className="result-downloads">
@@ -267,7 +328,7 @@ export default function Results({
         >
           {t('Bild laden')}
         </a>
-        {result.pdf && (
+        {pdf && (
           <a
             className="primary"
             aria-label={t('PDF herunterladen')}
@@ -294,7 +355,7 @@ export default function Results({
         </button>
         <p>
           {t('Schema')} {result.schemaVersion} · PDF{' '}
-          {result.pdf ? `${(result.pdf.size / 1024).toFixed(0)} KiB` : t('deaktiviert')}
+          {pdf ? `${(pdf.size / 1024).toFixed(0)} KiB` : t('deaktiviert')}
         </p>
         <pre>
           {JSON.stringify(
