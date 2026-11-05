@@ -1,7 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScanResult } from '@ktb-tools/scanner';
-import type { OcrLanguage, OcrProgress, SearchablePdfResult } from '@ktb-tools/scanner/ocr';
+import type {
+  OcrEngine,
+  OcrLanguage,
+  OcrProgress,
+  SearchablePdfResult,
+} from '@ktb-tools/scanner/ocr';
 import { useDemoLocale } from './i18n';
 
 type Result = Extract<ScanResult, { status: 'confirmed' }>;
@@ -9,7 +14,7 @@ type Phase = 'running' | 'complete' | 'cancelled' | 'failed';
 type Job = { source: Result; controller: AbortController };
 type State = { source: Result; phase: Phase; progress?: OcrProgress };
 export type OcrLanguageChoice = 'deu+eng' | 'deu' | 'eng';
-export type HostOcrOptions = { automatic: boolean; language: OcrLanguageChoice };
+export type HostOcrOptions = { engine: OcrEngine; language: OcrLanguageChoice };
 const LANGUAGE_CHOICES: Record<OcrLanguageChoice, readonly OcrLanguage[]> = {
   'deu+eng': ['deu', 'eng'],
   deu: ['deu'],
@@ -21,9 +26,16 @@ export function useResultOcr(
   hidden: boolean,
   options?: HostOcrOptions,
   onLanguageChange?: (language: OcrLanguageChoice) => void,
+  onEngineChange?: (engine: OcrEngine) => void,
 ) {
+  const [localEngine, setLocalEngine] = useState<OcrEngine>('paddle');
   const [localLanguage, setLocalLanguage] = useState<OcrLanguageChoice>('deu+eng');
+  const engine = options?.engine ?? localEngine;
   const language = options?.language ?? localLanguage;
+  const setEngine = (next: OcrEngine) => {
+    setLocalEngine(next);
+    onEngineChange?.(next);
+  };
   const setLanguage = (next: OcrLanguageChoice) => {
     setLocalLanguage(next);
     onLanguageChange?.(next);
@@ -35,9 +47,8 @@ export function useResultOcr(
   }>();
   const job = useRef<Job | null>(null);
   const alive = useRef(false);
-  const automaticAttempts = useRef(new WeakSet<Result>());
-  const current = useRef({ result, hidden, language, automatic: options?.automatic ?? false });
-  current.current = { result, hidden, language, automatic: options?.automatic ?? false };
+  const current = useRef({ result, hidden, engine, language, recognized });
+  current.current = { result, hidden, engine, language, recognized };
   const cancel = useCallback(() => {
     const pending = job.current;
     if (!pending) return;
@@ -62,11 +73,12 @@ export function useResultOcr(
     setState((previous) => (previous?.source === result ? previous : undefined));
   }, [result, hidden, cancel]);
   const start = useCallback(async () => {
-    const { result, hidden, language } = current.current;
+    const { result, hidden, engine, language, recognized } = current.current;
     if (job.current || !alive.current || hidden) return;
     const pending = { source: result, controller: new AbortController() };
     job.current = pending;
-    const languages = [...LANGUAGE_CHOICES[language]];
+    const languages = engine === 'tesseract' ? [...LANGUAGE_CHOICES[language]] : undefined;
+    const previousPages = recognized?.source === result ? recognized.value.pages.slice() : [];
     const valid = () =>
       alive.current &&
       job.current === pending &&
@@ -84,7 +96,9 @@ export function useResultOcr(
       const value = await createSearchablePdf({
         pages: pending.source.pages.slice(),
         assetBaseUrl: '/scanner-assets/',
+        engine,
         languages,
+        previousPages,
         signal: pending.controller.signal,
         onProgress: (progress) => {
           if (valid())
@@ -104,26 +118,9 @@ export function useResultOcr(
       if (job.current === pending) job.current = null;
     }
   }, []);
-  useEffect(() => {
-    let disposed = false;
-    const opening = current.current;
-    // Defer consumption until after StrictMode's setup/cleanup probe.
-    queueMicrotask(() => {
-      if (
-        disposed ||
-        !alive.current ||
-        current.current.result !== result ||
-        automaticAttempts.current.has(result)
-      )
-        return;
-      automaticAttempts.current.add(result);
-      if (opening.automatic && !opening.hidden && !current.current.hidden) void start();
-    });
-    return () => {
-      disposed = true;
-    };
-  }, [result, start]);
   return {
+    engine,
+    setEngine,
     language,
     setLanguage,
     state: state?.source === result ? state : undefined,
@@ -131,6 +128,32 @@ export function useResultOcr(
     start,
     cancel,
   };
+}
+
+export function OcrEngineSelect({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: OcrEngine;
+  onChange: (engine: OcrEngine) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useDemoLocale();
+  return (
+    <select
+      aria-label={t('Texterkennungs-Engine')}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => {
+        const next = event.target.value;
+        if (next === 'paddle' || next === 'tesseract') onChange(next);
+      }}
+    >
+      <option value="paddle">PaddleOCR</option>
+      <option value="tesseract">Tesseract</option>
+    </select>
+  );
 }
 
 export function OcrLanguageSelect({
@@ -198,7 +221,7 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
   return (
     <section className="result-ocr" aria-label={t('Texterkennung')}>
       <div className="result-ocr-options">
-        <OcrLanguageSelect value={ocr.language} disabled={running} onChange={ocr.setLanguage} />
+        <OcrEngineSelect value={ocr.engine} disabled={running} onChange={ocr.setEngine} />
         {running ? (
           <button
             onClick={() => {
@@ -219,7 +242,15 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
             )}
           </button>
         )}
+        {ocr.engine === 'tesseract' && (
+          <OcrLanguageSelect value={ocr.language} disabled={running} onChange={ocr.setLanguage} />
+        )}
       </div>
+      {ocr.engine === 'paddle' && (
+        <div className="result-ocr-status">
+          <p>{t('Latin-Modell (u. a. DE + EN)')}</p>
+        </div>
+      )}
       {ocr.state && (
         <div className="result-ocr-status">
           {running && <progress value={percent} max={100} aria-label={message} />}

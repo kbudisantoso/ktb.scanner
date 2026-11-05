@@ -5,8 +5,12 @@ import { imageHeader } from './image-header.ts';
 import { validateMetadata } from './validation.ts';
 import { WorkerClient, assetUrl } from './worker-client.ts';
 import { ocrImageSize, prepareOcrImage } from './ocr-image.ts';
+import { paddleWorkingBytes } from './paddle-memory.ts';
+import { estimatePaddlePdfMemory, validatePaddlePdfLayer } from './paddle-pdf-geometry.ts';
+import type { PaddlePdfLayer } from './paddle-pdf-geometry.ts';
 
 export type OcrLanguage = 'deu' | 'eng';
+export type OcrEngine = 'tesseract' | 'paddle';
 export interface OcrProgress {
   stage: 'loading' | 'recognizing' | 'assembling';
   /** One-based during recognition; zero for loading and assembly. */
@@ -29,16 +33,71 @@ export interface SearchablePdfResult {
 export interface OcrOptions {
   pages: readonly ScanPage[];
   assetBaseUrl: string;
+  /** Defaults to Tesseract; Paddle uses its pinned multilingual Latin model. */
+  engine?: OcrEngine;
+  /** Tesseract model selection; valid DE/EN values do not change Paddle's Latin model. */
   languages?: readonly OcrLanguage[];
+  /** Opt into RAM reuse of original SDK page-result objects; not a persistent cache. */
+  previousPages?: readonly OcrPageResult[];
   signal?: AbortSignal;
   onProgress?: (progress: OcrProgress) => void;
   limits?: Partial<Limits>;
 }
 type SnapshotPage = Pick<ScanPage, 'id' | 'revision' | 'image' | 'metadata'>;
+type TextLayer = { textPdf: Uint8Array } | { paddleText: PaddlePdfLayer };
+type AssemblyPage = SnapshotPage & TextLayer;
+type Recognition = { text: string; confidence: number; layer: TextLayer };
+type CachedRecognition = Recognition & {
+  id: string;
+  revision: number;
+  image: Blob;
+  configuration: string;
+  bytes: number;
+};
+const reusablePages = new WeakMap<OcrPageResult, CachedRecognition>();
 const ENGINE_RESERVE = 64 * 1024 ** 2;
 const ASSEMBLY_TIMEOUT = 300_000;
+const PADDLE_FONT_BYTES = 572;
+const TESSERACT_PIPELINE_ID = 'tesseract.js/core7.0.0/tessdata_fast4.1.0/psm3/border10';
 const limitError = () =>
   new ScannerError('LIMIT_EXCEEDED', 'OCR exceeds the configured memory or result limit.');
+const utf8Bytes = (text: string) => new TextEncoder().encode(text).byteLength;
+const textLayerBytes = (layer: TextLayer) =>
+  'textPdf' in layer ? layer.textPdf.byteLength : utf8Bytes(JSON.stringify(layer.paddleText));
+const cacheBytes = (recognition: Recognition) =>
+  512 +
+  recognition.text.length * 2 +
+  ('textPdf' in recognition.layer
+    ? recognition.layer.textPdf.byteLength
+    : estimatePaddlePdfMemory([recognition.layer.paddleText], 0));
+
+async function paddleFont(url: URL, signal?: AbortSignal): Promise<Uint8Array> {
+  aborted(signal);
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, ASSEMBLY_TIMEOUT);
+  signal?.addEventListener('abort', cancel, { once: true });
+  try {
+    aborted(signal);
+    const response = await fetch(url, { signal: controller.signal, redirect: 'error' });
+    if (!response.ok) throw new Error('Missing Paddle PDF font.');
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    aborted(signal);
+    if (bytes.byteLength !== PADDLE_FONT_BYTES) throw new Error('Unexpected Paddle PDF font.');
+    return bytes;
+  } catch {
+    aborted(signal);
+    if (timedOut) throw new ScannerError('PROCESSING_TIMEOUT', 'PDF font loading timed out.');
+    throw new ScannerError('ENGINE_LOAD_FAILED', 'The local Paddle PDF font could not be loaded.');
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+  }
+}
 
 /** Recognize confirmed final images and add an invisible text layer without changing their pixels. */
 export async function createSearchablePdf(options: OcrOptions): Promise<SearchablePdfResult> {
@@ -56,6 +115,19 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
       'Provide confirmed pages and a same-origin asset URL.',
     );
   const assetBaseUrl = options.assetBaseUrl;
+  const engine = options.engine === undefined ? 'tesseract' : options.engine;
+  if (engine !== 'tesseract' && engine !== 'paddle')
+    throw new ScannerError('CONFIG_INVALID', 'OCR engine must be tesseract or paddle.');
+  const reuse = options.previousPages !== undefined;
+  if (reuse && !Array.isArray(options.previousPages))
+    throw new ScannerError('CONFIG_INVALID', 'Previous OCR pages must be an array.');
+  const previous = new Set<CachedRecognition>();
+  if (reuse)
+    for (const candidate of options.previousPages!) {
+      if (!candidate || typeof candidate !== 'object') continue;
+      const cached = reusablePages.get(candidate);
+      if (cached) previous.add(cached);
+    }
   const limits = resolveLimits(options.limits);
   if (options.pages.length > limits.pages) throw limitError();
   const requested = options.languages ?? ['deu', 'eng'];
@@ -123,6 +195,8 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
     }
     return { id: page.id, revision: page.revision, image: page.image, metadata };
   });
+  for (const cached of previous) retained.add(cached.image);
+  const previousBytes = [...previous].reduce((sum, cached) => sum + cached.bytes, 0);
   const retainedBytes = [...retained].reduce((sum, blob) => sum + blob.size, 0);
   const externalBytes = [...retained]
     .filter((blob) => !images.has(blob))
@@ -131,7 +205,7 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
   const largestFile = Math.max(...snapshot.map((page) => page.image.size));
   if (
     imageBytes > limits.resultBytes ||
-    retainedBytes + largestFile + ENGINE_RESERVE > limits.workingBytes
+    retainedBytes + previousBytes + largestFile + ENGINE_RESERVE > limits.workingBytes
   )
     throw limitError();
   for (const page of snapshot) {
@@ -157,103 +231,240 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
       Math.max(header.width, header.height) > limits.outputDimension
     )
       throw limitError();
-    // The border is a working image, not an enlarged scan output. Encoding bytes are checked later.
-    const padded = ocrImageSize(header);
-    if (retainedBytes + padded.width * padded.height * 32 + ENGINE_RESERVE > limits.workingBytes)
-      throw limitError();
   }
   if (typeof Worker === 'undefined' || typeof document === 'undefined')
     throw new ScannerError('CONFIG_INVALID', 'OCR requires a browser with worker support.');
-  const ocrAssets = assetUrl(assetBaseUrl, 'ocr/');
-  const pdfAssets = assetUrl(assetBaseUrl, 'ocr-pdf.worker.js');
-  const layers: (SnapshotPage & { textPdf: Uint8Array })[] = [];
+  const assets = assetUrl(assetBaseUrl, './');
+  const ocrAssets = new URL('ocr/', assets);
+  const pdfAssets = new URL('ocr-pdf.worker.js', assets);
+  const paddle = engine === 'paddle' ? await import('./paddle-client.ts') : undefined;
+  aborted(signal);
+  const configuration = JSON.stringify([
+    engine,
+    assets.href,
+    paddle?.PADDLE_PIPELINE_ID ?? TESSERACT_PIPELINE_ID,
+    engine === 'tesseract' ? languages : [],
+  ]);
+  const hits = new Map<SnapshotPage, CachedRecognition>();
+  for (const page of snapshot) {
+    const cached = [...previous].find(
+      (candidate) =>
+        candidate.id === page.id &&
+        candidate.revision === page.revision &&
+        candidate.image === page.image &&
+        candidate.configuration === configuration,
+    );
+    if (cached) hits.set(page, cached);
+    else {
+      const size = page.metadata.outputSizePx;
+      const padded = ocrImageSize(size);
+      const bytes =
+        engine === 'paddle'
+          ? paddleWorkingBytes(size, page.image.size)
+          : padded.width * padded.height * 32 + ENGINE_RESERVE;
+      if (retainedBytes + previousBytes + bytes > limits.workingBytes) throw limitError();
+    }
+  }
+  const layers: AssemblyPage[] = [];
   const resultPages: OcrPageResult[] = [];
+  const pendingCache: [OcrPageResult, CachedRecognition][] = [];
   let textBytes = 0;
   let layerBytes = 0;
+  let freshCacheBytes = 0;
+  let recognitionPeak = 0;
   let activePage = 0;
   let recognizing = false;
+  let destroy: (() => void) | undefined;
+  let recognize: ((page: SnapshotPage, available: number) => Promise<Recognition>) | undefined;
+  const retainedWorkingBytes = () =>
+    retainedBytes + previousBytes + freshCacheBytes + textBytes + layerBytes;
+  const checkRecognition = (required: number, available: number) => {
+    recognitionPeak = Math.max(recognitionPeak, required);
+    if (recognitionPeak > available) throw limitError();
+  };
   try {
-    notify('loading', 0, 0);
-    aborted(signal);
-    const { OcrClient } = await import('./ocr-client.ts');
-    aborted(signal);
-    const client = new OcrClient({
-      assetBaseUrl: ocrAssets,
-      languages,
-      onProgress: ({ status, progress }) => {
-        if (recognizing && status === 'recognizing text')
-          notify('recognizing', activePage, progress);
-      },
-    });
     try {
-      await client.initialize(signal);
-      aborted(signal);
-      notify('loading', 0, 1);
-      aborted(signal);
+      if (hits.size !== snapshot.length) {
+        notify('loading', 0, 0);
+        aborted(signal);
+        if (engine === 'tesseract') {
+          const { OcrClient } = await import('./ocr-client.ts');
+          aborted(signal);
+          const client = new OcrClient({
+            assetBaseUrl: ocrAssets,
+            languages,
+            onProgress: ({ status, progress }) => {
+              if (recognizing && status === 'recognizing text')
+                notify('recognizing', activePage, progress);
+            },
+          });
+          destroy = () => client.destroy();
+          await client.initialize(signal);
+          recognize = async (page, available) => {
+            const size = page.metadata.outputSizePx;
+            const padded = ocrImageSize(size);
+            const pixels = padded.width * padded.height;
+            checkRecognition(
+              Math.max(4 * (size.width * size.height + pixels), 16 * pixels) + ENGINE_RESERVE,
+              available,
+            );
+            let prepared: Blob | undefined = await prepareOcrImage(page.image, size, signal);
+            try {
+              aborted(signal);
+              checkRecognition(pixels * 32 + 2 * prepared.size + ENGINE_RESERVE, available);
+              const result = await client.recognize(prepared, signal);
+              return {
+                text: result.text,
+                confidence: result.confidence,
+                layer: { textPdf: result.pdf },
+              };
+            } finally {
+              prepared = undefined;
+            }
+          };
+        } else {
+          const client = new paddle!.PaddleClient({
+            assetBaseUrl: assets,
+            onProgress: ({ status, progress }) => {
+              if (recognizing && status === 'recognizing')
+                notify('recognizing', activePage, progress);
+            },
+          });
+          destroy = () => client.destroy();
+          await client.initialize(signal);
+          recognize = async (page, available) => {
+            checkRecognition(
+              paddleWorkingBytes(page.metadata.outputSizePx, page.image.size),
+              available,
+            );
+            const result = await client.recognize(
+              { id: page.id, revision: page.revision, image: page.image, workingBytes: available },
+              signal,
+            );
+            const paddleText: PaddlePdfLayer = {
+              imageSize: { width: result.width, height: result.height },
+              lines: result.lines.map((line) => ({
+                text: line.text,
+                poly: line.poly.map(([x, y]) => [x, y] as const),
+              })),
+            };
+            validatePaddlePdfLayer(paddleText, page.metadata.outputSizePx);
+            return { text: result.text, confidence: result.confidence, layer: { paddleText } };
+          };
+        }
+        aborted(signal);
+        notify('loading', 0, 1);
+        aborted(signal);
+      }
       for (const [index, page] of snapshot.entries()) {
         activePage = index + 1;
-        const size = page.metadata.outputSizePx;
-        const padded = ocrImageSize(size);
-        const paddedPixels = padded.width * padded.height;
-        const preparationBytes = Math.max(
-          4 * (size.width * size.height + paddedPixels),
-          16 * paddedPixels,
-        );
+        const cached = hits.get(page);
+        let recognized: Recognition;
+        if (cached) recognized = cached;
+        else {
+          recognizing = true;
+          notify('recognizing', activePage, 0);
+          aborted(signal);
+          recognized = await recognize!(page, limits.workingBytes - retainedWorkingBytes());
+          recognizing = false;
+          aborted(signal);
+        }
+        const nextTextBytes = textBytes + utf8Bytes(recognized.text);
+        if (imageBytes + nextTextBytes > limits.resultBytes) throw limitError();
+        const nextLayerBytes = layerBytes + textLayerBytes(recognized.layer);
+        const entry: CachedRecognition | undefined = reuse
+          ? (cached ?? {
+              ...recognized,
+              id: page.id,
+              revision: page.revision,
+              image: page.image,
+              configuration,
+              bytes: cacheBytes(recognized),
+            })
+          : undefined;
+        const nextCacheBytes = freshCacheBytes + (entry && !cached ? entry.bytes : 0);
         if (
-          retainedBytes + layerBytes + textBytes + preparationBytes + ENGINE_RESERVE >
-          limits.workingBytes
+          imageBytes + nextLayerBytes + nextTextBytes > limits.resultBytes ||
+          retainedBytes +
+            previousBytes +
+            nextCacheBytes +
+            nextLayerBytes +
+            nextTextBytes +
+            recognitionPeak >
+            limits.workingBytes
         )
           throw limitError();
-        recognizing = true;
-        notify('recognizing', activePage, 0);
-        aborted(signal);
-        let prepared: Blob | undefined = await prepareOcrImage(page.image, size, signal);
-        aborted(signal);
-        const pageWorkingBytes =
-          retainedBytes + paddedPixels * 32 + 2 * prepared.size + ENGINE_RESERVE;
-        if (pageWorkingBytes + layerBytes + textBytes > limits.workingBytes) throw limitError();
-        const result = await client.recognize(prepared, signal).finally(() => {
-          prepared = undefined;
-        });
-        recognizing = false;
-        aborted(signal);
-        textBytes += new TextEncoder().encode(result.text).byteLength;
-        layerBytes += result.pdf.byteLength;
-        if (
-          imageBytes + layerBytes + textBytes > limits.resultBytes ||
-          pageWorkingBytes + layerBytes + textBytes > limits.workingBytes
-        )
-          throw limitError();
-        layers.push({ ...page, textPdf: result.pdf });
-        resultPages.push({
+        textBytes = nextTextBytes;
+        layerBytes = nextLayerBytes;
+        freshCacheBytes = nextCacheBytes;
+        // Transfer only an owned copy when the protected original remains reusable in RAM.
+        const layer =
+          reuse && 'textPdf' in recognized.layer
+            ? { textPdf: recognized.layer.textPdf.slice() }
+            : recognized.layer;
+        layers.push({ ...page, ...layer });
+        const publicPage = {
           id: page.id,
           revision: page.revision,
-          text: result.text,
-          confidence: result.confidence,
-        });
+          text: recognized.text,
+          confidence: recognized.confidence,
+        };
+        resultPages.push(publicPage);
+        if (entry) pendingCache.push([publicPage, entry]);
         notify('recognizing', activePage, 1);
         aborted(signal);
       }
     } finally {
       recognizing = false;
-      client.destroy();
+      destroy?.();
     }
     aborted(signal);
+    const paddleLayers = layers.flatMap((page) => ('paddleText' in page ? [page.paddleText] : []));
+    const paddleMemory = estimatePaddlePdfMemory(
+      paddleLayers,
+      paddleLayers.length ? PADDLE_FONT_BYTES : 0,
+    );
+    const cachedBytes = previousBytes + freshCacheBytes;
+    const largestRaster = Math.max(
+      ...snapshot.map((page) => {
+        const size = page.metadata.outputSizePx;
+        return size.width * size.height;
+      }),
+    );
+    if (
+      externalBytes +
+        cachedBytes +
+        (imageBytes + layerBytes) * 4 +
+        textBytes * 2 +
+        largestRaster * 16 +
+        ENGINE_RESERVE +
+        paddleMemory >
+      limits.workingBytes
+    )
+      throw limitError();
     notify('assembling', 0, 0);
+    aborted(signal);
+    const font = paddleLayers.length
+      ? await paddleFont(new URL('ocr/paddle/pdf.ttf', assets), signal)
+      : undefined;
     aborted(signal);
     const worker = new WorkerClient(pdfAssets);
     let pdf: Blob;
     try {
-      const transfers = [...new Set(layers.map((page) => page.textPdf.buffer))].filter(
-        (buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer,
-      );
+      const transfers = [
+        ...new Set([
+          ...layers.flatMap((page) => ('textPdf' in page ? [page.textPdf.buffer] : [])),
+          ...(font ? [font.buffer] : []),
+        ]),
+      ].filter((buffer): buffer is ArrayBuffer => buffer instanceof ArrayBuffer);
       pdf = await worker.run<Blob>(
         {
           pages: layers,
+          ...(font ? { paddleFont: font } : {}),
           maxBytes: limits.resultBytes - textBytes - layerBytes,
           workingBytes: limits.workingBytes,
           textBytes,
-          externalBytes,
+          externalBytes: externalBytes + cachedBytes,
         },
         transfers,
         signal,
@@ -275,8 +486,10 @@ export async function createSearchablePdf(options: OcrOptions): Promise<Searchab
       );
     notify('assembling', 0, 1);
     aborted(signal);
+    for (const [page, entry] of pendingCache) reusablePages.set(page, entry);
     return { pdf, pages: resultPages };
   } finally {
     layers.length = 0;
+    pendingCache.length = 0;
   }
 }

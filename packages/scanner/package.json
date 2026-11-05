@@ -55,6 +55,9 @@
     "scanic": "1.7.1"
   },
   "devDependencies": {
+    "@paddleocr/paddleocr-js": "0.4.2",
+    "@techstark/opencv-js": "4.10.0-release.1",
+    "onnxruntime-web": "1.31.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "tesseract.js": "7.0.0",

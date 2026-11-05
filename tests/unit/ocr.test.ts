@@ -13,6 +13,11 @@ type Message = {
   action: string;
   payload: Record<string, any>;
   id?: number;
+  requestId?: number;
+  pageId?: string;
+  revision?: number;
+  image?: Blob;
+  workingBytes?: number;
 };
 class FakeWorker {
   static instances: FakeWorker[] = [];
@@ -84,7 +89,15 @@ class FakeCanvas {
     return raster.encode(this);
   }
 }
-const globals = ['Worker', 'document', 'location', 'createImageBitmap', 'OffscreenCanvas'] as const;
+const network = { fontFetches: 0 };
+const globals = [
+  'Worker',
+  'document',
+  'location',
+  'createImageBitmap',
+  'OffscreenCanvas',
+  'fetch',
+] as const;
 const originals = globals.map(
   (key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)] as const,
 );
@@ -96,6 +109,7 @@ beforeEach(() => {
   raster.canvases = [];
   raster.decode = async () => new FakeBitmap();
   raster.encode = async (canvas) => png(canvas.width, canvas.height);
+  network.fontFetches = 0;
   Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker });
   Object.defineProperty(globalThis, 'createImageBitmap', {
     configurable: true,
@@ -112,6 +126,15 @@ beforeEach(() => {
   Object.defineProperty(globalThis, 'location', {
     configurable: true,
     value: { origin: 'http://localhost' },
+  });
+  Object.defineProperty(globalThis, 'fetch', {
+    configurable: true,
+    value: async () => {
+      network.fontFetches++;
+      const font = new Uint8Array(572);
+      font[1] = 1;
+      return new Response(font);
+    },
   });
 });
 afterEach(() => {
@@ -140,13 +163,29 @@ const recognized = () => ({
   confidence: 94,
   pdf: new TextEncoder().encode('%PDF-1.7\n%%EOF'),
 });
+const recognizedPaddle = () => ({
+  text: 'Grüße aus Köln',
+  confidence: 92,
+  width: 2,
+  height: 2,
+  lines: [
+    {
+      text: 'Grüße aus Köln',
+      poly: [
+        [0, 0],
+        [2, 0],
+        [2, 2],
+        [0, 2],
+      ],
+    },
+  ],
+});
 
-function confirmedPage(): ScanPage {
+function confirmedPage(id = 'confirmed', revision = 5, image = png(2, 2)): ScanPage {
   // Header validation is tested here; the browser case exercises real PNG decoding.
-  const image = png(2, 2);
   const draft = {
-    id: 'confirmed',
-    revision: 5,
+    id,
+    revision,
     source: 'file',
     original: image,
     size: { width: 2, height: 2 },
@@ -162,7 +201,7 @@ function confirmedPage(): ScanPage {
     quality: {
       state: 'completed',
       method: 'image-metrics',
-      revision: 5,
+      revision,
       assessment: 'no-warning',
       sharpness: 'sharp',
       reasons: [],
@@ -181,7 +220,7 @@ function confirmedPage(): ScanPage {
   };
 }
 
-function answerWorkers(result = recognized()) {
+function answerWorkers(result = recognized(), paddle = recognizedPaddle()) {
   FakeWorker.onPost = (worker, message) =>
     queueMicrotask(() => {
       if (worker.terminated) return;
@@ -190,6 +229,17 @@ function answerWorkers(result = recognized()) {
           data: {
             id: message.id,
             result: new Blob(['%PDF-1.7\n%%EOF'], { type: 'application/pdf' }),
+          },
+        });
+      else if (worker.url.pathname.endsWith('/paddle.worker.js'))
+        worker.onmessage?.({
+          data: {
+            requestId: message.requestId,
+            action: message.action,
+            pageId: message.pageId,
+            revision: message.revision,
+            type: 'result',
+            result: message.action === 'initialize' ? { ready: true } : paddle,
           },
         });
       else worker.reply('resolve', message.action === 'recognize' ? result : {}, message);
@@ -351,7 +401,16 @@ test('public OCR validates options, identity, metadata and budgets before openin
   });
   await assert.rejects(createSearchablePdf({ ...base, pages: [] }), { code: 'CONFIG_INVALID' });
   for (const languages of [[], ['fra']] as const)
-    await assert.rejects(createSearchablePdf({ ...base, languages: languages as any }), {
+    for (const engine of ['tesseract', 'paddle'] as const)
+      await assert.rejects(createSearchablePdf({ ...base, engine, languages: languages as any }), {
+        code: 'CONFIG_INVALID',
+      });
+  for (const engine of [null, '', 'PADDLE', 1])
+    await assert.rejects(createSearchablePdf({ ...base, engine: engine as any }), {
+      code: 'CONFIG_INVALID',
+    });
+  for (const previousPages of [null, {}, 'previous'])
+    await assert.rejects(createSearchablePdf({ ...base, previousPages: previousPages as any }), {
       code: 'CONFIG_INVALID',
     });
   await assert.rejects(createSearchablePdf({ ...base, pages: [base.pages[0], base.pages[0]] }), {
@@ -508,4 +567,222 @@ test('OCR working limits include the border before decode and actual PNG bytes b
   assert.equal(FakeWorker.instances.length, 1);
   assert.equal(FakeWorker.instances[0].terminated, 1);
   assert(FakeWorker.instances[0].messages.every((message) => message.action !== 'recognize'));
+});
+
+test('Paddle keeps one warm worker for ordered final blobs and releases it before font/PDF assembly', async () => {
+  answerWorkers();
+  const pages = [confirmedPage('first', 3), confirmedPage('second', 7)];
+  const result = await createSearchablePdf({
+    pages,
+    engine: 'paddle',
+    languages: ['eng'],
+    assetBaseUrl: '/scanner-assets/',
+    onProgress: async () => {
+      throw new Error('Rejected Paddle observer');
+    },
+  });
+  assert.deepEqual(
+    result.pages,
+    pages.map((page) => ({
+      id: page.id,
+      revision: page.revision,
+      text: 'Grüße aus Köln',
+      confidence: 92,
+    })),
+  );
+  const [ocr, pdf] = FakeWorker.instances;
+  assert.equal(ocr.url.pathname, '/scanner-assets/paddle.worker.js');
+  assert.deepEqual(
+    ocr.messages.map((message) => message.action),
+    ['initialize', 'recognize', 'recognize'],
+  );
+  assert.deepEqual(
+    ocr.messages.slice(1).map((message) => [message.pageId, message.revision]),
+    [
+      ['first', 3],
+      ['second', 7],
+    ],
+  );
+  for (const message of ocr.messages.slice(1)) {
+    assert.deepEqual(
+      new Uint8Array(await message.image!.arrayBuffer()),
+      new Uint8Array(await pages[0].image.arrayBuffer()),
+    );
+    assert(message.workingBytes! > 0);
+  }
+  assert.equal(raster.decodeCalls, 0, 'Paddle does not create a Tesseract-padded copy');
+  assert.equal(network.fontFetches, 1);
+  const packet = pdf.messages[0] as any;
+  assert.deepEqual(
+    packet.pages.map((page: any) => page.paddleText.imageSize),
+    [
+      { width: 2, height: 2 },
+      { width: 2, height: 2 },
+    ],
+  );
+  assert(packet.pages.every((page: any) => !('textPdf' in page)));
+  assert.equal(packet.paddleFont.byteLength, 572);
+  assert(
+    FakeWorker.events.indexOf('terminate:/scanner-assets/paddle.worker.js') <
+      FakeWorker.events.indexOf('create:/scanner-assets/ocr-pdf.worker.js'),
+  );
+  assert(FakeWorker.instances.every((worker) => worker.terminated === 1));
+});
+
+test('opt-in RAM reuse protects original results, reorders all pages and only recognizes new blobs', async () => {
+  for (const engine of ['tesseract', 'paddle'] as const) {
+    answerWorkers();
+    const pages = [confirmedPage('first', 1), confirmedPage('second', 2)];
+    const options = { pages, engine, assetBaseUrl: '/scanner-assets/' };
+    const first = await createSearchablePdf({ ...options, previousPages: [] });
+    first.pages[0].id = 'forged';
+    first.pages[0].revision = 999;
+    first.pages[0].text = 'forged host text';
+    first.pages[0].confidence = NaN;
+    const before = FakeWorker.instances.length,
+      decodes = raster.decodeCalls;
+    const reordered = await createSearchablePdf({
+      ...options,
+      pages: [pages[1], pages[0]],
+      previousPages: first.pages,
+      ...(engine === 'paddle' ? { languages: ['eng'] as const } : {}),
+      // A cached PDF fits this budget; recognition's engine/raster estimate does not.
+      limits: { workingBytes: 64 * 1024 ** 2 + (engine === 'paddle' ? 64_000 : 8000) },
+    });
+    assert.equal(FakeWorker.instances.length, before + 1, 'all hits create only the PDF worker');
+    assert.equal(FakeWorker.instances.at(-1)!.url.pathname, '/scanner-assets/ocr-pdf.worker.js');
+    assert.equal(raster.decodeCalls, decodes);
+    assert.deepEqual(
+      reordered.pages.map((page) => [page.id, page.revision, page.text, page.confidence]),
+      [
+        ['second', 2, 'Grüße aus Köln', engine === 'paddle' ? 92 : 94],
+        ['first', 1, 'Grüße aus Köln', engine === 'paddle' ? 92 : 94],
+      ],
+    );
+    const pdf = FakeWorker.instances.at(-1)!.messages[0] as any;
+    assert.deepEqual(
+      pdf.pages.map((page: any) => page.id),
+      ['second', 'first'],
+    );
+    if (engine === 'tesseract') assert(pdf.pages.every((page: any) => page.textPdf.byteLength > 0));
+    const replacement = { ...pages[0], image: new Blob([pages[0].image], { type: 'image/png' }) };
+    const start = FakeWorker.instances.length;
+    await createSearchablePdf({
+      ...options,
+      pages: [pages[1], replacement],
+      previousPages: reordered.pages,
+    });
+    const fresh = FakeWorker.instances.slice(start);
+    assert.equal(fresh.length, 2);
+    assert.equal(fresh[0].messages.filter((message) => message.action === 'recognize').length, 1);
+    const assembled = fresh[1].messages[0] as any;
+    assert.equal(assembled.pages.length, 2);
+    if (engine === 'tesseract')
+      assert(assembled.pages.every((page: any) => page.textPdf.byteLength > 0));
+    assert(fresh.every((worker) => worker.terminated === 1));
+  }
+});
+
+test('reuse requires initial opt-in and original candidate/configuration identity', async () => {
+  answerWorkers();
+  const page = confirmedPage(),
+    options = { pages: [page], assetBaseUrl: '/scanner-assets/' };
+  const uncached = await createSearchablePdf(options);
+  const start = FakeWorker.instances.length;
+  const cached = await createSearchablePdf({ ...options, previousPages: uncached.pages });
+  assert.equal(FakeWorker.instances.length, start + 2, 'default results retain no reusable layer');
+  for (const changed of [
+    { previousPages: cached.pages.map((entry) => ({ ...entry })) },
+    { languages: ['eng', 'deu'] as const },
+    { assetBaseUrl: '/other-assets/' },
+    { engine: 'paddle' as const },
+    { pages: [confirmedPage('different-id', page.revision, page.image)] },
+    { pages: [confirmedPage(page.id, page.revision + 1, page.image)] },
+  ]) {
+    const before = FakeWorker.instances.length;
+    await createSearchablePdf({ ...options, previousPages: cached.pages, ...changed });
+    assert.equal(
+      FakeWorker.instances.length,
+      before + 2,
+      'a mismatching cache candidate is a miss',
+    );
+  }
+});
+
+test('explicit previous owners count cached layers and unselected image blobs before compute', async () => {
+  for (const large of ['image', 'layer'] as const) {
+    const pdf = recognized().pdf;
+    const largePdf = new Uint8Array(1_000_000);
+    largePdf.set(pdf);
+    answerWorkers(large === 'layer' ? { ...recognized(), pdf: largePdf } : recognized());
+    const old = confirmedPage('old', 1, large === 'image' ? png(2, 2, 1_000_000) : png(2, 2));
+    const cached = await createSearchablePdf({
+      pages: [old],
+      assetBaseUrl: '/scanner-assets/',
+      previousPages: [],
+    });
+    const before = FakeWorker.instances.length;
+    await assert.rejects(
+      createSearchablePdf({
+        pages: [confirmedPage('current')],
+        assetBaseUrl: '/scanner-assets/',
+        previousPages: cached.pages,
+        limits: { workingBytes: 64 * 1024 ** 2 + 100_000 },
+      }),
+      { code: 'LIMIT_EXCEEDED' },
+    );
+    assert.equal(FakeWorker.instances.length, before);
+  }
+});
+
+test('Paddle abort/failure after one page discards the batch and permits an explicit retry', async () => {
+  for (const failure of ['abort', 'second-page-error'] as const) {
+    answerWorkers();
+    const answer = FakeWorker.onPost!;
+    FakeWorker.onPost = (worker, message) => {
+      if (failure === 'second-page-error' && message.pageId === 'second')
+        queueMicrotask(() =>
+          worker.onmessage?.({ data: { ...message, type: 'error', code: 'LIMIT_EXCEEDED' } }),
+        );
+      else answer(worker, message);
+    };
+    const abort = new AbortController(),
+      start = FakeWorker.instances.length,
+      fonts = network.fontFetches;
+    await assert.rejects(
+      createSearchablePdf({
+        pages: [confirmedPage('first'), confirmedPage('second')],
+        engine: 'paddle',
+        assetBaseUrl: '/scanner-assets/',
+        previousPages: [],
+        signal: abort.signal,
+        onProgress: (progress) => {
+          if (
+            failure === 'abort' &&
+            progress.stage === 'recognizing' &&
+            progress.page === 1 &&
+            progress.progress === 1
+          )
+            abort.abort();
+        },
+      }),
+      failure === 'abort' ? { name: 'AbortError' } : { code: 'LIMIT_EXCEEDED' },
+    );
+    const workers = FakeWorker.instances.slice(start);
+    assert.equal(workers.length, 1);
+    assert.equal(workers[0].url.pathname, '/scanner-assets/paddle.worker.js');
+    assert.equal(workers[0].terminated, 1);
+    assert.equal(network.fontFetches, fonts);
+  }
+  answerWorkers();
+  assert.equal(
+    (
+      await createSearchablePdf({
+        pages: [confirmedPage()],
+        engine: 'paddle',
+        assetBaseUrl: '/scanner-assets/',
+      })
+    ).pages.length,
+    1,
+  );
 });

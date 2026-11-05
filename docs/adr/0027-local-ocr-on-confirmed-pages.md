@@ -1,6 +1,6 @@
 # ADR 0027: Local OCR on confirmed pages
 
-Status: Accepted for unreleased source, 29 October 2026.
+Status: Accepted for unreleased source, 29 October 2026; Paddle/manual-demo/reuse extension approved 2 November 2026.
 
 ## Context
 
@@ -17,6 +17,12 @@ A private version-pinned adapter controls the native worker from construction th
 Recognize a temporary unscaled PNG copy with a fixed 10-pixel white margin. This prevents tight image borders from hiding text during automatic layout analysis without forcing a single text block and breaking multiple-column reading order. Release preparation resources and include the padded raster and actual encoded bytes in phase-specific memory estimates.
 
 Reuse Tesseract's invisible `pdfTextOnly` page to retain its baseline, font and Unicode mapping. After terminating OCR, a separate pdf-lib worker builds a fresh document from unchanged final JPEG/PNG images and the corresponding text overlays. Crop the text page's MediaBox proportionally to remove the working margin, including its origin; both image and text then use the existing image/layout box and PDF coordinate conversion. No extra rotation or lossy conversion of the final image. This avoids implementing PDF text/font placement from glyph bounding boxes.
+
+The 2 November extension adds `engine: 'paddle'` with the pinned Paddle SDK 0.4.2, ORT 1.31.1/OpenCV 4.10.0-release.1 worker and V5 mobile detector/Latin recognizer. Keep the SDK Tesseract default; select Paddle explicitly in the reference host. The demo invokes OCR only manually, superseding its earlier automatic opt-in. Production hosts may invoke the same operation automatically after final edits and scanner cleanup. One warm worker processes missing pages serially, then ends before PDF assembly.
+
+Paddle retains exact final image pixels. Apply the geometry-only reading order without rewriting text and use final-image line polygons, GlyphLessFont and an explicit Unicode map for invisible PDF text. Selection geometry within a line is approximate; no word/glyph localization is claimed. Preserve Tesseract's existing overlay path. No fontkit dependency is needed; bundle the hash-pinned original font and license.
+
+`previousPages` is an explicit RAM-reuse opt-in, including `[]` on the first call. Private metadata binds SDK-returned result objects to the identical image Blob, ID/revision and recognition configuration. Changed or reconstructed results are misses. Do not retain reuse layers implicitly when the option is absent or detach cached buffers during PDF assembly. This is not a persistent artifact format or a host-storage implementation.
 
 ## Consequences
 

@@ -1,0 +1,33 @@
+Native source notices for @techstark/opencv-js 4.10.0-release.1
+
+The installed package's Apache-2.0 LICENSE is collected with its JavaScript
+dependency notices. Its pinned source identifies the browser binary's origin:
+https://github.com/TechStark/opencv-js/tree/6a539c08d2ca78dc544dc6fee670af38740c4237
+https://docs.opencv.org/4.10.0/opencv.js
+OpenCV sources and build scripts: https://github.com/opencv/opencv/tree/4.10.0
+
+The reviewed npm opencv.js has SHA-256
+19b46167b59efbef9cc3836264b0b657110833e4b1df84282004b8b3141c048d.
+Its embedded WASM has SHA-256
+fe8e126d8c3e517bcb0e0c6401dbd6a714f4cd8d78705e6a3edbc7c813a0aae3.
+The static build-information string identifies OpenCV 4.10.0, single-file
+Emscripten output without pthreads, zlib 1.3.1, Protobuf 3.19.1 and
+FlatBuffers 23.5.9. It also lists OpenJPEG 2.5.0 while imgcodecs is disabled;
+that notice is retained conservatively, without claiming the codec is linked.
+
+Unchanged source notices:
+  LICENSE-zlib-1.3.1 (complete original README)
+  https://raw.githubusercontent.com/madler/zlib/v1.3.1/README
+  LICENSE-protobuf-3.19.1
+  https://raw.githubusercontent.com/opencv/opencv/4.10.0/3rdparty/protobuf/LICENSE
+  LICENSE-flatbuffers-23.5.9 (upstream LICENSE.txt)
+  https://raw.githubusercontent.com/opencv/opencv/4.10.0/3rdparty/flatbuffers/LICENSE.txt
+  LICENSE-openjpeg-2.5.0
+  https://raw.githubusercontent.com/uclouvain/openjpeg/v2.5.0/LICENSE
+
+The binary reports a compiler identified as LLVM/Clang 10.0.0, not an exact
+Emscripten release or complete runtime link map. The ONNX Runtime aggregate
+notice also retains upstream LLVM/Emscripten material, but does not establish
+the exact compiler-source version used for this OpenCV binary. No matching
+recompilation, complete native/runtime SBOM or claim that every optional
+OpenCV source component is linked is made.

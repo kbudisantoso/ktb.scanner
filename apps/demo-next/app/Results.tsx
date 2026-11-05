@@ -1,6 +1,7 @@
 'use client';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { ScanPage, ScanResult } from '@ktb-tools/scanner';
+import type { OcrEngine } from '@ktb-tools/scanner/ocr';
 import { useUrl } from './blob-url';
 import { useDemoLocale } from './i18n';
 import OcrControls, {
@@ -148,6 +149,7 @@ export default function Results({
   back,
   ocrOptions,
   onOcrLanguageChange,
+  onOcrEngineChange,
 }: {
   result: Result;
   reset: () => void;
@@ -156,6 +158,7 @@ export default function Results({
   back: () => void;
   ocrOptions?: HostOcrOptions;
   onOcrLanguageChange?: (language: OcrLanguageChoice) => void;
+  onOcrEngineChange?: (engine: OcrEngine) => void;
 }) {
   const { t } = useDemoLocale();
   const [index, setIndex] = useState(0),
@@ -169,7 +172,7 @@ export default function Results({
     setDetails(false);
     infoTrigger.current?.focus();
   };
-  const ocr = useResultOcr(result, hidden, ocrOptions, onOcrLanguageChange);
+  const ocr = useResultOcr(result, hidden, ocrOptions, onOcrLanguageChange, onOcrEngineChange);
   const recognizing = ocr.state?.phase === 'running';
   const pdf = ocr.output?.pdf ?? result.pdf;
   const text = ocr.output?.pages.find(

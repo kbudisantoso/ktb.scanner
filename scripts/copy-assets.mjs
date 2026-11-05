@@ -18,6 +18,7 @@ const files = [
   'processing.worker.js',
   'pdf.worker.js',
   'ocr-pdf.worker.js',
+  'paddle.worker.js',
   'scanic.js',
   'scanic.LICENSE',
   'ktb-scanner.LICENSE',

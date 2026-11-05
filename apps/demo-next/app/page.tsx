@@ -8,9 +8,10 @@ import {
   DEFAULT_AUTO_CAPTURE_STABILITY_MS,
 } from '@ktb-tools/scanner';
 import type { ScanResult, ScannerOptions, OpenOptions, ScanProfile } from '@ktb-tools/scanner';
+import type { OcrEngine } from '@ktb-tools/scanner/ocr';
 import { useUrl } from './blob-url';
 import Results from './Results';
-import { OcrLanguageSelect, type OcrLanguageChoice } from './OcrControls';
+import { OcrEngineSelect, OcrLanguageSelect, type OcrLanguageChoice } from './OcrControls';
 import { useDemoLocale } from './i18n';
 const Scanner = lazy(() =>
   import('@ktb-tools/scanner/react').then((module) => ({ default: module.Scanner })),
@@ -19,7 +20,6 @@ type Result = Extract<ScanResult, { status: 'confirmed' }>;
 type Request = {
   options: Omit<ScannerOptions, 'mount'>;
   initial: OpenOptions;
-  automaticOcr: boolean;
   trace?: DiagnosticRecording;
 };
 export default function Page() {
@@ -28,13 +28,10 @@ export default function Page() {
     input = useRef<HTMLInputElement>(null),
     soundPreview = useRef<HTMLAudioElement>(null);
   const [resultVisible, setResultVisible] = useState(true);
-  const [completed, setCompleted] = useState<{ result: Result; automaticOcr: boolean } | null>(
-      null,
-    ),
+  const [result, setResult] = useState<Result | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
-  const result = completed?.result ?? null;
-  const [automaticOcr, setAutomaticOcr] = useState(false),
+  const [ocrEngine, setOcrEngine] = useState<OcrEngine>('paddle'),
     [ocrLanguage, setOcrLanguage] = useState<OcrLanguageChoice>('deu+eng');
   const [diagnosticEnabled, setDiagnosticEnabled] = useState(false),
     [engineBuffers, setEngineBuffers] = useState(false),
@@ -164,7 +161,6 @@ export default function Page() {
         ...(profile === 'auto' ? {} : { defaultProfile: profile }),
       },
       initial: { initialFiles: files },
-      automaticOcr,
       trace,
     });
   };
@@ -174,7 +170,7 @@ export default function Page() {
     active.current = false;
     setBusy(false);
     if (next.status === 'confirmed') {
-      setCompleted({ result: next, automaticOcr: request?.automaticOcr ?? false });
+      setResult(next);
       setResultVisible(true);
     }
   };
@@ -233,10 +229,11 @@ export default function Page() {
           key={result.sessionId}
           result={result}
           hidden={busy || !!panel || !resultVisible}
-          ocrOptions={{ automatic: completed?.automaticOcr ?? false, language: ocrLanguage }}
+          ocrOptions={{ engine: ocrEngine, language: ocrLanguage }}
           onOcrLanguageChange={setOcrLanguage}
+          onOcrEngineChange={setOcrEngine}
           back={() => setResultVisible(false)}
-          reset={() => setCompleted(null)}
+          reset={() => setResult(null)}
           scan={() => open()}
         />
       )}
@@ -320,18 +317,17 @@ export default function Page() {
             </select>
           </label>
           <label>
-            {t('Texterkennungssprachen')}
-            <OcrLanguageSelect value={ocrLanguage} onChange={setOcrLanguage} disabled={busy} />
+            {t('Texterkennungs-Engine')}
+            <OcrEngineSelect value={ocrEngine} onChange={setOcrEngine} disabled={busy} />
           </label>
-          <label className="ocr-toggle">
-            <input
-              type="checkbox"
-              checked={automaticOcr}
-              disabled={busy}
-              onChange={(event) => setAutomaticOcr(event.target.checked)}
-            />
-            {t('Text nach dem Scan automatisch erkennen')}
-          </label>
+          {ocrEngine === 'tesseract' ? (
+            <label>
+              {t('Texterkennungssprachen')}
+              <OcrLanguageSelect value={ocrLanguage} onChange={setOcrLanguage} disabled={busy} />
+            </label>
+          ) : (
+            <p>{t('Latin-Modell (u. a. DE + EN)')}</p>
+          )}
           <label>
             {t('Aufnahmeablauf')}
             <select
