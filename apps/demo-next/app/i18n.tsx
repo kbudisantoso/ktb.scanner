@@ -22,8 +22,9 @@ const HOST_ENGLISH_TEXTS: Record<string, string> = {
     'Text recognition cancelled. Existing results are preserved.',
   'Seite {number} von {count} erkennen: {percent} %':
     'Recognizing page {number} of {count}: {percent}%',
-  'Durchsuchbares PDF erstellen: {percent} %': 'Creating searchable PDF: {percent}%',
-  'Texterkennung laden: {percent} %': 'Loading text recognition: {percent}%',
+  'Seite {number} von {count} wird erkannt...': 'Recognizing page {number} of {count}...',
+  'Durchsuchbares PDF wird erstellt...': 'Creating searchable PDF...',
+  'Texterkennung wird geladen...': 'Loading text recognition...',
   'Erkannter Text: Seite {number}': 'Recognized text: page {number}',
   'Kein Text auf dieser Seite erkannt.': 'No text recognized on this page.',
 };

@@ -1,6 +1,12 @@
 # Implementation and verification status
 
-Updated 2 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 5 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+
+## OCR integration verification, 5 November 2026
+
+The OCR-only integration is based on current main, preserving its existing camera and processing changes. The demo now shows indeterminate activity for Paddle recognition, loading and PDF assembly, while Tesseract retains its measured recognition percentages. The public integration guide records the fixed Paddle 8-MP/4,096-pixel input ceiling.
+
+Fresh local checks passed: 243 native tests, three built-package SSR checks, release-workflow tests, full library/Next.js/Astro builds, typechecking, formatting, 68-document link/reference checks, the inspected 368-file package, license inventory, delivered notices and diff checks. The four-profile OCR browser run passed 13 cases with one existing Firefox Paddle engine omission. Independent code and documentation reviews found no unresolved issues. Hosted full-suite CI is evaluated on the pull request separately; no release or npm publication is included.
 
 ## Paddle batches and manually invoked OCR, 2 November 2026
 

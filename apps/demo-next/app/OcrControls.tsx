@@ -11,8 +11,8 @@ import { useDemoLocale } from './i18n';
 
 type Result = Extract<ScanResult, { status: 'confirmed' }>;
 type Phase = 'running' | 'complete' | 'cancelled' | 'failed';
-type Job = { source: Result; controller: AbortController };
-type State = { source: Result; phase: Phase; progress?: OcrProgress };
+type Job = { source: Result; controller: AbortController; engine: OcrEngine };
+type State = { source: Result; phase: Phase; engine: OcrEngine; progress?: OcrProgress };
 export type OcrLanguageChoice = 'deu+eng' | 'deu' | 'eng';
 export type HostOcrOptions = { engine: OcrEngine; language: OcrLanguageChoice };
 const LANGUAGE_CHOICES: Record<OcrLanguageChoice, readonly OcrLanguage[]> = {
@@ -55,7 +55,7 @@ export function useResultOcr(
     job.current = null;
     pending.controller.abort();
     if (alive.current && current.current.result === pending.source)
-      setState({ source: pending.source, phase: 'cancelled' });
+      setState({ source: pending.source, phase: 'cancelled', engine: pending.engine });
   }, []);
   useEffect(() => {
     alive.current = true;
@@ -75,7 +75,7 @@ export function useResultOcr(
   const start = useCallback(async () => {
     const { result, hidden, engine, language, recognized } = current.current;
     if (job.current || !alive.current || hidden) return;
-    const pending = { source: result, controller: new AbortController() };
+    const pending = { source: result, controller: new AbortController(), engine };
     job.current = pending;
     const languages = engine === 'tesseract' ? [...LANGUAGE_CHOICES[language]] : undefined;
     const previousPages = recognized?.source === result ? recognized.value.pages.slice() : [];
@@ -88,6 +88,7 @@ export function useResultOcr(
     setState({
       source: result,
       phase: 'running',
+      engine,
       progress: { stage: 'loading', page: 0, pages: result.pages.length, progress: 0 },
     });
     try {
@@ -102,17 +103,23 @@ export function useResultOcr(
         signal: pending.controller.signal,
         onProgress: (progress) => {
           if (valid())
-            setState({ source: pending.source, phase: 'running', progress: { ...progress } });
+            setState({
+              source: pending.source,
+              phase: 'running',
+              engine: pending.engine,
+              progress: { ...progress },
+            });
         },
       });
       if (!valid()) return;
       setRecognized({ source: pending.source, value });
-      setState({ source: pending.source, phase: 'complete' });
+      setState({ source: pending.source, phase: 'complete', engine: pending.engine });
     } catch (error) {
       if (!valid()) return;
       setState({
         source: pending.source,
         phase: error instanceof Error && error.name === 'AbortError' ? 'cancelled' : 'failed',
+        engine: pending.engine,
       });
     } finally {
       if (job.current === pending) job.current = null;
@@ -201,6 +208,7 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
     }
   }, [running]);
   const progress = ocr.state?.progress;
+  const indeterminate = progress?.stage !== 'recognizing' || ocr.state?.engine === 'paddle';
   const percent = Math.round(Math.max(0, Math.min(1, progress?.progress ?? 0)) * 100);
   const message =
     ocr.state?.phase === 'complete'
@@ -210,14 +218,19 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
         : ocr.state?.phase === 'cancelled'
           ? t('Texterkennung abgebrochen. Vorhandene Ergebnisse bleiben erhalten.')
           : progress?.stage === 'recognizing'
-            ? t('Seite {number} von {count} erkennen: {percent} %', {
-                number: progress.page,
-                count: progress.pages,
-                percent,
-              })
+            ? t(
+                indeterminate
+                  ? 'Seite {number} von {count} wird erkannt...'
+                  : 'Seite {number} von {count} erkennen: {percent} %',
+                {
+                  number: progress.page,
+                  count: progress.pages,
+                  percent,
+                },
+              )
             : progress?.stage === 'assembling'
-              ? t('Durchsuchbares PDF erstellen: {percent} %', { percent })
-              : t('Texterkennung laden: {percent} %', { percent });
+              ? t('Durchsuchbares PDF wird erstellt...')
+              : t('Texterkennung wird geladen...');
   return (
     <section className="result-ocr" aria-label={t('Texterkennung')}>
       <div className="result-ocr-options">
@@ -253,7 +266,9 @@ export default function OcrControls({ ocr }: { ocr: ReturnType<typeof useResultO
       )}
       {ocr.state && (
         <div className="result-ocr-status">
-          {running && <progress value={percent} max={100} aria-label={message} />}
+          {running && (
+            <progress value={indeterminate ? undefined : percent} max={100} aria-label={message} />
+          )}
           <p role={ocr.state.phase === 'failed' ? 'alert' : 'status'}>{message}</p>
         </div>
       )}
