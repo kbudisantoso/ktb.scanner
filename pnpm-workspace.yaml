@@ -6,6 +6,7 @@ allowBuilds:
   sharp: true
   core-js: false
   protobufjs: false
+  tesseract.js: false
 overrides:
   onnxruntime-web: 1.31.1
   onnxruntime-common: 1.31.1
