@@ -13,14 +13,14 @@ Project source is AGPL-3.0-only; dependencies retain their own licenses. Direct 
 | PP-OCRv5 mobile detector / Latin recognizer | Pinned converted ONNX bytes and 502-character dictionary | Local Paddle models, reproducible SDK TAR packaging | Apache-2.0; [provenance and checksums](../packages/scanner/assets/ocr/paddle/models.json) |
 | Tesseract GlyphLessFont | tessconfigs `3decf1c8252ba6dbeef0bf908f4b0aab7f18d113` | Invisible Unicode text in Paddle PDFs | Apache-2.0; [font provenance](../packages/scanner/assets/ocr/paddle/pdf-font.json) |
 | pdf-lib | 1.17.1 | Optional searchable-PDF image/text assembly worker | MIT; [Source](https://github.com/Hopding/pdf-lib/tree/v1.17.1) |
-| PDF.js / pdfjs-dist | 6.4.299 | Next.js PDF preview only | Apache-2.0; [Release](https://github.com/mozilla/pdf.js/releases/tag/v6.4.299), [License](https://github.com/mozilla/pdf.js/blob/master/LICENSE) |
+| PDF.js / pdfjs-dist | 6.5.438 | Next.js PDF preview only | Apache-2.0; [Release](https://github.com/mozilla/pdf.js/releases/tag/v6.5.438), [License](https://github.com/mozilla/pdf.js/blob/master/LICENSE) |
 | React / React DOM | 19.3.1 | Peer / demo runtime | MIT; [React](https://github.com/facebook/react) |
-| Next.js | 16.4.2 | Full reference application | MIT; [Next.js](https://github.com/vercel/next.js) |
-| Astro | 7.4.1 | Small host example | MIT; [Astro](https://github.com/withastro/astro) |
-| @types/node | 26.6.5 | Development-only build/test types; runtime minimum is unchanged | MIT; [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
+| Next.js | 16.4.5 | Full reference application | MIT; [Next.js](https://github.com/vercel/next.js) |
+| Astro | 7.4.7 | Small host example | MIT; [Astro](https://github.com/withastro/astro) |
+| @types/node | 26.6.6 | Development-only build/test types | MIT; [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
 | TypeScript | 7.0.2 | Types / declarations | Apache-2.0; [TypeScript](https://github.com/microsoft/TypeScript) |
 | esbuild | 0.28.2 | Library/worker build | MIT; [esbuild](https://github.com/evanw/esbuild) |
-| Playwright | 1.64.1 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
+| Playwright | 1.65.0 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
 | Prettier | 3.9.10 | Formatting | MIT; [Prettier](https://github.com/prettier/prettier) |
 
 Scanic 1.7.1 provides scanDocument, extractDocument and createCornerEditor with keyboard/loupe support. The earlier 1.7.0 branch version was unavailable in the registry. Build-time instrumentation verifies exact source anchors, exposes existing buffers when enabled and adds an optional candidate selector. Installed vendor files remain unchanged. Preserve MIT and modification notices. Classic WASM bytes are embedded; the unused Scanic ML branch and commercial SDKs are not distributed. Unreleased OCR uses its own explicitly listed local models and worker assets.
@@ -48,3 +48,5 @@ The [dependency capability review](testing/DEPENDENCY-SECURITY.md) explains repo
 Next.js was updated from 16.3.8 to pinned 16.4.1 after the 23 October audit reported [SVG optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw), [Server Actions denial of service](https://github.com/advisories/GHSA-p3m5-59mp-jv5r) and [typed-array use-cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) advisories. The repeat production audit on 24 October 2026 reports zero known vulnerabilities in every severity. This describes the resolved tree at that time, not a general security guarantee. Recheck after dependency changes.
 
 The 26 October 2026 audit of the updated complete dependency tree, including development packages, also reported zero known vulnerabilities in every severity. Its scope and accepted licensing policies are recorded in the audit above.
+
+The 6 November review also checks primary upstream advisories rather than relying only on registry audit counts. Next.js 16.4.5 fixes seven moderate upstream advisories affecting earlier 16.4 versions, while the same-day full lockfile audit returned zero advisories. The reference host now pins 16.4.5; these framework dependencies are not part of the scanner runtime package. See the [official security release](https://github.com/vercel/next.js/releases/tag/v16.4.5). The workspace uses pnpm 11.28.11 and requires Node >=22.23.4 for the updated Astro reference; Node 24 LTS remains the recommended build environment. The established OCR/Scanic engine pins and provenance checks remain unchanged.

@@ -2,6 +2,14 @@
 
 Reviewed 26 October 2026 for published `@ktb-tools/scanner@0.1.0`. This review addresses the specific reported Socket findings. It does not certify every dependency, future version, host integration or execution path.
 
+## Release review, 6 November 2026
+
+The SDK input/worker/session boundaries, optional OCR/PDF paths and publication workflow were reviewed separately. No actionable P1/P2 finding was confirmed in those scopes. The established image/model/font provenance checks remain in place; this review is not a security certification.
+
+The complete npm audit returned zero advisories before and after the dependency refresh, but the [official Next.js 16.4.5 security release](https://github.com/vercel/next.js/releases/tag/v16.4.5) lists seven moderate upstream advisories affecting earlier 16.4 versions. The reference host therefore pins 16.4.5. Registry audit output alone is not treated as evidence that upstream advisories are absent. Next.js remains a reference-host dependency, not a scanner runtime dependency. The Astro refresh also resolves transitive `@astrojs/prism` from 4.1.0 to 4.1.2, fixing the upstream [Prism XSS advisory](https://github.com/advisories/GHSA-ff38-p3qj-4pmf); this is a framework capability and does not establish that the reference host exposes the affected rendering path.
+
+Fresh host/test dependencies use six exact-version release-age exceptions, with no wildcard or global age-policy override. Their npm tarballs were checked against registry SHA-512 integrity and the resolved lockfile, and their names, versions and dependency links were matched to official [Astro source tags](https://github.com/withastro/astro/tree/astro%407.4.7) and [Playwright source tags](https://github.com/microsoft/playwright/tree/v1.65.0). These narrow exceptions can be removed once the 24-hour release-age window has elapsed. OCR/Scanic runtime/model pins remain unchanged rather than replacing their separately reviewed binaries without a quality/provenance regression check.
+
 ## Evidence and versions
 
 The public npm tarball was downloaded and compared byte for byte with the inspected GitHub candidate artifact; they match. The npm license is `AGPL-3.0-only` and `latest` resolves to 0.1.0.

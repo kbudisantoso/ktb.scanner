@@ -64,7 +64,7 @@ The unreleased source improves folded-paper contour selection: when a supported 
 
 ## Run the demo applications
 
-Requirements: Node **>=22.13.0** (Node 24 LTS recommended), **pnpm 11.15.1**, and Python 3 for independent archive checks. No API key, `.env`, backend or external scanner service is required.
+Requirements: Node **>=22.23.4** (Node 24 LTS recommended), **pnpm 11.28.11**, and Python 3 for independent archive checks. No API key, `.env`, backend or external scanner service is required.
 
 ```sh
 git clone https://github.com/kbudisantoso/ktb.scanner.git

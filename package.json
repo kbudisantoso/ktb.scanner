@@ -4,9 +4,9 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
-  "packageManager": "pnpm@11.15.1",
+  "packageManager": "pnpm@11.28.11",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.23.4"
   },
   "scripts": {
     "build": "pnpm build:library && pnpm build:hosts",
@@ -30,8 +30,8 @@
     "check:package": "node scripts/check-package.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
-    "@types/node": "26.6.5",
+    "@playwright/test": "1.65.0",
+    "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "esbuild": "0.28.2",
