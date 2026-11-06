@@ -20,7 +20,7 @@ Project source is AGPL-3.0-only; dependencies retain their own licenses. Direct 
 | @types/node | 26.6.6 | Development-only build/test types | MIT; [DefinitelyTyped](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |
 | TypeScript | 7.0.2 | Types / declarations | Apache-2.0; [TypeScript](https://github.com/microsoft/TypeScript) |
 | esbuild | 0.28.2 | Library/worker build | MIT; [esbuild](https://github.com/evanw/esbuild) |
-| Playwright | 1.65.0 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
+| Playwright | 1.64.1 | Browser integration | Apache-2.0; [Playwright](https://github.com/microsoft/playwright) |
 | Prettier | 3.9.10 | Formatting | MIT; [Prettier](https://github.com/prettier/prettier) |
 
 Scanic 1.7.1 provides scanDocument, extractDocument and createCornerEditor with keyboard/loupe support. The earlier 1.7.0 branch version was unavailable in the registry. Build-time instrumentation verifies exact source anchors, exposes existing buffers when enabled and adds an optional candidate selector. Installed vendor files remain unchanged. Preserve MIT and modification notices. Classic WASM bytes are embedded; the unused Scanic ML branch and commercial SDKs are not distributed. Unreleased OCR uses its own explicitly listed local models and worker assets.
