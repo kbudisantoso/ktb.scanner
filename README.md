@@ -319,8 +319,8 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `imageType` | `image/jpeg` at 0.92; `image/png` is also supported |
 | `onPreferenceChange` | Optional notification of real SDK UI changes to `initialMode` / `imageType`, including cancelled sessions; introduced in 0.2.0 |
 | `createPdf` | `true`; raster PDF without searchable OCR text |
-| `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no sound/context/request |
-| `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` stays silent. See [custom audio](docs/SOUNDS.md) |
+| `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no SDK sound/context/request |
+| `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` suppresses SDK playback. See [custom audio](docs/SOUNDS.md) |
 | `paperRegion` | Optional ISO region as a weak A4/Letter prior; no GPS/IP permission |
 | `theme` | Semantic `--scanner-*` CSS variables |
 | `includeOriginals` | `false`; original bytes/EXIF are returned only when explicitly enabled |

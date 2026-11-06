@@ -41,7 +41,7 @@ const scanner = createScanner({
 });
 ```
 
-`shutterSoundUrl` overrides the selected recording, while `shutterSound: 'off'` always wins and remains silent. It works with the controller and the reusable React `Scanner` through the same `options` object. It does not add another entry to the shipped catalog; a host can provide its own selector and labels.
+`shutterSoundUrl` overrides the selected recording, while `shutterSound: 'off'` always wins and suppresses SDK playback. It works with the controller and the reusable React `Scanner` through the same `options` object. It does not add another entry to the shipped catalog; a host can provide its own selector and labels.
 
 Relative HTTP(S), absolute HTTP(S) and host-owned Blob URLs are accepted. Prefer same-origin delivery. An explicitly configured cross-origin URL needs CORS and an appropriate CSP `connect-src` because the recording is fetched for Web Audio decoding. There is no automatic CDN fallback. For a Blob URL, keep it valid for the session and revoke it after `destroy()` or component cleanup. Invalid URLs/schemes fail with `CONFIG_INVALID` before audio opens.
 
