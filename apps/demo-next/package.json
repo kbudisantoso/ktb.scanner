@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@ktb-tools/scanner": "workspace:*",
-    "next": "16.4.2",
-    "pdfjs-dist": "6.4.299",
+    "next": "16.4.5",
+    "pdfjs-dist": "6.5.438",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   }

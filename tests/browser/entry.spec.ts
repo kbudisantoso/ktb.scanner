@@ -118,11 +118,13 @@ for (const api of ['controller', 'react']) {
     await expect(page.getByRole('combobox', { name: 'Capture mode', exact: true })).toHaveValue(
       'manual',
     );
-    expect(
-      await page.evaluate(() =>
-        (window as any).entryHarness.requests.map((r: any) => r.constraints.audio),
-      ),
-    ).toEqual([false]);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window as any).entryHarness.requests.map((r: any) => r.constraints.audio),
+        ),
+      )
+      .toEqual([false]);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => (window as any).entryHarness.results.length))

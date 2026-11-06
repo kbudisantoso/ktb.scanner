@@ -1,4 +1,12 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+
+const nextDependencies = JSON.parse(
+  readFileSync(new URL('../../apps/demo-next/package.json', import.meta.url), 'utf8'),
+).dependencies;
+const astroDependencies = JSON.parse(
+  readFileSync(new URL('../../apps/demo-astro/package.json', import.meta.url), 'utf8'),
+).dependencies;
 
 for (const host of ['next', 'astro']) {
   test(
@@ -24,9 +32,9 @@ for (const host of ['next', 'astro']) {
       expect(text).not.toContain('Pixabay Content License');
       expect(text).not.toMatch(/\/Users\/|\/home\/runner\//);
       if (host === 'next') {
-        expect(text).toContain('pdfjs-dist@6.4.299 / LICENSE');
+        expect(text).toContain(`pdfjs-dist@${nextDependencies['pdfjs-dist']} / LICENSE`);
         expect(text).toContain('dist/compiled/react/LICENSE');
-      } else expect(text).toContain('astro@7.4.1 / LICENSE');
+      } else expect(text).toContain(`astro@${astroDependencies.astro} / LICENSE`);
     },
   );
 }

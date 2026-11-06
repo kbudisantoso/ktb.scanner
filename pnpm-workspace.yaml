@@ -7,6 +7,12 @@ allowBuilds:
   core-js: false
   protobufjs: false
   tesseract.js: false
+# Exact versions reviewed against official source tags and tarball/lockfile integrity on 2026-11-06.
+# Remove these narrow exceptions after the 24-hour release-age window.
+minimumReleaseAgeExclude:
+  - '@astrojs/internal-helpers@0.13.1'
+  - '@astrojs/markdown-satteri@0.4.7'
+  - astro@7.4.7
 overrides:
   onnxruntime-web: 1.31.1
   onnxruntime-common: 1.31.1

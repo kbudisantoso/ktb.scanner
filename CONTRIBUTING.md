@@ -4,7 +4,7 @@ Bug reports, focused fixes, documentation and synthetic image fixtures are welco
 
 ## Development
 
-Use Node 24 LTS, pnpm 11.15.1 and Python 3. Camera tests require localhost or HTTPS. No backend, account, API key or database is needed for the normal scanning flow.
+Use Node 24 LTS, pnpm 11.28.11 and Python 3. Camera tests require localhost or HTTPS. No backend, account, API key or database is needed for the normal scanning flow.
 
 ```sh
 pnpm install --frozen-lockfile

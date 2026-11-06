@@ -1,6 +1,6 @@
 # Integration and local operation
 
-Use Node >=22.13 (Node 24 LTS recommended), pnpm 11.15.1 and Python 3 for independent ZIP checks. The lockfile records the installed workspace resolution. This guide targets library 0.2.0. Direct camera entry, preference notifications and the extended theme tokens require 0.2.0; verify exact registry availability or build this source before using its public entry points.
+Use Node >=22.23.4 (Node 24 LTS recommended), pnpm 11.28.11 and Python 3 for independent ZIP checks. The lockfile records the installed workspace resolution. This guide targets library 0.2.0. Direct camera entry, preference notifications and the extended theme tokens require 0.2.0; verify exact registry availability or build this source before using its public entry points.
 
 ```sh
 pnpm install --frozen-lockfile
