@@ -23,6 +23,7 @@ export function retainedCaptureLimits(
   pageCount: number,
   extraPreviews: readonly Blob[] = [],
   cameraSnapshotBytes = 0,
+  forCapture = false,
 ): Limits {
   const originals = new Set<Blob>([incoming, ...files]),
     previews = new Set<Blob>(extraPreviews);
@@ -36,6 +37,7 @@ export function retainedCaptureLimits(
   const previewBytes = [...previews].reduce((n, blob) => n + blob.size, 0);
   const remaining = {
     ...limits,
+    originalBytes: forCapture ? limits.originalBytes - originalBytes : limits.originalBytes,
     resultBytes: limits.resultBytes - previewBytes,
     workingBytes: limits.workingBytes - originalBytes - previewBytes - cameraSnapshotBytes,
   };

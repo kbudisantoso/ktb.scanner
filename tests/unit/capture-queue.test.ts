@@ -29,6 +29,19 @@ test('pending sources, rollback images and edited previews retain their own budg
   assert.equal(remaining.workingBytes, 869);
   assert.equal(remaining.originalBytes, 100);
   assert.equal(remaining.pages, 3);
+  const capture = retainedCaptureLimits(
+    limits,
+    [page],
+    [file],
+    new Blob(),
+    3,
+    [editedPreview],
+    4,
+    true,
+  );
+  assert.equal(capture.originalBytes, 80);
+  assert.equal(capture.workingBytes, 881);
+  assert.equal(capture.fileBytes, limits.fileBytes);
   assert.throws(
     () =>
       retainedCaptureLimits({ ...limits, resultBytes: 95 }, [page], [], incoming, 2, [

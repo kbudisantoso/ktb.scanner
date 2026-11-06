@@ -1,6 +1,12 @@
 # Implementation and verification status
 
-Updated 5 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+Updated 6 November 2026. The library and both reference integrations are implemented. Automated evidence below does not establish physical-device, production deployment or universal detection quality. Default diagnostics are off.
+
+## Native camera photo source, 5 November 2026
+
+Unreleased camera acquisition now prefers a supported native photo on the existing track, retaining a synchronous video backup and exactly-once SDK feedback. Source/file/working limits, cancellation and pending hardware requests remain guarded. A fresh scene reference is secured before processing/feedback, so a next sheet placed during those phases does not become the duplicate-capture baseline. SDK cue settings cannot suppress independent browser/OS camera sounds.
+
+Final local package, library/Next.js/Astro build, typecheck, formatting, 246 native tests, three SSR checks, documentation links, notices and release-workflow checks passed. Focused camera coverage passed 48 cases with 12 existing canvas-stream omissions before the final early-page regression was added. That stricter early-page case now passes all four profiles, and the native source handoff verifies actual photo bytes, final pixels and independent corners. The 5 November macOS Firefox SDK-sound check failed with a decoded MP3 but a suspended AudioContext; an unchanged video-fallback control reproduced the same restriction. On 6 November the native-photo check passed on unchanged product code, including its SDK cue, image-pixel and cleanup assertions. The phone comparison was accepted on 6 November and the change is approved for PR integration. Hosted full-suite CI is assessed on that PR separately; the earlier macOS failure retains its original scope. No release or publication is included.
 
 ## OCR integration verification, 5 November 2026
 

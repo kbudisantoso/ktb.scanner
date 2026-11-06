@@ -55,6 +55,11 @@ async function prepare(page: Page) {
       ctx.fillStyle = h.scene === 0 ? '#999999' : '#435444';
       ctx.fillRect(0, 0, 600, 800);
       if (!h.scene) return;
+      ctx.save();
+      if (h.photoReconfigured) {
+        // Photo mode may change video framing without a physical page change.
+        ctx.translate(75, 0);
+      }
       ctx.fillStyle = '#fffdf6';
       ctx.fillRect(100, 60, 400, 680);
       ctx.fillStyle = h.scene === 1 ? '#96302a' : h.scene === 2 ? '#244b98' : '#385f2c';
@@ -70,6 +75,7 @@ async function prepare(page: Page) {
       } else
         for (let y = 240; y < 680; y += 28)
           for (let x = 140; x < 455; x += 52) ctx.fillRect(x, y, 36, 6);
+      ctx.restore();
     };
     h.draw();
     // A deterministic camera facade supplies synthetic pixels on all engines, including
@@ -126,6 +132,7 @@ async function prepare(page: Page) {
         source instanceof HTMLVideoElement && streams.has(source) ? canvas : source,
         ...args,
       ])) as typeof bitmap;
+    Object.defineProperty(window, 'ImageCapture', { configurable: true, value: undefined });
     // The facade presents frames independently of detector polling, just as a live camera
     // keeps presenting an unchanged scene. Native callbacks cannot run on its fake stream.
     const presentations = new Map<
@@ -181,6 +188,7 @@ async function prepare(page: Page) {
             getTracks: () => [track],
             getVideoTracks: () => [track],
           };
+          h.track = track;
           let frames = 0;
           timer = setInterval(() => {
             frames++;
@@ -567,12 +575,32 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
   page,
 }) => {
   await prepare(page);
-  await page.evaluate(() =>
-    (window as any).continuousHarness.open('react', {
+  await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    h.photoCalls = 0;
+    h.photoTracksMatch = [];
+    Object.defineProperty(window, 'ImageCapture', {
+      configurable: true,
+      value: class {
+        constructor(track: MediaStreamTrack) {
+          h.photoTracksMatch.push(track === h.track);
+        }
+        async takePhoto() {
+          h.photoCalls++;
+          const photo = await new Promise<Blob>((resolve) =>
+            h.canvas.toBlob((blob: Blob) => resolve(blob), 'image/png'),
+          );
+          h.photoReconfigured = true;
+          h.draw();
+          return photo;
+        }
+      },
+    });
+    h.open('react', {
       initialMode: 'auto',
       autoCaptureStabilityMs: 100,
-    }),
-  );
+    });
+  });
   await expect(page.getByRole('button', { name: 'Review pages (1)', exact: true })).toBeEnabled();
   // Observe several complete configured windows on the unchanged scene.
   await page.waitForTimeout(1600);
@@ -584,37 +612,107 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
         ).length,
     ),
   ).toBe(1);
+  const afterPhoto = await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    const capture = h.events.find((event: any) => event.type === 'capture-complete');
+    const fresh = h.events.findLast(
+      (event: any) =>
+        event.type === 'live-decision' &&
+        event.data.corners &&
+        event.data.timestamp > capture.data.details.capturedAtMs,
+    );
+    return {
+      photoCalls: h.photoCalls,
+      details: capture.data.details,
+      freshCorners: fresh.data.corners,
+      // This point was inside the original sheet and is now outside its shifted framing.
+      streamPixel: [...h.canvas.getContext('2d').getImageData(110, 70, 1, 1).data],
+    };
+  });
+  expect(afterPhoto.photoCalls).toBe(1);
+  expect(afterPhoto.details.method).toBe('photo');
+  expect(afterPhoto.details.photoAttempted).toBe(true);
+  expect(afterPhoto.streamPixel).toEqual([67, 84, 68, 255]);
   await page.evaluate(() => {
     const h = (window as any).continuousHarness;
+    const earlyPage = new MutationObserver(() => {
+      const review = h.mount.querySelector('button[aria-label="Review pages (2)"]');
+      if (!(review instanceof HTMLButtonElement) || !review.disabled) return;
+      // Place the next page while processing/feedback still owns the shutter.
+      h.earlySceneAt = performance.now();
+      h.earlyReviewDisabled = review.disabled;
+      h.earlyCaptureCount = h.events.filter(
+        (event: any) => event.type === 'capture-complete',
+      ).length;
+      h.scene = 2;
+      h.draw();
+      earlyPage.disconnect();
+    });
+    earlyPage.observe(h.mount, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['aria-label'],
+    });
     h.sceneChangeAt = performance.now();
     h.scene = 4;
     h.draw();
   });
-  await expect(page.getByRole('button', { name: 'Review pages (2)', exact: true })).toBeEnabled();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).continuousHarness.earlySceneAt ?? 0))
+    .toBeGreaterThan(0);
   const captures = await page.evaluate(() => {
     const h = (window as any).continuousHarness;
     return {
       changedAt: h.sceneChangeAt,
+      early: { disabled: h.earlyReviewDisabled, capturedBeforeChange: h.earlyCaptureCount },
       captures: h.events
         .filter((event: any) => event.type === 'capture-complete')
+        .slice(0, 2)
         .map((event: any) => ({
           at: event.data.details.capturedAtMs,
           corners: event.data.hint.corners,
+          method: event.data.details.method,
+          photoAttempted: event.data.details.photoAttempted,
         })),
     };
   });
   expect(captures.captures).toHaveLength(2);
+  expect(captures.early).toEqual({ disabled: true, capturedBeforeChange: 2 });
+  expect(
+    captures.captures.map(
+      ({ method, photoAttempted }: { method: string; photoAttempted: boolean }) => [
+        method,
+        photoAttempted,
+      ],
+    ),
+  ).toEqual([
+    ['photo', true],
+    ['photo', true],
+  ]);
   expect(captures.captures[1].at - captures.changedAt).toBeGreaterThanOrEqual(700);
   expect(
     Math.max(
       ...captures.captures[1].corners.map((point: { x: number; y: number }, index: number) =>
         Math.hypot(
-          point.x - captures.captures[0].corners[index].x,
-          point.y - captures.captures[0].corners[index].y,
+          point.x - afterPhoto.freshCorners[index].x,
+          point.y - afterPhoto.freshCorners[index].y,
         ),
       ),
     ),
   ).toBeLessThan(0.03);
+  await expect(page.getByRole('button', { name: 'Review pages (3)', exact: true })).toBeEnabled();
+  const early = await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    const captures = h.events.filter((event: any) => event.type === 'capture-complete');
+    return {
+      changedAt: h.earlySceneAt,
+      third: captures[2].data.details,
+    };
+  });
+  expect(early.third.method).toBe('photo');
+  expect(early.third.photoAttempted).toBe(true);
+  expect(early.third.capturedAtMs - early.changedAt).toBeGreaterThanOrEqual(700);
   await page.waitForTimeout(1600);
   expect(
     await page.evaluate(
@@ -623,7 +721,13 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
           (event: any) => event.type === 'capture-complete',
         ).length,
     ),
-  ).toBe(2);
+  ).toBe(3);
+  expect(await page.evaluate(() => (window as any).continuousHarness.photoCalls)).toBe(3);
+  expect(await page.evaluate(() => (window as any).continuousHarness.photoTracksMatch)).toEqual([
+    true,
+    true,
+    true,
+  ]);
   await page.getByRole('button', { name: 'Turn light on', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Turn light off', exact: true })).toBeEnabled();
   await page.waitForTimeout(1600);
@@ -634,7 +738,7 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
           (event: any) => event.type === 'capture-complete',
         ).length,
     ),
-  ).toBe(2);
+  ).toBe(3);
   await page.evaluate(() => {
     const h = (window as any).continuousHarness;
     h.options = { ...h.options, captureWorkflow: 'review-each' };

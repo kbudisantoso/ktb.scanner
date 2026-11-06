@@ -52,6 +52,8 @@ These projects retain their own licenses. See [dependencies and pinned versions]
 
 There is no built-in upload, account, document persistence, service worker, PDF import or cloud synchronization. TIFF/HEIC import and general paper flattening are outside the current implementation. Lens correction is a bounded radial model, not full camera calibration. Detection, automatic format suggestions and cleanup remain heuristics; see [verification and known limits](docs/testing/STATUS.md).
 
+Unreleased camera acquisition prefers a supported native photo from the existing track, with immediate frozen feedback and the already secured video frame as a fallback. See [camera image sources and limits](docs/INTEGRATION.md#camera-image-sources). This behavior is not included in npm 0.2.0.
+
 Unreleased source adds optional **local OCR** after scanning has finished. `createSearchablePdf` from `@ktb-tools/scanner/ocr` recognizes confirmed final images and returns per-page text plus a searchable PDF without changing image pixels. The Next.js host starts OCR only through its manual result action and defaults to Paddle, with Tesseract available for comparison. One worker recognizes the batch serially; optional in-memory reuse skips unchanged page revisions. Models and workers are served locally; the ordinary scanner result/raster PDF remains unchanged. This is not included in npm 0.2.0. See [OCR integration and limits](docs/INTEGRATION.md#local-ocr-and-searchable-pdf).
 
 Unreleased source offers **Replace image** (**Bild tauschen**) for imported images through a direct picker and retains **Retake** (**Wiederholen**) for camera captures. The corner editor also offers **Find edges** (**Kanten finden**), preserving page settings until explicit Apply; Cancel retains the prior crop. Review places replacement, direct discard and Add page beneath the document, with equally sized mobile actions. The extra Undo/Original utility row is removed; Undo stays within the current editing tool. Zoom is centered below the image in both scanner and standalone/result viewers. In page review, the information icon and count stay on the right; the button is disabled when the count is 0. The corner editor retains the complete original, and held Before retains the unoptimized crop comparison. Individual adjustment resets are inline icons beside the slider, disabled at neutral values, and preserve other settings. Filter selection retains Auto as its default without an extra optimization-reset action. Tool views keep Cancel/Undo/Apply in the existing footer instead of the session-close X. These changes are not in npm 0.2.0. See [integration](docs/INTEGRATION.md).
@@ -317,8 +319,8 @@ The library sends nothing. Your host supplies its endpoint, authentication, canc
 | `imageType` | `image/jpeg` at 0.92; `image/png` is also supported |
 | `onPreferenceChange` | Optional notification of real SDK UI changes to `initialMode` / `imageType`, including cancelled sessions; introduced in 0.2.0 |
 | `createPdf` | `true`; raster PDF without searchable OCR text |
-| `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no sound/context/request |
-| `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` stays silent. See [custom audio](docs/SOUNDS.md) |
+| `shutterSound` | `camera` (default) or `reflex`, both CC0; `off` creates no SDK sound/context/request |
+| `shutterSoundUrl` | Optional host-owned audio URL; overrides the cue, while `off` suppresses SDK playback. See [custom audio](docs/SOUNDS.md) |
 | `paperRegion` | Optional ISO region as a weak A4/Letter prior; no GPS/IP permission |
 | `theme` | Semantic `--scanner-*` CSS variables |
 | `includeOriginals` | `false`; original bytes/EXIF are returned only when explicitly enabled |

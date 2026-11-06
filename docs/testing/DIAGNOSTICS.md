@@ -35,8 +35,9 @@ Schema 2 `manifest.json` contains package/engine versions, browser identifier, v
 | `live-detection` / `live-decision` | Same source timestamp, receipt/latency, raw/displayed corners, generations, progress and decision reason |
 | `live-watchdog` | Waiting/evidence expiry without invalidating a running detection job |
 | `candidate-selection` | Candidate geometry/evidence/paper scores, continuity, completeness, exclusions and final selection |
+| `capture-scene-baseline` | Fresh post-photo video reference acquired before still processing/feedback; it only maintains the duplicate-capture lock |
 | `capture-shutter` | Synchronously secured pixels, dimensions and software playback start; not proof of audible sound |
-| `capture-complete` | Encoding duration, streamframe provenance and frozen hint/Auto stability |
+| `capture-complete` | Chosen photo/video source, encoded dimensions, claim/backup time, total capture duration, optional native request/completion times and frozen hint/Auto stability; encoding duration is separate only without a photo attempt, and native exposure time is not known |
 | `passMaxDimension` / `still-combined` | Individual 1,000/800 px passes and combined selection |
 | `still-orientation-retry` / `still-guided-edge-check` | Additional rotated hypotheses and independent original-edge checks |
 | `capture-crop-guard` / `crop-required` | Required confirmation, reason/source size/unconfirmed handles, with no result image |
