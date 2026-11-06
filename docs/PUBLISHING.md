@@ -1,6 +1,6 @@
 # Public distribution
 
-Project source is licensed under GNU AGPL version 3 only (`AGPL-3.0-only`), explicitly selected for this project. Full text is in the root and library LICENSE; NOTICE explains third-party boundaries. Workspace and example manifests stay `private: true` to prevent accidental package publication; the library is prepared for public packaging. Version 0.1.0 is published; the current source and integration guides target 0.2.0. Source preparation alone does not establish registry availability.
+Project source is licensed under GNU AGPL version 3 only (`AGPL-3.0-only`), explicitly selected for this project. Full text is in the root and library LICENSE; NOTICE explains third-party boundaries. Workspace and example manifests stay `private: true` to prevent accidental package publication; the library is prepared for public packaging. Versions 0.1.0 and 0.2.0 are published; the current source and integration guides target 0.3.0. Source preparation alone does not establish registry availability.
 
 Public documentation is English. The library defaults to English with built-in German; both reference applications default to English, detect German browser language and support explicit DE/EN selection. Hosts can override text. Contribution guidance, issue/PR templates, security policy, pinned CI actions, dependency updates and CLI secret scanning follow the established workspace workflow. Application code/infrastructure from other products are not copied.
 
@@ -16,7 +16,7 @@ Create the public repository only after these checks. Enable private vulnerabili
 
 ## Registry release
 
-The confirmed npm organization is **`ktb-tools`**, managed through a personal npm account. The public package is **`@ktb-tools/scanner`**, initially version **0.1.0**. Version 0.1.0 is published from tag `v0.1.0` at `d277d32d6f9df52c6c95dd31e79885ddd3b11793`. Never overwrite that version. The 0.2.0 release is authorized by D-046 in [decisions](DECISIONS.md) and uses the subsequent-release procedure below; registry availability must be verified for the exact version. GitHub source publication, npm releases and application deployment are separate operations; no workflow deploys a hosted scanner application.
+The confirmed npm organization is **`ktb-tools`**, managed through a personal npm account. The public package is **`@ktb-tools/scanner`**, initially version **0.1.0**. Version 0.1.0 is published from tag `v0.1.0` at `d277d32d6f9df52c6c95dd31e79885ddd3b11793`. Never overwrite that version. Version 0.2.0 was published from tag `v0.2.0` at `bcce5424f12e0533adba6dfbf40ac50175b56b55` under D-046. The 0.3.0 release is authorized by D-061 in [decisions](DECISIONS.md) and uses the subsequent-release procedure below; registry availability must be verified for the exact version. Preserve both existing release tags and archives. GitHub source publication, npm releases and application deployment are separate operations; no workflow deploys a hosted scanner application.
 
 `.github/workflows/publish.yml` publishes when a GitHub release is **published**, not when a draft is saved or a commit is pushed. Tags must exactly match `v<package-version>` and point to a commit on `main`. Stable versions use npm's `latest` channel; semantic prereleases such as `0.2.0-beta.1` must be marked as GitHub prereleases and use `next`. Version numbers are immutable; increase the library version before the next release. Root/example versions do not determine the npm version.
 
@@ -47,9 +47,9 @@ The GitHub job uses environment `npm`. Create/configure it under **Repository Se
 ### Subsequent GitHub releases
 
 1. Update only the library version in `packages/scanner/package.json`, the changelog, release notes and relevant public guides. Run checks, open a release-preparation PR and merge it to `main` after review and CI. Workspace/example manifests stay private and need no matching version bump. Reinstall if dependency declarations change; never reuse a published version.
-2. On GitHub, open **Releases > Draft a new release**, create/select the matching tag (for example `v0.2.0`) on the reviewed `main` commit, and add notes. Mark semantic prereleases as **pre-release**.
+2. On GitHub, open **Releases > Draft a new release**, create/select the matching tag (for example `v0.3.0`) on the reviewed `main` commit, and add notes. Mark semantic prereleases as **pre-release**.
 3. Click **Publish release**. The workflow checks/builds, publishes to npm using OIDC, verifies the registry archive and attaches it to the release. Drafting alone does not publish to npm. Confirm workflow success; a GitHub release page by itself is not evidence of npm publication.
-4. Consumers install, for example, `pnpm add @ktb-tools/scanner@0.2.0`. CSS and complete asset-copy integration remain required.
+4. Consumers install, for example, `pnpm add @ktb-tools/scanner@0.3.0`. CSS and complete asset-copy integration remain required.
 
 For a failed run caused by external setup, correct the setup and rerun it. A workflow-only fix can instead be reviewed, checked and merged to `main`, then run **Publish npm package > Run workflow** from that new `main` commit with the existing unchanged release tag and **publish** enabled. The selected ref supplies the workflow; every package checkout still uses the validated tag/commit, and identical-byte registry guards remain active. For example, use `npm publish "./release/$RELEASE_ARCHIVE"` with the explicit `./`: npm can interpret `release/archive.tgz` as a GitHub shortcut. A runtime/package code change requires a new reviewed version and tag. Never move an already-published release tag or change its archive bytes.
 

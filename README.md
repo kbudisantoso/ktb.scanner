@@ -52,15 +52,15 @@ These projects retain their own licenses. See [dependencies and pinned versions]
 
 There is no built-in upload, account, document persistence, service worker, PDF import or cloud synchronization. TIFF/HEIC import and general paper flattening are outside the current implementation. Lens correction is a bounded radial model, not full camera calibration. Detection, automatic format suggestions and cleanup remain heuristics; see [verification and known limits](docs/testing/STATUS.md).
 
-Unreleased camera acquisition prefers a supported native photo from the existing track, with immediate frozen feedback and the already secured video frame as a fallback. See [camera image sources and limits](docs/INTEGRATION.md#camera-image-sources). This behavior is not included in npm 0.2.0.
+Since 0.3.0, camera acquisition prefers a supported native photo from the existing track, with immediate frozen feedback and the already secured video frame as a fallback. See [camera image sources and limits](docs/INTEGRATION.md#camera-image-sources).
 
-Unreleased source adds optional **local OCR** after scanning has finished. `createSearchablePdf` from `@ktb-tools/scanner/ocr` recognizes confirmed final images and returns per-page text plus a searchable PDF without changing image pixels. The Next.js host starts OCR only through its manual result action and defaults to Paddle, with Tesseract available for comparison. One worker recognizes the batch serially; optional in-memory reuse skips unchanged page revisions. Models and workers are served locally; the ordinary scanner result/raster PDF remains unchanged. This is not included in npm 0.2.0. See [OCR integration and limits](docs/INTEGRATION.md#local-ocr-and-searchable-pdf).
+Since 0.3.0, the library offers optional **local OCR** after scanning has finished. `createSearchablePdf` from `@ktb-tools/scanner/ocr` recognizes confirmed final images and returns per-page text plus a searchable PDF without changing image pixels. The Next.js host starts OCR only through its manual result action and defaults to Paddle, with Tesseract available for comparison. One worker recognizes the batch serially; optional in-memory reuse skips unchanged page revisions. Models and workers are served locally; the ordinary scanner result/raster PDF remains unchanged. See [OCR integration and limits](docs/INTEGRATION.md#local-ocr-and-searchable-pdf).
 
-Unreleased source offers **Replace image** (**Bild tauschen**) for imported images through a direct picker and retains **Retake** (**Wiederholen**) for camera captures. The corner editor also offers **Find edges** (**Kanten finden**), preserving page settings until explicit Apply; Cancel retains the prior crop. Review places replacement, direct discard and Add page beneath the document, with equally sized mobile actions. The extra Undo/Original utility row is removed; Undo stays within the current editing tool. Zoom is centered below the image in both scanner and standalone/result viewers. In page review, the information icon and count stay on the right; the button is disabled when the count is 0. The corner editor retains the complete original, and held Before retains the unoptimized crop comparison. Individual adjustment resets are inline icons beside the slider, disabled at neutral values, and preserve other settings. Filter selection retains Auto as its default without an extra optimization-reset action. Tool views keep Cancel/Undo/Apply in the existing footer instead of the session-close X. These changes are not in npm 0.2.0. See [integration](docs/INTEGRATION.md).
+Since 0.3.0, the scanner offers **Replace image** (**Bild tauschen**) for imported images through a direct picker and retains **Retake** (**Wiederholen**) for camera captures. The corner editor also offers **Find edges** (**Kanten finden**), preserving page settings until explicit Apply; Cancel retains the prior crop. Review places replacement, direct discard and Add page beneath the document, with equally sized mobile actions. The extra Undo/Original utility row is removed; Undo stays within the current editing tool. Zoom is centered below the image in both scanner and standalone/result viewers. In page review, the information icon and count stay on the right; the button is disabled when the count is 0. The corner editor retains the complete original, and held Before retains the unoptimized crop comparison. Individual adjustment resets are inline icons beside the slider, disabled at neutral values, and preserve other settings. Filter selection retains Auto as its default without an extra optimization-reset action. Tool views keep Cancel/Undo/Apply in the existing footer instead of the session-close X. See [integration](docs/INTEGRATION.md).
 
-Unreleased source also supports `captureWorkflow: 'continuous'`: capture a batch while the camera stays open, then review the pages in order. The library default remains `review-each`; both reference hosts select continuous capture and expose the choice. Review supports horizontal page swipes at fit, alongside the existing buttons. See [multi-page capture and review](docs/INTEGRATION.md#multi-page-capture-and-review) for both SDK entry points and limits. These additions are not in npm 0.2.0.
+Since 0.3.0, the library also supports `captureWorkflow: 'continuous'`: capture a batch while the camera stays open, then review the pages in order. The library default remains `review-each`; both reference hosts select continuous capture and expose the choice. Review supports horizontal page swipes at fit, alongside the existing buttons. See [multi-page capture and review](docs/INTEGRATION.md#multi-page-capture-and-review) for both SDK entry points and limits.
 
-The unreleased source improves folded-paper contour selection: when a supported complete outer boundary is present, stronger internal panels sharing both opposite sides no longer displace it. This does not reconstruct missing boundaries or flatten paper and is not included in npm 0.2.0.
+Since 0.3.0, the library improves folded-paper contour selection: when a supported complete outer boundary is present, stronger internal panels sharing both opposite sides no longer displace it. This does not reconstruct missing boundaries or flatten paper.
 
 ## Run the demo applications
 
@@ -135,11 +135,11 @@ Open `https://192.168.1.20:3443` on the phone and allow camera access. The devel
 
 ### 1. Obtain and install the package
 
-The npm organization is `ktb-tools`; this guide targets **`@ktb-tools/scanner@0.2.0`**. Direct camera entry, UI preference notifications and the complete theme-token set require 0.2.0. Check that exact version in the registry before installing:
+The npm organization is `ktb-tools`; this guide targets **`@ktb-tools/scanner@0.3.0`**. Direct camera entry, UI preference notifications and the complete theme-token set require 0.2.0. Check that exact version in the registry before installing:
 
 ```sh
-npm view @ktb-tools/scanner@0.2.0 version
-pnpm add @ktb-tools/scanner@0.2.0 react@19 react-dom@19
+npm view @ktb-tools/scanner@0.3.0 version
+pnpm add @ktb-tools/scanner@0.3.0 react@19 react-dom@19
 ```
 
 A source checkout can use the built archive below independently of registry availability. The original **0.1.0** release remains immutable at tag `v0.1.0`, commit `d277d32d6f9df52c6c95dd31e79885ddd3b11793`; it does not contain these additions. See the [release guide](docs/PUBLISHING.md#registry-release).
@@ -152,12 +152,12 @@ mkdir -p artifacts/local/packages
 pnpm --filter @ktb-tools/scanner pack --pack-destination "$PWD/artifacts/local/packages"
 ```
 
-The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-tools-scanner-0.2.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
+The package's `prepack` builds clean output. With the current version, this creates `artifacts/local/packages/ktb-tools-scanner-0.3.0.tgz`, including built entry points, declarations, CSS, complete worker/media assets, source/build scripts, license and dependency notices.
 
 From your host project, install that archive and the React peers:
 
 ```sh
-pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-tools-scanner-0.2.0.tgz react@19.3.1 react-dom@19.3.1
+pnpm add --ignore-scripts /absolute/path/to/ktb.scanner/artifacts/local/packages/ktb-tools-scanner-0.3.0.tgz react@19.3.1 react-dom@19.3.1
 ```
 
 The archive is already built and needs no dependency install scripts; `--ignore-scripts` also avoids an unnecessary dependency postinstall prompt in pnpm 11. Use a bundler with ESM, dynamic imports and CSS support, for example Next.js, Astro or Vite. The ready-made UI requires React/React DOM 19 even when the host uses another framework. Core-only consumers do not need to render React. Within this workspace the examples use `workspace:*`; external projects should consume a reproducible package artifact, not an unbuilt sibling directory.
@@ -345,7 +345,7 @@ const theme = {
 
 Pass this as `theme` in either API. The UI-theme extension in 0.2.0 also applies theme variables to the backdrop, adds primary/warning foregrounds and camera palette/focus tokens, and lets standalone `ImageViewer` consume inherited `--scanner-font` directly. Existing defaults stay unchanged; see the [token contract](docs/adr/0026-complete-ui-theme-tokens.md). See the complete [UI styling guide](docs/UI-THEMING.md) for every token/default, light/dark examples, fonts, inheritance and the standalone viewer. Full [configuration, viewer and lifecycle details](docs/INTEGRATION.md).
 
-Unreleased source accepts supported photos up to **256 MP** and **64 MiB/file** by default. It requests a smaller decoded raster when needed and chooses the largest planned working resolution that fits the processing budget. Files that already fit keep their existing sampling. Original bytes and full orientation-normalized source dimensions are preserved; the corner editor uses a separate bounded view. See [high-resolution imports](docs/INTEGRATION.md#high-resolution-image-imports).
+Since 0.3.0, the library accepts supported photos up to **256 MP** and **64 MiB/file** by default. It requests a smaller decoded raster when needed and chooses the largest planned working resolution that fits the processing budget. Files that already fit keep their existing sampling. Original bytes and full orientation-normalized source dimensions are preserved; the corner editor uses a separate bounded view. See [high-resolution imports](docs/INTEGRATION.md#high-resolution-image-imports).
 
 Other defaults remain **20 pages**, **100 MiB originals**, **8 MP/4,096 px output** without upscaling, **128 MiB retained results**, **384 MiB estimated working buffers**, and one high-resolution page at a time. Override the budget with `limits.workingBytes` when appropriate for the host. These are configurable estimates, not a browser RSS guarantee or a measurement of available device memory. Browser-internal decoder allocations are not controlled by the requested bitmap size. Extremely long receipts remain limited by source/output resolution.
 
@@ -357,7 +357,7 @@ Other defaults remain **20 pages**, **100 MiB originals**, **8 MP/4,096 px outpu
 | `@ktb-tools/scanner/react` | `createScanner`, `Scanner` and reusable `ImageViewer` |
 | `@ktb-tools/scanner/scanic` | Abortable worker adapter for classic Scanic detection/correction |
 | `@ktb-tools/scanner/export` | Serial images and browser PDF creation |
-| `@ktb-tools/scanner/ocr` | Unreleased, optional local recognition of confirmed pages and searchable PDF creation |
+| `@ktb-tools/scanner/ocr` | Since 0.3.0, optional local recognition of confirmed pages and searchable PDF creation |
 | `@ktb-tools/scanner/styles.css` | Scoped styles and theme variables |
 
 React/engine resources load on scanner open; PDF generation and the reference PDF.js viewer load when needed. Serve controlled assets locally. No service worker is registered and no backend or global cross-origin isolation is required.

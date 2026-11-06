@@ -1,6 +1,6 @@
 # ADR 0027: Local OCR on confirmed pages
 
-Status: Accepted for unreleased source, 29 October 2026; Paddle/manual-demo/reuse extension approved 2 November 2026.
+Status: Accepted for 0.3.0, 29 October 2026; Paddle/manual-demo/reuse extension approved 2 November 2026.
 
 ## Context
 

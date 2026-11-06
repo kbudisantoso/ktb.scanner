@@ -1,31 +1,40 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-11-06
+
+Local OCR, continuous capture and a larger review workspace, with improved camera acquisition and bounded high-resolution photo imports. The host retains ownership of confirmed blobs, storage, filenames and downloads.
 
 ### Added
 
-- Optional local OCR through `@ktb-tools/scanner/ocr`: Paddle Latin or Tesseract German/English recognition, per-page text, cancellation and a searchable PDF preserving final images and layouts. Recognize pages sequentially and optionally reuse unchanged page revisions in memory. The Next.js demo defaults to Paddle and starts OCR manually, with an activity indicator and selectable text; the existing scanner/raster export stays unchanged.
-- Inline brightness, contrast, sharpness and lens reset icons in Adjust preserve unrelated page settings and are disabled at neutral values.
-- Optional `captureWorkflow: 'continuous'` keeps the camera open for multiple pages, shows extracted-page feedback and opens sequential review from **Review pages (n)**. The SDK default remains `review-each`; both demos expose the choice. Retake replaces the current page, and every page still requires review or explicit discard before export.
-- Finger-following horizontal page swipes at fit in review: the current page slides out and the neighboring page enters with its own proportions, with short-gesture rebound and reduced-motion support. Optional `ImageViewer.onPageSwipe` continues to report host-owned page navigation.
-- **Find edges** (**Kanten finden**) reruns automatic detection from the original in the corner editor while retaining page settings. Preview the proposed corners before applying them; cancelling the editor preserves the previous crop, and unsuccessful detection keeps the current corner selection.
+- Optional local OCR through `@ktb-tools/scanner/ocr`: Paddle Latin or Tesseract German/English recognition, per-page text, cancellation and a searchable PDF preserving final images and layouts. Recognize pages sequentially and optionally reuse unchanged page revisions in memory. The SDK defaults to Tesseract; the Next.js demo defaults to Paddle and starts OCR manually, with an activity indicator and selectable text.
+- Optional `captureWorkflow: 'continuous'` keeps the camera open for multiple pages and opens sequential review from **Review pages (n)**. The SDK default remains `review-each`; both demos expose the choice. Retake replaces the current page, and every page still requires review or explicit discard before export.
+- **Find edges** (**Kanten finden**) reruns detection from the original in the corner editor while retaining page settings. Proposals require Apply; cancelling preserves the previous crop, and unsuccessful detection keeps the current selection.
+- Finger-following horizontal page swipes at fit, with proportional neighboring-page transitions, short-gesture rebound and reduced-motion support. Optional `ImageViewer.onPageSwipe` leaves standalone page navigation with the host.
+- Prefer a supported native camera photo from the existing track, retaining immediate frozen feedback and the secured full video frame as a fallback. Preserve cancellation, continuous capture and resource limits without a second camera stream.
 
 ### Fixed
 
-- Prefer a supported native camera photo as the scan source, retaining immediate frozen feedback and the secured full video frame as a fallback. Keep cancellation, continuous capture and resource limits on the existing camera/session path.
-- Keep live camera detection and automatic capture running when the browser reports constant media time with advancing presented-frame counters.
-- Import high-resolution phone photos with proportional working-size adjustment instead of rejecting ordinary 24/48-MP images at the former 24-MP cutoff. Preserve original bytes and source coordinates, and keep corner editing bounded as well.
-- Avoid premature memory-limit errors when changing filters on large, nearly full-frame scans by planning the actual processing buffers within the existing resource limits.
-- Render the Next.js reference host in its selected language from the first HTML response, avoiding the brief English content after refresh.
-- Suppress accidental text selection, touch callouts and native media dragging in scanner/viewer controls while preserving native form editing and image gestures.
-- Put replacement, direct discard and Add page below the review document with equally sized mobile actions. Remove the extra Undo/Original row for more image space; retain Undo in the existing Cancel/Apply footer of the current editing tool, remove the extra Filter reset, center zoom in the shared scanner/result viewer, and keep the counted hints button at the bottom right of page review, disabled at 0. The corner editor still shows the complete original; held Before retains the unoptimized crop comparison.
-- Keep the complete filter icon inside its SVG viewBox.
-- Hide the session-close X inside editing tools and make Escape follow local cancellation and focus restoration.
+- Keep live detection and automatic capture running when media time remains constant but presented-frame counters advance. Separate result freshness from bounded observation cadence so fresh slower measurements can advance stability; smooth only the displayed contour.
+- Import high-resolution JPEG, PNG and WebP photos with proportional working-size adjustment while preserving original bytes and source coordinates. Keep corner editing bounded as well.
+- Avoid premature memory-limit errors when changing filters on large, nearly full-frame scans by planning actual processing buffers. Preserve fitting source detail before perspective extraction instead of adding an unnecessary resize.
+- Keep supported complete document boundaries around internal fold panels, recover supported low-contrast outer edges and determine the final still crop independently of inaccurate live hints. These changes do not reconstruct absent edges or flatten paper.
+- Imported images offer **Replace image** (**Bild tauschen**) through a single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing replacement preserves the prior candidate/page and remaining imports.
+- Give review more image space: place replacement, direct discard and Add page below the document with equal-width mobile actions; remove the extra Undo/Original row, retain labelled tool-local Undo and show inline neutral adjustment resets. Keep Filter's existing Auto default without an extra reset action, center shared-viewer zoom, keep counted hints at the bottom right and correct the filter icon.
+- Hide the session-close X inside editing tools and make Escape follow local cancellation and focus restoration. Preserve touch activation of adjustment resets and prevent accidental native selection/callouts without changing native form editing or image gestures.
+- Render the Next.js reference host in its selected language from the first HTML response.
 
-- Imported images now offer **Replace image** (**Bild tauschen**) with a direct single-image picker; camera captures retain **Retake** (**Wiederholen**). Cancelling or failing a replacement preserves the previous candidate/page and remaining imports.
-- Keep observed complete document boundaries instead of replacing them with stronger internal fold panels that share both opposite paper sides.
-- Determine the final crop independently from the captured original, so an inaccurate live-camera contour cannot force an inner crop or override complete-sheet selection.
-- Improve detection of low-contrast outer document edges in camera and still processing.
+### Changed
+
+- Raise default source admission to 256 MP and 64 MiB per file. Explicit host caps still apply; original/session retention and the 8-MP/4,096-px output caps remain unchanged. Choose a smaller working raster only when required by the configured budget.
+- Update the reference hosts to Next.js 16.4.5, including its security fixes, Astro 7.4.7 and PDF.js 6.5.438. These framework dependencies belong to the reference hosts, not the scanner runtime package.
+
+### Upgrading from 0.2.0
+
+Use the matching 0.3.0 package, stylesheet and complete worker/model/media asset tree together; rebuild the host and recopy all assets. Load optional OCR lazily through `@ktb-tools/scanner/ocr` after confirmed scanning has closed. The scanner's existing raster result remains unchanged; OCR is a separate host-invoked operation. The SDK OCR default is Tesseract, while the reference Next.js host selects Paddle and invokes it manually.
+
+Workspace/reference builds now require Node >=22.23.4 and pnpm 11.28.11; Node 24 LTS is recommended. SDK sound settings suppress SDK playback only; a native browser/OS camera sound is controlled separately. Existing confirmed-blob ownership and the host boundary for storage, filenames, downloads and PWA behavior remain unchanged. Preserve AGPL and all separate runtime/model/media notices.
+
+[Full changes since 0.2.0](https://github.com/kbudisantoso/ktb.scanner/compare/v0.2.0...v0.3.0).
 
 ## 0.2.0 - 2026-10-27
 
