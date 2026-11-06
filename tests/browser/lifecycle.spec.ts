@@ -273,18 +273,24 @@ test('camera presentation identity skips repeats and format changes release late
       .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.callbacks.size))
       .toBe(1);
   await pendingFrame();
-  await page.evaluate(() => (window as any).scannerHarness.fire(10, 1));
+  // Live media time can stay at zero while distinct presentations keep arriving.
+  await page.evaluate(() => (window as any).scannerHarness.fire(0, 1));
   await expect(page.locator('.scanner-camera svg polygon')).toBeVisible();
   await pendingFrame();
-  await page.evaluate(() => (window as any).scannerHarness.fire(10, 1));
+  await page.evaluate(() => (window as any).scannerHarness.fire(0, 1));
   await pendingFrame();
   expect(await page.evaluate(() => (window as any).scannerHarness.frames.sizes)).toEqual([
     [800, 600],
   ]);
+  await page.evaluate(() => (window as any).scannerHarness.fire(0, 2));
+  await expect
+    .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.sizes.length))
+    .toBe(2);
+  await pendingFrame();
   await page.evaluate(() => {
     const h = (window as any).scannerHarness;
     h.frames.holdNext = true;
-    h.fire(10.1, 2);
+    h.fire(0, 3);
   });
   await expect
     .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.pending.length))
@@ -296,10 +302,10 @@ test('camera presentation identity skips repeats and format changes release late
     document.querySelector('video')!.dispatchEvent(new Event('resize'));
   });
   await pendingFrame();
-  await page.evaluate(() => (window as any).scannerHarness.fire(10.2, 3));
+  await page.evaluate(() => (window as any).scannerHarness.fire(0, 4));
   await expect
     .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.sizes.length))
-    .toBe(2);
+    .toBe(3);
   await expect
     .poll(() =>
       page.locator('.scanner-camera').evaluate((element) => {
@@ -310,7 +316,7 @@ test('camera presentation identity skips repeats and format changes release late
     .toBeCloseTo(480 / 640, 2);
   await page.evaluate(() => (window as any).scannerHarness.frames.pending.shift()());
   await expect
-    .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.closes.get(2)))
+    .poll(() => page.evaluate(() => (window as any).scannerHarness.frames.closes.get(3)))
     .toBe(1);
   await pendingFrame();
   const cleanup = await page.evaluate(async () => {
@@ -320,7 +326,7 @@ test('camera presentation identity skips repeats and format changes release late
     h.abort.abort();
     const result = await h.result;
     await h.controller.destroy();
-    late(performance.now(), { mediaTime: 10.3, presentedFrames: 4 } as VideoFrameCallbackMetadata);
+    late(performance.now(), { mediaTime: 0, presentedFrames: 5 } as VideoFrameCallbackMetadata);
     await Promise.resolve();
     h.mount.remove();
     return {
