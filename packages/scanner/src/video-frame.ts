@@ -29,7 +29,7 @@ export class VideoFrameIdentity {
       return null;
     const previous = this.previous;
     const frames =
-      Number.isFinite(presentation.frames) &&
+      Number.isSafeInteger(presentation.frames) &&
       presentation.frames! >= 0 &&
       (presentation.frames! > 0 || previous?.frames !== undefined)
         ? presentation.frames
@@ -39,12 +39,15 @@ export class VideoFrameIdentity {
       (presentation.width !== previous.width ||
         presentation.height !== previous.height ||
         presentation.mediaTime < previous.mediaTime ||
+        (frames !== undefined && previous.frames === undefined) ||
         (frames !== undefined && previous.frames !== undefined && frames < previous.frames));
     if (changed) this.reset();
     else if (
       previous &&
-      (presentation.mediaTime <= previous.mediaTime ||
-        (frames !== undefined && previous.frames !== undefined && frames <= previous.frames))
+      // Live streams may keep mediaTime at zero; their presented-frame counter identifies progress.
+      (frames !== undefined && previous.frames !== undefined
+        ? frames <= previous.frames
+        : presentation.mediaTime <= previous.mediaTime)
     )
       return null;
     this.previous = { ...presentation, frames };

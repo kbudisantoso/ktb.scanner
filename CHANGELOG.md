@@ -13,6 +13,7 @@
 ### Fixed
 
 - Prefer a supported native camera photo as the scan source, retaining immediate frozen feedback and the secured full video frame as a fallback. Keep cancellation, continuous capture and resource limits on the existing camera/session path.
+- Keep live camera detection and automatic capture running when the browser reports constant media time with advancing presented-frame counters.
 - Avoid premature memory-limit errors when changing filters on large, nearly full-frame scans by planning the actual processing buffers within the existing resource limits.
 - Render the Next.js reference host in its selected language from the first HTML response, avoiding the brief English content after refresh.
 - Suppress accidental text selection, touch callouts and native media dragging in scanner/viewer controls while preserving native form editing and image gestures.
