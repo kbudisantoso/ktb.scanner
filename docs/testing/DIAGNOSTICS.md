@@ -39,6 +39,8 @@ Schema 2 `manifest.json` contains package/engine versions, browser identifier, v
 | `capture-shutter` | Synchronously secured pixels, dimensions and software playback start; not proof of audible sound |
 | `capture-complete` | Chosen photo/video source, encoded dimensions, claim/backup time, total capture duration, optional native request/completion times and frozen hint/Auto stability; encoding duration is separate only without a photo attempt, and native exposure time is not known |
 | `passMaxDimension` / `still-combined` | Individual 1,000/800 px passes and combined selection |
+| `input-normalization` | Full oriented source size, actual decoded size and `unchanged`/`working-budget` reason; original bytes remain unchanged |
+| `processing-scale` | Source, decoded, working and output sizes, with `unchanged`, `output-limits` or `working-budget` reason |
 | `still-orientation-retry` / `still-guided-edge-check` | Additional rotated hypotheses and independent original-edge checks |
 | `capture-crop-guard` / `crop-required` | Required confirmation, reason/source size/unconfirmed handles, with no result image |
 | `crop-confirmed` | Explicit corner confirmation |

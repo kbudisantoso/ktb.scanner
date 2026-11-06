@@ -231,11 +231,22 @@ test('session abort and editor unmount invalidate unfinished searches', async ({
   const find = page.getByRole('button', { name: 'Find edges', exact: true });
   await expect(find).toBeEnabled();
   await find.click();
+  const detachedCorner = await page
+    .getByRole('button', { name: 'Top-left corner', exact: true })
+    .elementHandle();
+  expect(detachedCorner).not.toBeNull();
   await page.evaluate(() => (window as any).edgeHarness.abort.abort());
   expect(await page.evaluate(() => (window as any).edgeHarness.jobs[0].signal.aborted)).toBe(true);
+  await expect(page.getByRole('button', { name: 'Top-left corner', exact: true })).toHaveCount(0);
+  expect(await detachedCorner!.evaluate((handle) => handle.isConnected)).toBe(false);
+  await detachedCorner!.evaluate((handle) =>
+    handle.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
+    ),
+  );
   await page.evaluate((corners) => (window as any).edgeHarness.jobs[0].resolve(corners), detected);
-  await page.getByRole('button', { name: 'Top-left corner', exact: true }).press('Enter');
   expect(await page.evaluate(() => (window as any).edgeHarness.applied.length)).toBe(0);
+  await detachedCorner!.dispose();
   await page.evaluate(() => (window as any).edgeHarness.root.unmount());
   await page.evaluate(() => (window as any).edgeHarness.editor());
   await expect(find).toBeEnabled();
@@ -372,10 +383,42 @@ test('required crop replacement keeps rollback budgets during redetection and re
   });
   await page.evaluate((source) => (window as any).edgeHarness.open(source), source);
   await expect(page.getByRole('heading', { name: 'Dokumentecken festlegen' })).toBeVisible();
+  const find = page.getByRole('button', { name: 'Kanten finden', exact: true });
+  await expect(find).toBeEnabled();
+  const editorFootprint = async () => {
+    let bytes = 0;
+    await expect
+      .poll(async () => {
+        const measured = await page.evaluate(() => {
+          const host = document.querySelector<HTMLElement>('.scanner-corner-host')!;
+          const viewport = host.querySelector<HTMLCanvasElement>('canvas')!;
+          const loupe = document.querySelector<HTMLCanvasElement>('.scanner-corner-loupe')!;
+          const density = window.devicePixelRatio || 1;
+          return {
+            // The known 600x800 input is unscaled: SDK source plus Scanic's private copy.
+            bytes:
+              600 * 800 * 8 +
+              [...host.querySelectorAll('canvas')].reduce(
+                (sum, canvas) => sum + canvas.width * canvas.height * 4,
+                0,
+              ) +
+              loupe.width * loupe.height * 4,
+            settled:
+              viewport.width === Math.round(Math.max(1, Math.round(host.clientWidth)) * density) &&
+              viewport.height === Math.round(Math.max(1, Math.round(host.clientHeight)) * density),
+          };
+        });
+        bytes = measured.bytes;
+        return measured.settled;
+      })
+      .toBe(true);
+    return bytes;
+  };
   const baseline = await page.evaluate(() => {
     const initial = (window as any).edgeHarness.requests[0];
     return { limits: initial.limits, originalBytes: initial.original.size };
   });
+  const footprints = [await editorFootprint()];
   const picker = page.waitForEvent('filechooser');
   await page.getByRole('button', { name: 'Bild tauschen', exact: true }).click();
   await (
@@ -388,23 +431,26 @@ test('required crop replacement keeps rollback budgets during redetection and re
   await expect.poll(() => page.evaluate(() => (window as any).edgeHarness.requests.length)).toBe(2);
   await expect(page.locator('.scanner')).toHaveAttribute('aria-busy', 'false');
   await expect(page.getByRole('heading', { name: 'Dokumentecken festlegen' })).toBeVisible();
-  const find = page.getByRole('button', { name: 'Kanten finden', exact: true });
   await expect(find).toBeEnabled();
+  footprints.push(await editorFootprint());
   await find.click();
   await expect(page.getByRole('alert')).toHaveText(
     'Keine Dokumentkanten gefunden. Die bisherige Auswahl bleibt erhalten.',
   );
   await expect(page.getByRole('button', { name: 'Abschließen', exact: true })).toHaveCount(0);
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toHaveCount(0);
+  footprints.push(await editorFootprint());
   await page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }).click();
   await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
   const limits = await page.evaluate(() =>
     (window as any).edgeHarness.requests.slice(1).map((request: any) => request.limits),
   );
   expect(limits).toHaveLength(3);
-  expect(limits[0].workingBytes).toBe(baseline.limits.workingBytes - baseline.originalBytes);
-  expect(limits[1]).toEqual(limits[0]);
-  expect(limits[2]).toEqual(limits[0]);
+  for (const [index, actual] of limits.entries())
+    expect(actual).toEqual({
+      ...baseline.limits,
+      workingBytes: baseline.limits.workingBytes - baseline.originalBytes - footprints[index],
+    });
   await page.evaluate(async () => {
     const h = (window as any).edgeHarness;
     await h.controller.destroy();

@@ -199,7 +199,10 @@ test('all acceptance fixtures pass through the real engine without losing the so
     }
     await expect(preview).toBeVisible();
     const original = await readCornerOriginal(page);
-    expect([original.width, original.height]).toEqual([fixture.width, fixture.height]);
+    // The 650 x 2,400 source uses a proportional editor view with a 2,048 px longest side.
+    expect([original.width, original.height]).toEqual(
+      fixture.name === 'acceptance-long-receipt' ? [554, 2048] : [fixture.width, fixture.height],
+    );
     expect(original.bytes).toEqual(Array.from(Buffer.from(data.split(',')[1], 'base64')));
     await expect(page.getByRole('button', { name: 'Schließen', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: 'Abbrechen', exact: true }).click();

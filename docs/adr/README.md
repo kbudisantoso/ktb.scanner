@@ -32,3 +32,4 @@ Each record separates context, decision, consequences and evidence. Historical v
 
 - [0026: Complete reusable UI theme tokens](0026-complete-ui-theme-tokens.md)
 - [0027: Local OCR on confirmed pages](0027-local-ocr-on-confirmed-pages.md)
+- [0028: High-resolution image imports with bounded working rasters](0028-high-resolution-image-imports.md)

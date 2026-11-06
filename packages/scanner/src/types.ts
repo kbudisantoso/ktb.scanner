@@ -119,7 +119,9 @@ export interface ScannerController {
 }
 export interface Limits {
   pages: number;
+  /** Compressed bytes per source file, before decoding. */
   fileBytes: number;
+  /** Source pixel admission cap; processing may decode a smaller raster within workingBytes. */
   inputPixels: number;
   originalBytes: number;
   outputPixels: number;

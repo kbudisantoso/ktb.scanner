@@ -26,6 +26,7 @@ import type {
   FormatSelection,
   PaperPreference,
   Recipe,
+  Limits,
 } from '../types.ts';
 import { ScanSession, resolveLimits } from '../session.ts';
 import { suggestFormat } from '../geometry.ts';
@@ -313,6 +314,16 @@ export function ScannerView({
     return true;
   };
   const replacementLimits = (original: Blob, pageCount = candidateCount(), forCapture = false) => {
+    const editorBytes = cornerEditor.current?.getWorkingBytes() ?? 0;
+    const withEditor = (limits: Limits): Limits => {
+      const workingBytes = limits.workingBytes - editorBytes;
+      if (workingBytes <= 0)
+        throw new ScannerError(
+          'LIMIT_EXCEEDED',
+          'Datei- oder Sitzungslimit erreicht. Vorhandene Seiten bleiben erhalten.',
+        );
+      return { ...limits, workingBytes };
+    };
     if (continuous || forCapture) {
       const retained: CaptureCandidate[] = [...retainedPages.current];
       const files: Blob[] = [],
@@ -334,19 +345,22 @@ export function ScannerView({
             if (blob && !acceptedBlobs.current.has(blob)) extraPreviews.push(blob);
         }
       }
-      return retainedCaptureLimits(
+      const incoming = originalOwners.current.get(original) ?? original;
+      const remaining = retainedCaptureLimits(
         session.limits,
         retained,
         files,
-        originalOwners.current.get(original) ?? original,
+        incoming,
         pageCount,
         extraPreviews,
         camera ? 4_000_000 : 0,
         forCapture,
       );
+      // Keep the preflight unchanged; the worker charges its own incoming Blob exactly once.
+      return withEditor({ ...remaining, workingBytes: remaining.workingBytes + incoming.size });
     }
 
-    if (!fileReplacement.current) return session.limits;
+    if (!fileReplacement.current) return withEditor(session.limits);
     const originals = new Set<Blob>(),
       previews = new Set<Blob>();
     for (const candidate of [
@@ -387,7 +401,7 @@ export function ScannerView({
         'LIMIT_EXCEEDED',
         'Datei- oder Sitzungslimit erreicht. Vorhandene Seiten bleiben erhalten.',
       );
-    return limits;
+    return withEditor(limits);
   };
   const markAccepted = (page: PageDraft) => {
     originalOwners.current.set(
@@ -639,7 +653,7 @@ export function ScannerView({
         {
           original: next.original,
           diagnosticContext: { pageId: next.id, source: next.source, operation: 'edit' },
-          limits: continuous ? replacementLimits(next.original) : session.limits,
+          limits: replacementLimits(next.original),
           corners: next.corners,
           format:
             changes.corners && !changes.format && next.format.origin !== 'user'
@@ -1258,6 +1272,7 @@ export function ScannerView({
                 <CornerEditor
                   cancelRef={cornerEditor}
                   page={pendingCrop}
+                  getWorkingLimit={() => replacementLimits(pendingCrop.original).workingBytes}
                   t={t}
                   signal={signal}
                   findEdges={(abort) => findEdges(pendingCrop, abort)}
@@ -1274,6 +1289,7 @@ export function ScannerView({
                 <CornerEditor
                   cancelRef={cornerEditor}
                   page={draft}
+                  getWorkingLimit={() => replacementLimits(draft.original).workingBytes}
                   t={t}
                   disabled={busy}
                   signal={signal}
