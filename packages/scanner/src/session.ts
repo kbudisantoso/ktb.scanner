@@ -3,8 +3,8 @@ import { ScannerError } from './errors.ts';
 import { validQuad, cropSize, layoutMm } from './geometry.ts';
 export const DEFAULT_LIMITS: Readonly<Limits> = Object.freeze({
   pages: 20,
-  fileBytes: 20 * 1024 ** 2,
-  inputPixels: 24_000_000,
+  fileBytes: 64 * 1024 ** 2,
+  inputPixels: 256_000_000,
   originalBytes: 100 * 1024 ** 2,
   outputPixels: 8_000_000,
   outputDimension: 4096,

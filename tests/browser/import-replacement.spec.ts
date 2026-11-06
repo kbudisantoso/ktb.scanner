@@ -133,7 +133,8 @@ test.beforeEach(async ({ page }) => {
           });
           const previewBytes =
             result.preview.size + result.thumbnail.size + (result.unoptimizedPreview?.size ?? 0);
-          // Initial processing fits; retaining the rollback candidate crosses the same guard.
+          // The old full-source working bound now permits adaptive decoding; result storage
+          // still has to reject the additional retained preview.
           limits =
             budget === 'workingBytes'
               ? {
@@ -519,16 +520,80 @@ test('add, discard and accepted file replacement preserve the saved page; replac
 });
 
 for (const budget of ['originalBytes', 'workingBytes', 'resultBytes']) {
-  test(`rollback storage counts toward ${budget} and rejection retains the original candidate`, async ({
-    page,
-  }) => {
+  const title =
+    budget === 'workingBytes'
+      ? 'rollback storage reduces workingBytes while an adaptive replacement preserves the original'
+      : `rollback storage counts toward ${budget} and rejection retains the original candidate`;
+  test(title, async ({ page }) => {
     await start(page, 'controller', 'en', [0], budget);
     await expect(page.getByRole('button', { name: 'Replace image', exact: true })).toBeVisible();
     const before = await imageHash(page);
+    const workingBaseline =
+      budget === 'workingBytes'
+        ? await page.evaluate(() => {
+            const h = (window as any).replacementHarness;
+            const current = h.lastWorkerResult;
+            return {
+              limits: h.jobs.at(-1).limits,
+              retainedBytes:
+                h.files[0].size +
+                current.preview.size +
+                current.thumbnail.size +
+                (current.unoptimizedPreview?.size ?? 0),
+              previewBytes:
+                current.preview.size +
+                current.thumbnail.size +
+                (current.unoptimizedPreview?.size ?? 0),
+              sourceSize: current.size,
+              normalizationCount: h.events.filter(
+                (event: any) => event.type === 'input-normalization',
+              ).length,
+              decodedSize: h.events.find((event: any) => event.type === 'input-normalization').data
+                .decodedSize,
+            };
+          })
+        : undefined;
     await choose(page, 0);
-    await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+    if (workingBaseline) {
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () =>
+              (window as any).replacementHarness.events.filter(
+                (event: any) => event.type === 'input-normalization',
+              ).length,
+          ),
+        )
+        .toBe(workingBaseline.normalizationCount + 1);
+      await expect(page.getByRole('dialog')).toHaveAttribute('aria-busy', 'false');
+      await expect(page.getByRole('dialog').getByRole('alert')).toHaveCount(0);
+      const replacement = await page.evaluate(() => {
+        const h = (window as any).replacementHarness;
+        return {
+          limits: h.jobs.at(-1).limits,
+          normalization: h.events
+            .filter((event: any) => event.type === 'input-normalization')
+            .at(-1).data,
+          sourceSize: h.lastWorkerResult.size,
+        };
+      });
+      expect(replacement.limits.workingBytes).toBe(
+        workingBaseline.limits.workingBytes - workingBaseline.retainedBytes,
+      );
+      expect(replacement.limits.resultBytes).toBe(
+        workingBaseline.limits.resultBytes - workingBaseline.previewBytes,
+      );
+      expect(replacement.sourceSize).toEqual(workingBaseline.sourceSize);
+      expect(replacement.normalization.sourceSize).toEqual(workingBaseline.sourceSize);
+      expect(replacement.normalization.reason).toBe('working-budget');
+      expect(
+        replacement.normalization.decodedSize.width * replacement.normalization.decodedSize.height,
+      ).toBeLessThan(workingBaseline.decodedSize.width * workingBaseline.decodedSize.height);
+    } else {
+      await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible();
+      expect(await imageHash(page)).toBe(before);
+    }
     await expect(page.getByRole('button', { name: 'Replace image', exact: true })).toBeEnabled();
-    expect(await imageHash(page)).toBe(before);
     const original = await readCornerOriginal(page);
     expect(original.bytes).toEqual(Array.from((await file(page, 0)).buffer));
     await page.evaluate(() => (window as any).replacementHarness.controller.destroy());

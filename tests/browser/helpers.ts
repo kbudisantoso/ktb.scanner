@@ -37,16 +37,25 @@ export async function readCornerOriginal(page: Page) {
   await closeTool(page);
   await waitForPreview(page);
   await page.evaluate(() => {
-    const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src')!;
-    const probe = { descriptor, url: '' };
+    const original = window.createImageBitmap;
+    const probe = {
+      original,
+      observed: null as { blob: Blob; width: number; height: number } | null,
+    };
     (window as any).cornerOriginalProbe = probe;
-    Object.defineProperty(HTMLImageElement.prototype, 'src', {
-      ...descriptor,
-      set(this: HTMLImageElement, value: string) {
-        if (!this.isConnected && value.startsWith('blob:')) probe.url = value;
-        descriptor.set!.call(this, value);
-      },
-    });
+    window.createImageBitmap = (async (...args: Parameters<typeof createImageBitmap>) => {
+      const bitmap: ImageBitmap = await Reflect.apply(original, window, args);
+      const options = args.at(-1);
+      if (
+        args[0] instanceof Blob &&
+        options &&
+        typeof options === 'object' &&
+        'imageOrientation' in options &&
+        options.imageOrientation === 'from-image'
+      )
+        probe.observed = { blob: args[0], width: bitmap.width, height: bitmap.height };
+      return bitmap;
+    }) as typeof createImageBitmap;
   });
   try {
     await page.getByRole('button', { name: /^(Ecken korrigieren|Adjust corners)$/ }).click();
@@ -54,24 +63,18 @@ export async function readCornerOriginal(page: Page) {
       page.getByRole('button', { name: /^(Zuschnitt übernehmen|Apply crop)$/ }),
     ).toBeEnabled();
     return await page.evaluate(async () => {
-      const url = (window as any).cornerOriginalProbe.url;
-      if (!url) throw new Error('The corner editor original image was not observed');
-      const image = new Image();
-      image.src = url;
-      await image.decode();
+      const observed = (window as any).cornerOriginalProbe.observed;
+      if (!observed) throw new Error('The corner editor source decode was not observed');
       return {
-        width: image.naturalWidth,
-        height: image.naturalHeight,
-        bytes: Array.from(new Uint8Array(await (await fetch(url)).arrayBuffer())),
+        // These are the real bounded editor dimensions; bytes remain the complete original.
+        width: observed.width,
+        height: observed.height,
+        bytes: Array.from(new Uint8Array(await observed.blob.arrayBuffer())),
       };
     });
   } finally {
     await page.evaluate(() => {
-      Object.defineProperty(
-        HTMLImageElement.prototype,
-        'src',
-        (window as any).cornerOriginalProbe.descriptor,
-      );
+      window.createImageBitmap = (window as any).cornerOriginalProbe.original;
       delete (window as any).cornerOriginalProbe;
     });
   }
