@@ -36,8 +36,9 @@ Schema 2 `manifest.json` contains package/engine versions, browser identifier, v
 | `live-watchdog` | Waiting/evidence expiry without invalidating a running detection job |
 | `candidate-selection` | Candidate geometry/evidence/paper scores, continuity, completeness, exclusions and final selection |
 | `capture-scene-baseline` | Fresh post-photo video reference acquired before still processing/feedback; it only maintains the duplicate-capture lock |
-| `capture-shutter` | Synchronously secured pixels, dimensions and software playback start; not proof of audible sound |
+| `capture-shutter` | SDK readiness feedback after final source selection and the early bounded continuous-scene baseline attempt in unreleased D-062; a fresh reference is used when available; software playback attempt, not a sensor-exposure timestamp or proof of audible sound |
 | `capture-complete` | Chosen photo/video source, encoded dimensions, claim/backup time, total capture duration, optional native request/completion times and frozen hint/Auto stability; encoding duration is separate only without a photo attempt, and native exposure time is not known |
+| `capturedAtMs` | Monotonic time of the synchronous video-backup copy, retained even when a native photo is selected; not its exposure time or the later SDK readiness time |
 | `passMaxDimension` / `still-combined` | Individual 1,000/800 px passes and combined selection |
 | `input-normalization` | Full oriented source size, actual decoded size and `unchanged`/`working-budget` reason; original bytes remain unchanged |
 | `processing-scale` | Source, decoded, working and output sizes, with `unchanged`, `output-limits` or `working-budget` reason |
@@ -50,6 +51,8 @@ Schema 2 `manifest.json` contains package/engine versions, browser identifier, v
 | `top-edge-recovery` | Previous geometry, evidence, application or rejection; an attempted check is not an improvement |
 | `paper-cleanup` / `lens-correction` | Actual processing status, neutral coverage, strength/evidence/errors |
 | `lens-corrected` / `manual-adjustments` / `color-profile` | Available intermediate pixels and confirmed recipe settings |
+
+The unreleased [D-062 correction](../DECISIONS.md) keeps the event names but moves `capture-shutter` after the final image is secured and the existing bounded scene-reference handoff has run. The handoff uses a fresh reference when available; it does not guarantee one. Archives from the published npm 0.3.0 build instead mark the earlier video-backup feedback with this event. Unpublished local source builds can still report version 0.3.0 while already using the corrected readiness timing. Interpret the event using known build provenance and event order; the version alone does not identify its timing semantics. Event receipt `atMs` and backup `capturedAtMs` describe different moments.
 
 Coordinate spaces distinguish original bytes before orientation normalization, normalized source, engine work image and output image. Normalized corners refer to the normalized source; raw Scanic coordinates use the work dimensions named by their event. `formatGeometryUncertain` separates confirmed corners from independently supported format geometry. `session-open.paperPreference` records A4/Letter plus `host-region`/`browser-region`/`default`, not GPS, region codes or locale strings. An uncertain fallback ratio is raw geometry, not reconstructed physical measurement; see [ADR 0008](../adr/0008-perspective-and-regional-paper-format.md).
 

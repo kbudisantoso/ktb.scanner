@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Keep a hold-still state until the final capture is secured, then give the SDK completion sound and visual feedback once. Moving after that cue cannot replace the chosen image with a later photo.
+
 ## 0.3.0 - 2026-11-06
 
 Local OCR, continuous capture and a larger review workspace, with improved camera acquisition and bounded high-resolution photo imports. The host retains ownership of confirmed blobs, storage, filenames and downloads.

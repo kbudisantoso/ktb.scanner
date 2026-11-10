@@ -99,7 +99,7 @@ export function CameraView({
     [device, setDevice] = useState(''),
     [restart, setRestart] = useState(0);
   const [taking, setTaking] = useState(false);
-  const [phase, setPhase] = useState<'live' | 'encoding' | 'processing' | 'feedback'>('live');
+  const [phase, setPhase] = useState<'live' | 'capturing' | 'processing' | 'feedback'>('live');
   const [autoBlock, setAutoBlock] = useState('');
   const [previewSize, setPreviewSize] = useState<Size>({ width: 4, height: 3 });
   const shot = useRef<() => void>(() => {});
@@ -243,7 +243,7 @@ export function CameraView({
       clearTimeout(timer);
       detectionAbort.abort();
       const evidence = latest;
-      setProgress((value) => (value > 0 ? 1 : 0));
+      setProgress((value) => Math.min(value, 0.985));
       setTaking(true);
       let handedOff = false;
       try {
@@ -266,7 +266,7 @@ export function CameraView({
               rebaseScene = rearm.blocked;
             }
           },
-          (value, image) => {
+          (_value, image) => {
             const canvas = snapshot.current!;
             const scale = Math.min(1, 1000 / Math.max(image.width, image.height));
             canvas.width = Math.round(image.width * scale);
@@ -275,11 +275,7 @@ export function CameraView({
             setPreviewSize({ width: image.width, height: image.height });
             if (callbacks.current.continuous)
               rearm.lock(fingerprint(image), evidence?.detection.corners ?? null);
-            else video.current?.pause();
-            setPhase('encoding');
-            const soundPlayed = callbacks.current.onShutter();
-            if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
-            diagnose(diagnostics, 'capture-shutter', { ...value, soundPlayed });
+            setPhase('capturing');
           },
         );
         if (!active) return;
@@ -342,6 +338,20 @@ export function CameraView({
           }
         }
         if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
+        // The selected image and the continuous-scene reference are fixed before
+        // signalling that the phone can move. Processing can continue afterwards.
+        if (!callbacks.current.continuous) video.current?.pause();
+        setProgress(1);
+        setPhase('processing');
+        let soundPlayed = false;
+        try {
+          soundPlayed = callbacks.current.onShutter();
+        } catch {
+          /* Optional audio cannot invalidate the secured capture. */
+        }
+        if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
+        diagnose(diagnostics, 'capture-shutter', { ...details, soundPlayed });
+        if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         if (!callbacks.current.continuous) camera.current.stop();
         engine?.destroy();
         engine = undefined;
@@ -369,7 +379,6 @@ export function CameraView({
         });
         if (!active || abort.signal.aborted || captureEpoch !== detectionEpoch) return;
         handedOff = true;
-        setPhase('processing');
         const outcome = await callbacks.current.onCapture(blob, hint);
         if (!active || abort.signal.aborted || !callbacks.current.continuous) return;
         if (outcome) {
@@ -761,7 +770,7 @@ export function CameraView({
         </button>
       </div>
       <div
-        className={`scanner-camera ${phase !== 'live' && phase !== 'feedback' ? 'scanner-camera-captured' : ''}`}
+        className={`scanner-camera ${phase === 'processing' ? 'scanner-camera-captured' : ''}`}
         style={{
           aspectRatio: `${previewSize.width}/${previewSize.height}`,
           width: `min(100%, calc(var(--scanner-camera-height, 52dvh) * ${previewSize.width / previewSize.height}))`,
@@ -773,9 +782,9 @@ export function CameraView({
           className="scanner-captured-photo"
           role="img"
           aria-label={t('Aufgenommenes Foto')}
-          hidden={phase === 'live'}
+          hidden={phase === 'live' || phase === 'capturing'}
         />
-        {quad && phase === 'live' && (
+        {quad && (phase === 'live' || phase === 'capturing') && (
           <CaptureOutline
             corners={quad}
             size={previewSize}
@@ -787,18 +796,18 @@ export function CameraView({
         )}
         {phase !== 'live' && phase !== 'feedback' && (
           <>
-            <div className="scanner-shutter-flash" aria-hidden="true" />
+            {phase === 'processing' && <div className="scanner-shutter-flash" aria-hidden="true" />}
             <div className="scanner-photo-processing" role="status">
               <span className="scanner-processing-mark" aria-hidden="true">
                 <span />
               </span>
               <div>
                 <strong>
-                  {phase === 'encoding' ? t('Aufnahme läuft...') : t('Foto aufgenommen')}
+                  {phase === 'capturing' ? t('Aufnahme läuft...') : t('Foto aufgenommen')}
                 </strong>
                 <p>
-                  {phase === 'encoding'
-                    ? t('Bild wird gesichert...')
+                  {phase === 'capturing'
+                    ? t('Bitte weiter ruhig halten.')
                     : t('Zuschnitt und Bildoptimierung laufen...')}
                 </p>
                 <div className="scanner-processing-track" aria-hidden="true">
