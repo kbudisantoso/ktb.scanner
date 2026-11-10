@@ -195,7 +195,7 @@ Configuration/lifecycle: `CONFIG_INVALID`, `SCANNER_BUSY`, `SCANNER_DISPOSED`. C
 | T-25 | Opt-in diagnostics, independent ZIP reading, final bytes, limits/errors/abort | F-30, N-02, N-04 |
 | T-26 | Multi-sheet completeness/middle/left, observed outer boundaries versus fold panels, low-contrast recovery, negative inner frames/absent/clipped/weak wrappers, preserved normal targets and independent still despite delayed live job | F-06, F-24, F-31, N-03 |
 | T-27 | Paper scores, outliers, confirmed changes and paused evidence, no stale trigger | F-19, F-23, F-26, F-32 |
-| T-28 | Secured backup, pending hold-still without completion cues, final source/fresh-reference readiness, exactly-once cue/freeze, late-photo invalidation and reduced motion | F-24, F-26, F-33, N-05 |
+| T-28 | Secured backup, pending hold-still without completion cues, final-source readiness and bounded baseline attempt, exactly-once cue/freeze, late-photo invalidation and reduced motion | F-24, F-26, F-33, N-05 |
 | T-29 | Rotated known corners, dual resolutions with one shared recovery-call budget, bounded sharpening and optional autofocus | F-06, F-08, F-24, F-34, N-01 |
 | T-30 | Mobile camera portrait/landscape, reachable controls, import, light and errors | F-35, F-02, F-03, F-04, F-25, I-02, N-05 |
 | T-31 | Paper axes without content rotation, edits/metadata/rendered PDF consistency | F-36, F-07, F-13, F-28 |
