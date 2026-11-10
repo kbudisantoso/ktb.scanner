@@ -82,7 +82,7 @@ for (const [mode, sound, nativePhoto] of [
   ['auto', 'reflex', false],
   ['auto', 'camera', true],
 ] as const)
-  test(`${mode}/${sound}/${nativePhoto ? 'native-photo' : 'video-fallback'}: shutter freezes and sounds before encoding; photo remains during processing`, async ({
+  test(`${mode}/${sound}/${nativePhoto ? 'native-photo' : 'video-fallback'}: ready feedback follows final source selection and preserves the secured pixels`, async ({
     page,
     browserName,
   }, info) => {
@@ -104,12 +104,19 @@ for (const [mode, sound, nativePhoto] of [
         lastDetectionReply: 0,
         photoCalls: 0,
         soundsAtPhotoRequest: 0,
+        sceneMoved: false,
+        sceneMovedAtPhotoRequest: false,
+        canvas: null as HTMLCanvasElement | null,
+        draws: 0,
+        draw: () => {},
+        encodingReady: false,
         photoPending: false,
         photoTrackMatches: false,
         track: null as MediaStreamTrack | null,
         nativeBlob: null as Blob | null,
         processRequest: null as any,
         processResult: null as any,
+        processCalls: 0,
         releasePhoto: () => {},
         releaseEncoding: () => {},
         releaseProcessing: () => {},
@@ -124,7 +131,12 @@ for (const [mode, sound, nativePhoto] of [
       };
       const start = AudioBufferSourceNode.prototype.start;
       AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) {
-        if ((this.buffer?.length ?? 0) > 1) state.sounds++;
+        if ((this.buffer?.length ?? 0) > 1) {
+          state.sounds++;
+          // Moving the phone on the ready cue must be too late to change this capture.
+          state.sceneMoved = true;
+          state.draw();
+        }
         return start.apply(this, args);
       };
       const toBlob = HTMLCanvasElement.prototype.toBlob;
@@ -135,6 +147,7 @@ for (const [mode, sound, nativePhoto] of [
           return toBlob.call(
             this,
             (blob) => {
+              state.encodingReady = true;
               state.releaseEncoding = () => callback(blob);
             },
             type,
@@ -153,6 +166,7 @@ for (const [mode, sound, nativePhoto] of [
           });
         }
         postMessage(message: any, transfer?: any) {
+          if (message.kind === 'process') state.processCalls++;
           if (message.kind === 'process' && !state.processing) {
             state.processing = true;
             state.processRequest = message.request;
@@ -173,7 +187,9 @@ for (const [mode, sound, nativePhoto] of [
               }
               takePhoto() {
                 state.photoCalls++;
+                state.nativeBlob = null;
                 state.soundsAtPhotoRequest = state.sounds;
+                state.sceneMovedAtPhotoRequest = state.sceneMoved;
                 state.audioAtPhotoRequest = state.audioContext?.state ?? 'missing';
                 state.photoPending = true;
                 state.shutterAt = performance.now();
@@ -181,7 +197,7 @@ for (const [mode, sound, nativePhoto] of [
                 photo.width = 1200;
                 photo.height = 1600;
                 const ctx = photo.getContext('2d')!;
-                ctx.fillStyle = '#493327';
+                ctx.fillStyle = state.sceneMoved ? '#a33422' : '#493327';
                 ctx.fillRect(0, 0, photo.width, photo.height);
                 ctx.fillStyle = '#fffdf6';
                 ctx.fillRect(150, 164, 900, 1272);
@@ -189,12 +205,15 @@ for (const [mode, sound, nativePhoto] of [
                 ctx.font = '28px monospace';
                 for (let y = 240; y < 1380; y += 44)
                   ctx.fillText('NATIVE PHOTO 0123456789', 205, y);
-                ctx.fillStyle = '#244bce';
+                ctx.fillStyle = state.sceneMoved ? '#a33422' : '#244bce';
                 ctx.fillRect(430, 700, 340, 180);
                 return new Promise<Blob>((resolve) => {
                   photo.toBlob((blob) => {
                     state.nativeBlob = blob!;
-                    state.releasePhoto = () => resolve(blob!);
+                    state.releasePhoto = () => {
+                      state.photoPending = false;
+                      resolve(blob!);
+                    };
                     photo.width = photo.height = 1;
                   }, 'image/png');
                 });
@@ -213,9 +232,11 @@ for (const [mode, sound, nativePhoto] of [
           const canvas = document.createElement('canvas');
           canvas.width = 960;
           canvas.height = 1280;
+          state.canvas = canvas;
           const ctx = canvas.getContext('2d')!;
           const draw = () => {
-            ctx.fillStyle = state.encoding || state.photoPending ? '#a33422' : '#435444';
+            state.draws++;
+            ctx.fillStyle = state.sceneMoved ? '#a33422' : '#435444';
             ctx.fillRect(0, 0, 960, 1280);
             ctx.fillStyle = '#fffdf6';
             ctx.fillRect(180, 120, 600, 1000);
@@ -223,6 +244,7 @@ for (const [mode, sound, nativePhoto] of [
             ctx.font = '23px monospace';
             for (let y = 180; y < 1080; y += 36) ctx.fillText('TEST 0123456789 12,34', 220, y);
           };
+          state.draw = draw;
           draw();
           const timer = setInterval(draw, 50),
             stream = canvas.captureStream(20);
@@ -259,8 +281,123 @@ for (const [mode, sound, nativePhoto] of [
       await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
     }
     const photo = page.getByRole('img', { name: 'Aufgenommenes Foto', exact: true });
+    await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'capturing');
+    await expect(page.locator('.scanner-photo-processing strong')).toHaveText('Aufnahme läuft...');
+    await expect(page.getByText('Bitte weiter ruhig halten.', { exact: true })).toBeVisible();
+    if (nativePhoto)
+      await expect
+        .poll(() => page.evaluate(() => !!(window as any).shutterTest.nativeBlob))
+        .toBe(true);
+    else
+      await expect
+        .poll(() => page.evaluate(() => (window as any).shutterTest.encodingReady))
+        .toBe(true);
+    const pending = await page.evaluate(() => {
+      const state = (window as any).shutterTest;
+      const video = document.querySelector('video')!;
+      const snapshot = document.querySelector<HTMLCanvasElement>('.scanner-captured-photo')!;
+      const progress = document.querySelector('.scanner-camera svg')?.getAttribute('data-progress');
+      return {
+        sounds: state.sounds,
+        processing: state.processing,
+        stopped: state.stopped,
+        sceneMoved: state.sceneMoved,
+        photoCalls: state.photoCalls,
+        soundsAtPhotoRequest: state.soundsAtPhotoRequest,
+        sceneMovedAtPhotoRequest: state.sceneMovedAtPhotoRequest,
+        photoTrackMatches: state.photoTrackMatches,
+        encoding: state.encoding,
+        snapshotHidden: snapshot.hidden,
+        videoPaused: video.paused,
+        videoVisible: getComputedStyle(video).visibility,
+        flashes: document.querySelectorAll('.scanner-shutter-flash').length,
+        progress: progress === null || progress === undefined ? null : Number(progress),
+        draws: state.draws,
+      };
+    });
+    expect(pending).toMatchObject({
+      sounds: 0,
+      processing: false,
+      stopped: 0,
+      sceneMoved: false,
+      photoCalls: nativePhoto ? 1 : 0,
+      soundsAtPhotoRequest: 0,
+      sceneMovedAtPhotoRequest: false,
+      photoTrackMatches: nativePhoto,
+      encoding: !nativePhoto,
+      snapshotHidden: true,
+      videoPaused: false,
+      videoVisible: 'visible',
+      flashes: 0,
+    });
+    if (mode === 'auto') expect(pending.progress).not.toBeNull();
+    if (pending.progress !== null) expect(pending.progress).toBeLessThan(1);
+    await expect(photo).toBeHidden();
+    await page.waitForTimeout(100);
+    expect(await page.evaluate(() => (window as any).shutterTest.draws)).toBeGreaterThan(
+      pending.draws,
+    );
+    expect(await page.evaluate(() => (window as any).shutterTest.sounds)).toBe(0);
+    if (mode === 'auto') {
+      const lag = await page.evaluate(() => {
+        const s = (window as any).shutterTest;
+        return s.shutterAt - s.lastDetectionReply;
+      });
+      expect(lag).toBeGreaterThanOrEqual(0);
+      expect(lag).toBeLessThan(150);
+    }
+    if (nativePhoto) await page.evaluate(() => (window as any).shutterTest.releasePhoto());
+    else {
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await info.attach('capture-pending-desktop', {
+        body: await page.screenshot({
+          path: `artifacts/local/shutter-${info.project.name}-${mode}-${sound}-${page.viewportSize()!.width}.png`,
+        }),
+        contentType: 'image/png',
+      });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await info.attach('capture-pending-mobile', {
+        body: await page.screenshot({
+          path: `artifacts/local/shutter-${info.project.name}-${mode}-${sound}-${page.viewportSize()!.width}.png`,
+        }),
+        contentType: 'image/png',
+      });
+      await page.evaluate(() => (window as any).shutterTest.releaseEncoding());
+    }
+    await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'processing');
+    await expect.poll(() => page.evaluate(() => (window as any).shutterTest.sounds)).toBe(1);
+    await expect(page.locator('.scanner-photo-processing strong')).toHaveText('Foto aufgenommen');
+    await expect(
+      page.getByText('Zuschnitt und Bildoptimierung laufen...', { exact: true }),
+    ).toBeVisible();
     await expect(photo).toBeVisible();
-    await expect(page.getByText('Bild wird gesichert...', { exact: true })).toBeVisible();
+    const ready = await page.evaluate(() => {
+      const state = (window as any).shutterTest;
+      const snapshot = document.querySelector<HTMLCanvasElement>('.scanner-captured-photo')!;
+      return {
+        frozen: [...snapshot.getContext('2d')!.getImageData(0, 0, 1, 1).data],
+        movedScene: [...state.canvas.getContext('2d').getImageData(0, 0, 1, 1).data],
+        sceneMoved: state.sceneMoved,
+        sounds: state.sounds,
+        soundsAtPhotoRequest: state.soundsAtPhotoRequest,
+        stopped: state.stopped,
+        paused: document.querySelector('video')!.paused,
+      };
+    });
+    expect(ready).toEqual({
+      frozen: [67, 84, 68, 255],
+      movedScene: [163, 52, 34, 255],
+      sceneMoved: true,
+      sounds: 1,
+      soundsAtPhotoRequest: 0,
+      stopped: 1,
+      paused: true,
+    });
+    expect(
+      await photo.evaluate(
+        (c) => c.getBoundingClientRect().width / c.getBoundingClientRect().height,
+      ),
+    ).toBeCloseTo(960 / 1280, 2);
     await info.attach('shutter-audio.json', {
       contentType: 'application/json',
       body: JSON.stringify(
@@ -272,13 +409,13 @@ for (const [mode, sound, nativePhoto] of [
             atPhotoRequest: state.audioAtPhotoRequest,
             sounds: state.sounds,
             soundsAtPhotoRequest: state.soundsAtPhotoRequest,
+            sceneMovedAtPhotoRequest: state.sceneMovedAtPhotoRequest,
             photoCalls: state.photoCalls,
             encoding: state.encoding,
           };
         }),
       ),
     });
-    await expect.poll(() => page.evaluate(() => (window as any).shutterTest.sounds)).toBe(1);
     expect(await page.evaluate(() => (window as any).testMutedOutput.gains.length)).toBeGreaterThan(
       0,
     );
@@ -287,71 +424,6 @@ for (const [mode, sound, nativePhoto] of [
         (window as any).testMutedOutput.gains.every((gain: GainNode) => gain.gain.value === 0),
       ),
     ).toBe(true);
-    await page.waitForTimeout(300);
-    if (mode === 'auto') {
-      const lag = await page.evaluate(() => {
-        const s = (window as any).shutterTest;
-        return s.shutterAt - s.lastDetectionReply;
-      });
-      expect(lag).toBeGreaterThanOrEqual(0);
-      expect(lag).toBeLessThan(150);
-    }
-    const frozen = await photo.evaluate((canvas: HTMLCanvasElement) => [
-      ...canvas.getContext('2d')!.getImageData(0, 0, 1, 1).data,
-    ]);
-    expect(frozen).toEqual([67, 84, 68, 255]);
-    expect(await page.locator('video').evaluate((video: HTMLVideoElement) => video.paused)).toBe(
-      true,
-    );
-    if (nativePhoto) {
-      await expect(page.locator('.scanner-photo-processing strong')).toHaveText(
-        'Aufnahme läuft...',
-      );
-      expect(
-        await page.evaluate(() => {
-          const state = (window as any).shutterTest;
-          return [
-            state.photoCalls,
-            state.soundsAtPhotoRequest,
-            state.photoTrackMatches,
-            state.encoding,
-            state.processing,
-          ];
-        }),
-      ).toEqual([1, 1, true, false, false]);
-      await expect
-        .poll(() => page.evaluate(() => !!(window as any).shutterTest.nativeBlob))
-        .toBe(true);
-      await page.evaluate(() => (window as any).shutterTest.releasePhoto());
-    } else {
-      await page.setViewportSize({ width: 1440, height: 1000 });
-      await info.attach('shutter-desktop', {
-        body: await page.screenshot({
-          path: `artifacts/local/shutter-${info.project.name}-${mode}-${sound}-${page.viewportSize()!.width}.png`,
-        }),
-        contentType: 'image/png',
-      });
-      await page.setViewportSize({ width: 390, height: 844 });
-      await info.attach('shutter-mobile', {
-        body: await page.screenshot({
-          path: `artifacts/local/shutter-${info.project.name}-${mode}-${sound}-${page.viewportSize()!.width}.png`,
-        }),
-        contentType: 'image/png',
-      });
-      await page.evaluate(() => (window as any).shutterTest.releaseEncoding());
-    }
-    await expect(
-      page.getByText('Zuschnitt und Bildoptimierung laufen...', { exact: true }),
-    ).toBeVisible();
-    if (nativePhoto)
-      await expect(page.locator('.scanner-photo-processing strong')).toHaveText('Foto aufgenommen');
-    await expect(photo).toBeVisible();
-    expect(
-      await photo.evaluate(
-        (c) => c.getBoundingClientRect().width / c.getBoundingClientRect().height,
-      ),
-    ).toBeCloseTo(960 / 1280, 2);
-    expect(await page.evaluate(() => (window as any).shutterTest.stopped)).toBe(1);
     await page.evaluate(() => (window as any).shutterTest.releaseProcessing());
     await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
     await expect(photo).toHaveCount(0);
@@ -393,5 +465,57 @@ for (const [mode, sound, nativePhoto] of [
       expect(processed.corners[0].x).toBeCloseTo(150 / 1200, 2);
       expect(processed.corners[0].y).toBeCloseTo(164 / 1600, 2);
       expect(processed.blueFraction).toBeGreaterThan(0.015);
-    } else expect(await page.evaluate(() => (window as any).shutterTest.photoCalls)).toBe(0);
+      await page.getByRole('button', { name: 'Wiederholen', exact: true }).click();
+      await page.getByLabel('Aufnahmemodus').selectOption('manual');
+      await page.getByRole('button', { name: 'Jetzt aufnehmen', exact: true }).click();
+      await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'capturing');
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const state = (window as any).shutterTest;
+            return state.photoCalls === 2 && !!state.nativeBlob;
+          }),
+        )
+        .toBe(true);
+      expect(await page.evaluate(() => (window as any).shutterTest.sounds)).toBe(1);
+      await page.getByRole('button', { name: 'Schließen', exact: true }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      // Resolve hardware only after the UI session ended; no ready cue may escape the abort.
+      await page.evaluate(() => (window as any).shutterTest.releasePhoto());
+      await page.waitForTimeout(150);
+      expect(
+        await page.evaluate(() => {
+          const state = (window as any).shutterTest;
+          return {
+            sounds: state.sounds,
+            processingCalls: state.processCalls,
+            stopped: state.stopped,
+            flashes: document.querySelectorAll('.scanner-shutter-flash').length,
+            snapshots: document.querySelectorAll('.scanner-captured-photo').length,
+          };
+        }),
+      ).toEqual({ sounds: 1, processingCalls: 1, stopped: 2, flashes: 0, snapshots: 0 });
+    } else {
+      const source = await page.evaluate(async () => {
+        const state = (window as any).shutterTest;
+        const image = await createImageBitmap(state.processRequest.original);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(image, 0, 0);
+        const result = {
+          width: image.width,
+          height: image.height,
+          pixel: [...ctx.getImageData(0, 0, 1, 1).data],
+          photoCalls: state.photoCalls,
+        };
+        image.close();
+        canvas.width = canvas.height = 1;
+        return result;
+      });
+      expect(source).toMatchObject({ width: 960, height: 1280, photoCalls: 0 });
+      for (const [channel, expected] of [67, 84, 68].entries())
+        expect(Math.abs(source.pixel[channel] - expected)).toBeLessThanOrEqual(3);
+      expect(source.pixel[3]).toBe(255);
+    }
   });

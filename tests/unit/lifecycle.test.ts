@@ -242,43 +242,65 @@ test('stopping diagnostic detail recording never changes the selected detector p
   adapter.destroy();
 });
 
-test('capture callback cancellation rejects the secured frame and always releases its canvas', async (context) => {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+test('capture callback cancellation rejects secured sources and observes pending native work', async (context) => {
+  const keys = ['document', 'navigator', 'ImageCapture'] as const;
+  const previous = keys.map(
+    (key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)] as const,
+  );
   context.after(() => {
-    if (previous) Object.defineProperty(globalThis, 'document', previous);
-    else delete (globalThis as any).document;
+    for (const [key, descriptor] of previous) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
   });
-  for (const cancelAt of ['shutter', 'details'] as const) {
-    const abort = new AbortController();
-    let encodings = 0,
-      details = 0;
-    const canvas = {
-      width: 0,
-      height: 0,
-      getContext: () => ({ drawImage: () => {} }),
-      toBlob: (done: (blob: Blob) => void) => {
-        encodings++;
-        done(new Blob(['encoded-frame']));
-      },
-    };
-    Object.defineProperty(globalThis, 'document', {
-      configurable: true,
-      value: { createElement: () => canvas },
-    });
-    const track = { readyState: 'live', stop: () => {} };
-    Object.defineProperty(globalThis, 'navigator', {
-      configurable: true,
-      value: {
-        mediaDevices: {
-          getUserMedia: async () => ({ getVideoTracks: () => [track], getTracks: () => [track] }),
+  for (const native of [false, true])
+    for (const cancelAt of ['native', 'frame', 'details'] as const) {
+      if (!native && cancelAt === 'native') continue;
+      const abort = new AbortController();
+      let encodings = 0,
+        details = 0,
+        frames = 0,
+        nativeCalls = 0;
+      let releasePhoto: ((blob: Blob) => void) | undefined;
+      const canvas = {
+        width: 0,
+        height: 0,
+        getContext: () => ({ drawImage: () => {} }),
+        toBlob: (done: (blob: Blob) => void) => {
+          encodings++;
+          done(new Blob(['encoded-frame']));
         },
-      },
-    });
-    const camera = new Camera(),
-      video = { videoWidth: 600, videoHeight: 800, play: async () => {} } as HTMLVideoElement;
-    await camera.start(video, abort.signal);
-    await assert.rejects(
-      camera.capture(
+      };
+      Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: { createElement: () => canvas },
+      });
+      const track = { readyState: 'live', stop: () => {} };
+      Object.defineProperty(globalThis, 'navigator', {
+        configurable: true,
+        value: {
+          mediaDevices: {
+            getUserMedia: async () => ({ getVideoTracks: () => [track], getTracks: () => [track] }),
+          },
+        },
+      });
+      setNativePhoto(
+        native
+          ? class {
+              takePhoto() {
+                nativeCalls++;
+                if (cancelAt === 'native') abort.abort();
+                return new Promise<Blob>((resolve) => {
+                  releasePhoto = resolve;
+                });
+              }
+            }
+          : undefined,
+      );
+      const camera = new Camera(),
+        video = { videoWidth: 600, videoHeight: 800, play: async () => {} } as HTMLVideoElement;
+      await camera.start(video, abort.signal);
+      const pending = camera.capture(
         video,
         { ...DEFAULT_LIMITS, inputPixels: 1_000_000 },
         abort.signal,
@@ -287,17 +309,28 @@ test('capture callback cancellation rejects the secured frame and always release
           if (cancelAt === 'details') abort.abort();
         },
         () => {
-          if (cancelAt === 'shutter') abort.abort();
+          frames++;
+          if (cancelAt === 'frame') abort.abort();
         },
-      ),
-      { name: 'AbortError' },
-    );
-    assert.equal(encodings, cancelAt === 'shutter' ? 0 : 1);
-    assert.equal(details, cancelAt === 'shutter' ? 0 : 1);
-    assert.equal(canvas.width, 1);
-    assert.equal(canvas.height, 1);
-    camera.stop();
-  }
+      );
+      const rejected = assert.rejects(pending, { name: 'AbortError' });
+      if (native && cancelAt === 'details') releasePhoto!(nativePng(600, 800).blob);
+      await rejected;
+      assert.equal(nativeCalls, native ? 1 : 0);
+      assert.equal(encodings, !native && cancelAt === 'details' ? 1 : 0);
+      assert.equal(details, cancelAt === 'details' ? 1 : 0);
+      assert.equal(frames, cancelAt === 'native' ? 0 : 1);
+      if (native && cancelAt !== 'details') {
+        assert.equal(camera.photoPending, true);
+        releasePhoto!(nativePng(600, 800).blob);
+        await tick();
+        assert.equal(camera.photoPending, false);
+        assert.equal(details, 0);
+      }
+      assert.equal(canvas.width, 1);
+      assert.equal(canvas.height, 1);
+      camera.stop();
+    }
 });
 
 function nativePng(width = 3000, height = 4000, length = 32) {
@@ -387,7 +420,7 @@ function setNativePhoto(value: unknown) {
   Object.defineProperty(globalThis, 'ImageCapture', { configurable: true, value });
 }
 
-test('native photo preserves its bytes and encoded geometry after one synchronous shutter', async (context) => {
+test('native photo starts before frame feedback and preserves its final bytes and geometry', async (context) => {
   const { state } = cameraFixture(context);
   await state.camera.start(state.video, new AbortController().signal);
   let finish!: (blob: Blob) => void;
@@ -404,7 +437,7 @@ test('native photo preserves its bytes and encoded geometry after one synchronou
       }
     },
   );
-  const shutter: CaptureDetails[] = [],
+  const frames: CaptureDetails[] = [],
     details: CaptureDetails[] = [];
   await assert.rejects(state.camera.capture(state.video, DEFAULT_LIMITS, AbortSignal.abort()), {
     name: 'AbortError',
@@ -419,12 +452,12 @@ test('native photo preserves its bytes and encoded geometry after one synchronou
       throw new Error('Observer failed');
     },
     (value) => {
-      state.events.push('shutter');
-      shutter.push(value);
-      throw new Error('Cue failed');
+      state.events.push('frame');
+      frames.push(value);
+      throw new Error('Frame observer failed');
     },
   );
-  assert.deepEqual(state.events, ['draw', 'shutter', 'native']);
+  assert.deepEqual(state.events, ['draw', 'native', 'frame']);
   assert.equal(state.encodings, 0);
   await assert.rejects(
     state.camera.capture(state.video, DEFAULT_LIMITS, new AbortController().signal),
@@ -445,13 +478,13 @@ test('native photo preserves its bytes and encoded geometry after one synchronou
   assert.deepEqual(new Uint8Array(await result.arrayBuffer()), bytes);
   assert.equal(result.type, 'image/png');
   assert.equal(details.length, 1);
-  assert.equal(shutter.length, 1);
-  assert.equal(shutter[0].method, 'video-frame');
+  assert.equal(frames.length, 1);
+  assert.equal(frames[0].method, 'video-frame');
   assert.equal(details[0].method, 'photo');
   assert.equal(details[0].photoAttempted, true);
   assert.equal(details[0].sizeCoordinateSpace, 'encoded-photo');
   assert.deepEqual(details[0].size, { width: 3000, height: 4000 });
-  assert.equal(details[0].capturedAtMs, shutter[0].capturedAtMs);
+  assert.equal(details[0].capturedAtMs, frames[0].capturedAtMs);
   assert(details[0].nativeRequestedAtMs! >= details[0].capturedAtMs);
   assert(details[0].nativeCompletedAtMs! >= details[0].nativeRequestedAtMs!);
   assert.deepEqual(reads, [[0, 1024 * 1024]]);

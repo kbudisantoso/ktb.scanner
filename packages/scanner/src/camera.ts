@@ -246,7 +246,7 @@ export class Camera {
     limits: Limits,
     signal: AbortSignal,
     onDetails?: (details: CaptureDetails) => void,
-    onShutter?: (details: CaptureDetails, image: HTMLCanvasElement) => void,
+    onFrameSecured?: (details: CaptureDetails, image: HTMLCanvasElement) => void,
   ): Promise<Blob> {
     aborted(signal);
     if (this.captureJob) throw new ScannerError('SCANNER_BUSY', 'Verarbeitung läuft bereits.');
@@ -295,13 +295,19 @@ export class Camera {
         capturedAtMs,
       };
       this.activeCapture(job);
+      // Start the hardware request before preview work can delay it. The source is
+      // still undecided here, so this callback must not signal capture completion.
+      const photo = this.photo(job, limits, pixels);
+      // A reentrant stop in the frame observer can exit before the await below.
+      void photo.catch(() => {});
+      this.activeCapture(job);
       try {
-        onShutter?.({ ...details, size: { ...details.size } }, canvas);
+        onFrameSecured?.({ ...details, size: { ...details.size } }, canvas);
       } catch {
         /* Feedback cannot invalidate the secured pixels. */
       }
       this.activeCapture(job);
-      const { source, ...attempt } = await this.photo(job, limits, pixels);
+      const { source, ...attempt } = await photo;
       this.activeCapture(job);
       Object.assign(details, attempt);
       if (source) {

@@ -51,6 +51,7 @@ export const ENGLISH_TEXTS: Readonly<Record<string, string>> = {
     'Check the mount, asset URL, image format, capture mode and paper region.',
   'Bitte die vier Blattecken bestätigen.': 'Confirm the four document corners.',
   'Bitte mindestens eine Seite hinzufügen.': 'Add at least one page.',
+  'Bitte weiter ruhig halten.': 'Keep holding still.',
   'Bitte verbleibende Importe zuerst prüfen oder verwerfen.':
     'Review or discard the remaining imports first.',
   'Bitte vier gültige Dokumentecken setzen.': 'Set four valid document corners.',

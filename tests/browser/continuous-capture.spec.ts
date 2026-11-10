@@ -579,6 +579,7 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
     const h = (window as any).continuousHarness;
     h.photoCalls = 0;
     h.photoTracksMatch = [];
+    h.holdPhoto = true;
     Object.defineProperty(window, 'ImageCapture', {
       configurable: true,
       value: class {
@@ -587,11 +588,19 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
         }
         async takePhoto() {
           h.photoCalls++;
+          h.releasePhoto = undefined;
           const photo = await new Promise<Blob>((resolve) =>
             h.canvas.toBlob((blob: Blob) => resolve(blob), 'image/png'),
           );
           h.photoReconfigured = true;
           h.draw();
+          if (h.holdPhoto)
+            return new Promise<Blob>((resolve) => {
+              h.releasePhoto = () => {
+                h.holdPhoto = false;
+                resolve(photo);
+              };
+            });
           return photo;
         }
       },
@@ -601,6 +610,46 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
       autoCaptureStabilityMs: 100,
     });
   });
+  await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'capturing');
+  await expect(page.getByText('Keep holding still.', { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => typeof (window as any).continuousHarness.releasePhoto === 'function'),
+    )
+    .toBe(true);
+  const pending = await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    const video = h.mount.querySelector('video');
+    const progress = h.mount.querySelector('.scanner-camera svg')?.getAttribute('data-progress');
+    return {
+      readyEvents: h.events.filter((event: any) => event.type === 'capture-shutter').length,
+      completed: h.events.filter((event: any) => event.type === 'capture-complete').length,
+      processing: h.events.some(
+        (event: any) => event.type === 'job-start' && event.data.kind === 'process',
+      ),
+      snapshotHidden: h.mount.querySelector('.scanner-captured-photo').hidden,
+      videoVisible: getComputedStyle(video).visibility,
+      track: h.track.readyState,
+      requests: h.requests,
+      stops: h.stops,
+      flashes: h.mount.querySelectorAll('.scanner-shutter-flash').length,
+      progress: progress === null || progress === undefined ? null : Number(progress),
+    };
+  });
+  expect(pending).toMatchObject({
+    readyEvents: 0,
+    completed: 0,
+    processing: false,
+    snapshotHidden: true,
+    videoVisible: 'visible',
+    track: 'live',
+    requests: 1,
+    stops: 0,
+    flashes: 0,
+  });
+  expect(pending.progress).not.toBeNull();
+  expect(pending.progress).toBeLessThan(1);
+  await page.evaluate(() => (window as any).continuousHarness.releasePhoto());
   await expect(page.getByRole('button', { name: 'Review pages (1)', exact: true })).toBeEnabled();
   // Observe several complete configured windows on the unchanged scene.
   await page.waitForTimeout(1600);
@@ -624,6 +673,9 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
     return {
       photoCalls: h.photoCalls,
       details: capture.data.details,
+      baselineIndex: h.events.findIndex((event: any) => event.type === 'capture-scene-baseline'),
+      readyIndex: h.events.findIndex((event: any) => event.type === 'capture-shutter'),
+      completeIndex: h.events.indexOf(capture),
       freshCorners: fresh.data.corners,
       // This point was inside the original sheet and is now outside its shifted framing.
       streamPixel: [...h.canvas.getContext('2d').getImageData(110, 70, 1, 1).data],
@@ -632,6 +684,9 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
   expect(afterPhoto.photoCalls).toBe(1);
   expect(afterPhoto.details.method).toBe('photo');
   expect(afterPhoto.details.photoAttempted).toBe(true);
+  expect(afterPhoto.baselineIndex).toBeGreaterThanOrEqual(0);
+  expect(afterPhoto.readyIndex).toBeGreaterThan(afterPhoto.baselineIndex);
+  expect(afterPhoto.completeIndex).toBeGreaterThan(afterPhoto.readyIndex);
   expect(afterPhoto.streamPixel).toEqual([67, 84, 68, 255]);
   await page.evaluate(() => {
     const h = (window as any).continuousHarness;
@@ -743,10 +798,67 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
     const h = (window as any).continuousHarness;
     h.options = { ...h.options, captureWorkflow: 'review-each' };
     h.render('latest');
+    h.holdPhoto = true;
   });
   await page.getByRole('button', { name: 'Capture now', exact: true }).click();
+  await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'capturing');
+  await expect(page.getByText('Keep holding still.', { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).continuousHarness.events.filter(
+          (event: any) => event.type === 'capture-shutter',
+        ).length,
+    ),
+  ).toBe(3);
+  // The native request times out; only its already secured fallback may become ready.
   await expect(page.getByRole('img', { name: 'Captured page', exact: true })).toBeVisible();
-  await page.evaluate(() => (window as any).continuousHarness.abort.abort());
+  const fallback = await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    const captures = h.events.filter((event: any) => event.type === 'capture-complete');
+    return {
+      details: captures[3].data.details,
+      completed: captures.length,
+      readyEvents: h.events.filter((event: any) => event.type === 'capture-shutter').length,
+      photoCalls: h.photoCalls,
+    };
+  });
+  expect(fallback).toMatchObject({
+    details: { method: 'video-frame', photoAttempted: true },
+    completed: 4,
+    readyEvents: 4,
+    photoCalls: 4,
+  });
+  await page.evaluate(async () => {
+    const h = (window as any).continuousHarness;
+    h.releasePhoto();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    h.holdPhoto = true;
+  });
+  await expect(page.getByRole('button', { name: 'Review pages (4)', exact: true })).toBeEnabled();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).continuousHarness.events.filter(
+          (event: any) => event.type === 'capture-complete',
+        )[3].data.details.method,
+    ),
+  ).toBe('video-frame');
+  await page.getByRole('button', { name: 'Capture now', exact: true }).click();
+  await expect(page.locator('.scanner-capture')).toHaveAttribute('data-phase', 'capturing');
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const h = (window as any).continuousHarness;
+        return h.photoCalls === 5 && typeof h.releasePhoto === 'function';
+      }),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    const h = (window as any).continuousHarness;
+    h.abort.abort();
+    h.releasePhoto();
+  });
   await expect
     .poll(() => page.evaluate(() => (window as any).continuousHarness.results))
     .toEqual([{ status: 'cancelled', handler: 'latest' }]);
@@ -758,6 +870,15 @@ test('React snapshots workflow, keeps its current result handler and aborts owne
       }),
     )
     .toEqual([1, 1, 0, 0]);
+  expect(
+    await page.evaluate(() => {
+      const h = (window as any).continuousHarness;
+      return [
+        h.events.filter((event: any) => event.type === 'capture-shutter').length,
+        h.events.filter((event: any) => event.type === 'capture-complete').length,
+      ];
+    }),
+  ).toEqual([4, 4]);
   await page.evaluate(() => (window as any).continuousHarness.root.unmount());
 });
 
@@ -790,7 +911,7 @@ test('invalid workflows fail before resources and the omitted option retains rev
     }),
   ).toEqual([1, 1]);
   await page.evaluate(() => (window as any).continuousHarness.controller.destroy());
-  for (const eventType of ['camera-start', 'capture-complete']) {
+  for (const eventType of ['camera-start', 'capture-shutter', 'capture-complete']) {
     await page.evaluate((eventType) => {
       const h = (window as any).continuousHarness;
       h.results = [];
@@ -805,7 +926,7 @@ test('invalid workflows fail before resources and the omitted option retains rev
         },
       });
     }, eventType);
-    if (eventType === 'capture-complete')
+    if (eventType !== 'camera-start')
       await page.getByRole('button', { name: 'Capture now', exact: true }).click();
     await expect
       .poll(() => page.evaluate(() => (window as any).continuousHarness.results))
