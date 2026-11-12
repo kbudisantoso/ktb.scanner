@@ -102,6 +102,42 @@ function overlapCoverage(a: Quad, b: Quad): number {
     ) / 2;
   return Math.min(1, intersection / Math.min(area(a), area(b)));
 }
+/** Two independently approximated sides may each be one refinement strip from the same edge. */
+function sharesBoundary(a: Quad, b: Quad, size: Size): boolean {
+  const pixels = (quad: Quad) =>
+    quad.map((p) => ({ x: p.x * (size.width - 1), y: p.y * (size.height - 1) }));
+  const first = pixels(a),
+    second = pixels(b),
+    tolerance =
+      2 * Math.min(24, Math.max(3, Math.round(Math.max(size.width, size.height) * 0.006)));
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++) {
+      let start = first[i],
+        end = first[(i + 1) % 4],
+        otherStart = second[j],
+        otherEnd = second[(j + 1) % 4];
+      let length = Math.hypot(end.x - start.x, end.y - start.y),
+        otherLength = Math.hypot(otherEnd.x - otherStart.x, otherEnd.y - otherStart.y);
+      if (length < otherLength) {
+        [start, otherStart] = [otherStart, start];
+        [end, otherEnd] = [otherEnd, end];
+        [length, otherLength] = [otherLength, length];
+      }
+      const tx = (end.x - start.x) / length,
+        ty = (end.y - start.y) / length;
+      const distance = (p: Point) => Math.abs((p.x - start.x) * ty - (p.y - start.y) * tx);
+      if (Math.max(distance(otherStart), distance(otherEnd)) > tolerance) continue;
+      const project = (p: Point) => (p.x - start.x) * tx + (p.y - start.y) * ty;
+      const from = project(otherStart),
+        to = project(otherEnd);
+      const overlap = Math.max(
+        0,
+        Math.min(length, Math.max(from, to)) - Math.max(0, Math.min(from, to)),
+      );
+      if (overlap >= 0.5 * otherLength) return true;
+    }
+  return false;
+}
 /** Soft evidence in pixel space. Perspective is allowed; no corners are moved. */
 export function paperShape(corners: Quad, size: Size) {
   const points = corners.map((p) => ({ x: p.x * (size.width - 1), y: p.y * (size.height - 1) }));
@@ -150,6 +186,7 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
   input: readonly T[],
   size: Size,
   previous?: Quad | null,
+  boundaries?: readonly { supported: boolean; absentSides: number }[],
 ) {
   const assessed = input.map((candidate, index) => {
     const corners = candidateQuad(candidate, size);
@@ -182,9 +219,27 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
       excluded: plausible ? '' : 'implausible',
     };
   });
+  // Only competing hypotheses may displace one another. Weak or unmeasurable
+  // boundaries are not proof of absence, and separate sheets retain position priority.
+  if (boundaries)
+    for (const item of assessed) {
+      if (!item.plausible || (boundaries[item.index]?.absentSides ?? 0) < 2) continue;
+      if (
+        assessed.some(
+          (other) =>
+            other !== item &&
+            other.plausible &&
+            boundaries[other.index]?.supported === true &&
+            !contains(item.corners!, other.corners!) &&
+            (overlapCoverage(item.corners!, other.corners!) > 0.18 ||
+              sharesBoundary(item.corners!, other.corners!, size)),
+        )
+      )
+        item.excluded = 'unsupported-competing-boundary';
+    }
   const unique: typeof assessed = [];
   for (const item of assessed
-    .filter((item) => item.plausible)
+    .filter((item) => item.plausible && !item.excluded)
     .sort((a, b) => Number(b.full) - Number(a.full) || b.score - a.score || b.area - a.area)) {
     // Resolve observed outer/inner alternatives before greedy deduplication can
     // discard the outer sheet. Strong creases can bound high-confidence panels.
@@ -192,6 +247,7 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
       (outer) =>
         outer !== item &&
         outer.plausible &&
+        outer.excluded !== 'unsupported-competing-boundary' &&
         outer.full &&
         supportedContour(outer.candidate) &&
         item.area < outer.area * 0.82 &&
@@ -202,19 +258,28 @@ export function selectDocumentCandidate<T extends DocumentCandidate>(
       item.excluded = 'inside-another-sheet';
       continue;
     }
-    if (
-      unique.some(
-        (other) =>
-          (item.area / other.area > 0.65 &&
-            item.area / other.area < 1.54 &&
-            quadDrift(item.corners!, other.corners!) < 0.12) ||
-          (item.area / other.area > 0.5 &&
-            item.area / other.area < 2 &&
-            overlapCoverage(item.corners!, other.corners!) > 0.65),
-      )
-    )
-      item.excluded = 'duplicate';
-    else unique.push(item);
+    const duplicates = unique.filter(
+      (other) =>
+        (item.area / other.area > 0.65 &&
+          item.area / other.area < 1.54 &&
+          quadDrift(item.corners!, other.corners!) < 0.12) ||
+        (item.area / other.area > 0.5 &&
+          item.area / other.area < 2 &&
+          overlapCoverage(item.corners!, other.corners!) > 0.65),
+    );
+    if (!duplicates.length) unique.push(item);
+    else if (
+      duplicates.length === 1 &&
+      boundaries?.[item.index]?.supported === true &&
+      boundaries[duplicates[0].index]?.supported === false &&
+      !contains(duplicates[0].corners!, item.corners!)
+    ) {
+      // Resolve the same observed document with source pixels before a higher
+      // geometric score can permanently discard its complete boundary.
+      const previous = duplicates[0];
+      previous.excluded = 'duplicate';
+      unique[unique.indexOf(previous)] = item;
+    } else item.excluded = 'duplicate';
   }
   const sheets = unique.filter((item) => {
     const nested = unique.some(

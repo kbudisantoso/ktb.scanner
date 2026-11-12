@@ -5,6 +5,7 @@
 ### Fixed
 
 - Keep a hold-still state until the final capture is secured, then give the SDK completion sound and visual feedback once. Moving after that cue cannot replace the chosen image with a later photo.
+- Prefer image-supported document boundaries over competing background fragments when selecting a still-image crop, including when finding edges again.
 
 ## 0.3.0 - 2026-11-06
 
