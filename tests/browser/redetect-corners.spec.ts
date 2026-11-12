@@ -1,6 +1,7 @@
 import { build } from 'esbuild';
 import { test, expect } from './fixtures';
 import { fixtureInBrowser, fixtures } from '../fixtures/generate';
+import { clutteredReceiptCorners, clutteredReceiptInBrowser } from '../fixtures/cluttered-document';
 import { chooseFormat, chooseProfile, closeTool, tone } from './helpers';
 
 let harness: string;
@@ -368,6 +369,81 @@ test('real redetection preserves original, rotation, recipe and paper format thr
   expect(result.metadata.rotationDegrees).toBe(after.before.rotation);
   expect(result.metadata.recipe).toEqual(after.before.recipe);
   expect(result.metadata.format).toEqual(after.before.format);
+  expect(result.cameraRequests).toBe(0);
+});
+
+test('initial processing and Find edges keep a receipt instead of an adjacent background outline', async ({
+  page,
+}) => {
+  await page.evaluate(() => {
+    const h = (window as any).edgeHarness;
+    h.edgeResults = [];
+    const post = Worker.prototype.postMessage;
+    Worker.prototype.postMessage = function (
+      message: any,
+      transfer?: Transferable[] | StructuredSerializeOptions,
+    ) {
+      if (message.kind === 'process') {
+        const complete = ({ data }: MessageEvent) => {
+          if (data.id !== message.id || data.diagnostic) return;
+          this.removeEventListener('message', complete);
+          h.edgeResults.push({ corners: data.result?.corners, error: data.error });
+        };
+        this.addEventListener('message', complete);
+      }
+      Reflect.apply(post, this, [message, transfer]);
+    };
+  });
+  const source = await page.evaluate(clutteredReceiptInBrowser);
+  await page.evaluate((source) => (window as any).edgeHarness.open(source), source);
+  await expect(page.getByRole('img', { name: 'Bearbeitete Seite', exact: true })).toBeVisible();
+  const distance = (corners: { x: number; y: number }[]) =>
+    Math.max(
+      ...corners.map((point, index) =>
+        Math.hypot(
+          point.x * 749 - clutteredReceiptCorners[index][0],
+          point.y * 999 - clutteredReceiptCorners[index][1],
+        ),
+      ),
+    );
+  const initial = await page.evaluate(() => (window as any).edgeHarness.edgeResults[0]);
+  expect(initial.error).toBeUndefined();
+  expect(distance(initial.corners), 'initial source-image detection').toBeLessThan(8);
+
+  await page.getByRole('button', { name: 'Ecken korrigieren', exact: true }).click();
+  const corner = page.getByRole('button', { name: 'Ecke oben links', exact: true });
+  await corner.press('Shift+ArrowRight');
+  await corner.press('Shift+ArrowRight');
+  const count = await page.evaluate(() => (window as any).edgeHarness.edgeResults.length);
+  const find = page.getByRole('button', { name: 'Kanten finden', exact: true });
+  await expect(find).toBeEnabled();
+  await find.click();
+  await expect
+    .poll(() => page.evaluate(() => (window as any).edgeHarness.edgeResults.length))
+    .toBe(count + 1);
+  await expect(page.locator('.scanner-corners')).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  const redetected = await page.evaluate(() => (window as any).edgeHarness.edgeResults.at(-1));
+  expect(redetected.error).toBeUndefined();
+  expect(distance(redetected.corners), 'independent edge redetection').toBeLessThan(8);
+  await page.getByRole('button', { name: 'Zuschnitt übernehmen', exact: true }).click();
+  await expect(page.locator('.scanner')).toHaveAttribute('aria-busy', 'false');
+  const applied = await page.evaluate(() => (window as any).edgeHarness.requests.at(-1).corners);
+  expect(distance(applied), 'corners actually applied by the editor').toBeLessThan(8);
+  await page.getByRole('button', { name: 'Abschließen', exact: true }).click();
+  const result = await page.evaluate(async () => {
+    const h = (window as any).edgeHarness;
+    const result = await h.result;
+    await h.controller.destroy();
+    return {
+      status: result.status,
+      metadata: result.pages[0].metadata,
+      cameraRequests: h.cameraRequests,
+    };
+  });
+  expect(result.status).toBe('confirmed');
+  expect(result.metadata.normalizedSourceSizePx).toEqual({ width: 750, height: 1000 });
+  expect(distance(result.metadata.corners), 'confirmed output geometry').toBeLessThan(8);
   expect(result.cameraRequests).toBe(0);
 });
 

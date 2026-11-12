@@ -34,8 +34,11 @@ function bands(reach: number, band: number) {
   return far[0] - near[2] >= gap ? { near, far } : null;
 }
 
-/** Admission evidence for additional contours; failure never invalidates a normal result. */
-export function hasBoundaryContrast(image: Pixels, corners: Quad): boolean {
+function measureBoundary(
+  image: Pixels,
+  corners: Quad,
+  collectAbsence: boolean,
+): { supported: boolean; absentSides: number } {
   const { width, height, data } = image;
   const points = corners.map((point) => ({ x: point.x * (width - 1), y: point.y * (height - 1) }));
   const band = Math.max(4, Math.min(width, height) * 0.01);
@@ -46,6 +49,13 @@ export function hasBoundaryContrast(image: Pixels, corners: Quad): boolean {
     const index = (y * width + x) * 4;
     return data[index] * 0.2126 + data[index + 1] * 0.7152 + data[index + 2] * 0.0722;
   };
+  const coherent = (positive: number[], negative: number[]) =>
+    [positive, negative].some(
+      (quarters) =>
+        quarters.reduce((sum, count) => sum + count, 0) >= 20 && Math.min(...quarters) >= 4,
+    );
+  let supported = true,
+    absentSides = 0;
   for (let edge = 0; edge < 4; edge++) {
     const start = points[edge],
       end = points[(edge + 1) % 4];
@@ -56,6 +66,9 @@ export function hasBoundaryContrast(image: Pixels, corners: Quad): boolean {
       ny = tx;
     const positive = [0, 0, 0, 0],
       negative = [0, 0, 0, 0];
+    const absence = collectAbsence
+      ? { positive: [0, 0, 0, 0], negative: [0, 0, 0, 0], measured: [0, 0, 0, 0] }
+      : undefined;
     for (let sample = 0; sample < 32; sample++) {
       const t = length * (0.06 + (0.88 * sample) / 31);
       const x = start.x + tx * t,
@@ -78,18 +91,41 @@ export function hasBoundaryContrast(image: Pixels, corners: Quad): boolean {
       // This exceeds a pixel cell's diagonal; rounded samples cannot collapse.
       const near = median(inside.near, 1) - median(outside.near, -1);
       const far = median(inside.far, 1) - median(outside.far, -1);
-      if (near >= 8 && far >= 8) positive[Math.floor(sample / 8)]++;
-      if (near <= -8 && far <= -8) negative[Math.floor(sample / 8)]++;
+      const quarter = Math.floor(sample / 8);
+      if (near >= 8 && far >= 8) positive[quarter]++;
+      if (near <= -8 && far <= -8) negative[quarter]++;
+      if (!absence || !Number.isFinite(near) || !Number.isFinite(far)) continue;
+      absence.measured[quarter]++;
+      if (near >= 1 && far >= 1) absence.positive[quarter]++;
+      if (near <= -1 && far <= -1) absence.negative[quarter]++;
     }
+    if (!coherent(positive, negative)) {
+      if (!collectAbsence) return { supported: false, absentSides: 0 };
+      supported = false;
+    }
+    // Weak coherent boundaries only protect an existing hypothesis from removal.
+    // Insufficient outside space is unknown, never evidence of a missing side.
     if (
-      ![positive, negative].some(
-        (quarters) =>
-          quarters.reduce((sum, count) => sum + count, 0) >= 20 && Math.min(...quarters) >= 4,
-      )
+      absence &&
+      Math.min(...absence.measured) >= 6 &&
+      !coherent(absence.positive, absence.negative)
     )
-      return false;
+      absentSides++;
   }
-  return true;
+  return { supported, absentSides };
+}
+
+/** Strong admission evidence and conservative absence evidence are separate decisions. */
+export function boundaryEvidence(
+  image: Pixels,
+  corners: Quad,
+): { supported: boolean; absentSides: number } {
+  return measureBoundary(image, corners, true);
+}
+
+/** Admission evidence for additional contours; failure never invalidates a normal result. */
+export function hasBoundaryContrast(image: Pixels, corners: Quad): boolean {
+  return measureBoundary(image, corners, false).supported;
 }
 
 /** Compare observed contours using a fixed working-image pixel tolerance, including narrow receipts. */

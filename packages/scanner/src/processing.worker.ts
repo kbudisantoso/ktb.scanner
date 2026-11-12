@@ -25,7 +25,7 @@ import { normalizePaperLighting } from './paper-cleanup.ts';
 import { applyAdjustments, autoPaperContrast, validRecipe } from './adjustments.ts';
 import { refineEdges } from './refine.ts';
 import { recoverTopPaperEdge } from './top-edge.ts';
-import { createDetectionJob } from './detection.ts';
+import { boundaryEvidence, createDetectionJob } from './detection.ts';
 import { correctLens, estimateLens } from './lens.ts';
 import { grayscale, blackAndWhite } from './color-profiles.ts';
 import { WorkerTrace } from './diagnostics.worker.ts';
@@ -242,6 +242,16 @@ async function process(
     if (!corners) {
       const detection = createDetectionJob();
       const pool: DocumentCandidate[] = [];
+      const selectStill = () =>
+        selectDocumentCandidate(
+          pool,
+          small,
+          undefined,
+          pool.map((candidate) => {
+            const quad = candidateQuad(candidate, small);
+            return quad ? boundaryEvidence(data!, quad) : { supported: false, absentSides: 0 };
+          }),
+        );
       const getPixels = () =>
         (sourcePixels ??= source!
           .getContext('2d')!
@@ -291,7 +301,7 @@ async function process(
           if (pass !== small) pass.width = pass.height = 1;
         }
       }
-      const provisional = selectDocumentCandidate(pool, small);
+      const provisional = selectStill();
       const provisionalCorners = provisional.candidate
         ? candidateQuad(provisional.candidate, small)
         : null;
@@ -360,7 +370,7 @@ async function process(
           }
         }
       }
-      const selected = selectDocumentCandidate(pool, small);
+      const selected = selectStill();
       trace?.event('candidate-selection', {
         phase: 'still-combined',
         ...selected,

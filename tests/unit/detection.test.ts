@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  boundaryEvidence,
   containsObservedTarget,
   createDetectionJob,
   hasBoundaryContrast,
@@ -66,6 +67,7 @@ test('boundary admission accepts either material polarity but rejects thin frame
       x >= 60 && x <= 340 && y >= 60 && y <= 540 ? inside : outside,
     );
     assert.equal(hasBoundaryContrast(image, paper), true);
+    assert.deepEqual(boundaryEvidence(image, paper), { supported: true, absentSides: 0 });
   }
   const frame = gray(size.width, size.height, (x, y) =>
     ((Math.abs(x - 60) <= 1 || Math.abs(x - 340) <= 1) && y >= 60 && y <= 540) ||
@@ -74,6 +76,7 @@ test('boundary admission accepts either material polarity but rejects thin frame
       : 180,
   );
   assert.equal(hasBoundaryContrast(frame, paper), false);
+  assert.deepEqual(boundaryEvidence(frame, paper), { supported: false, absentSides: 4 });
   const folded = gray(size.width, size.height, (x, y) => {
     if (x < 60 || x > 340 || y < 60 || y > 540) return 80;
     return Math.abs(y - 220) <= 2 || Math.abs(y - 380) <= 2 ? 60 : 220;
@@ -84,6 +87,10 @@ test('boundary admission accepts either material polarity but rejects thin frame
 test('near-frame samples cannot be duplicated by clamping; smaller sheets and narrow receipts retain evidence', () => {
   const near = gray(400, 600, (x, y) => (x >= 4 && x <= 340 && y >= 60 && y <= 540 ? 220 : 80));
   assert.equal(hasBoundaryContrast(near, rectangle(near, 4, 60, 340, 540)), false);
+  assert.deepEqual(boundaryEvidence(near, rectangle(near, 4, 60, 340, 540)), {
+    supported: false,
+    absentSides: 0,
+  });
   for (const [width, height, left, top, right, bottom] of [
     [240, 300, 20, 20, 220, 280],
     [80, 800, 12, 20, 67, 780],
@@ -98,6 +105,23 @@ test('near-frame samples cannot be duplicated by clamping; smaller sheets and na
       `${width} x ${height} paper with visible outside margins`,
     );
   }
+});
+
+test('weak coherent material boundaries prevent absence without admitting low-contrast contours', () => {
+  const size = { width: 400, height: 600 };
+  const paper = rectangle(size, 60, 60, 340, 540);
+  for (const [inside, outside] of [
+    [211, 205],
+    [205, 211],
+  ]) {
+    const image = gray(size.width, size.height, (x, y) =>
+      x >= 60 && x <= 340 && y >= 60 && y <= 540 ? inside : outside,
+    );
+    assert.equal(hasBoundaryContrast(image, paper), false);
+    assert.deepEqual(boundaryEvidence(image, paper), { supported: false, absentSides: 0 });
+  }
+  const flat = gray(size.width, size.height, () => 205);
+  assert.deepEqual(boundaryEvidence(flat, paper), { supported: false, absentSides: 4 });
 });
 
 test('one contrast polarity must support every edge quarter instead of mixing positive and negative counts', () => {

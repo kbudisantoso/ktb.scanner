@@ -42,6 +42,62 @@ test('two full sheets prefer the left, even when the right is closer to frame ce
     right = sheet(0.37, 0.65);
   assert.equal(selectDocumentCandidate([right, left], size).candidate, left);
 });
+test('still boundary evidence excludes a competing background before deduplication and position choice', () => {
+  const background = sheet(0.01, 0.25, 0.15, 0.63, 0.7),
+    receipt = sheet(0.257, 0.5, 0.11, 0.65, 0.72);
+  assert.equal(selectDocumentCandidate([background, receipt], size).candidate, background);
+  const result = selectDocumentCandidate([background, receipt], size, undefined, [
+    { supported: false, absentSides: 2 },
+    { supported: true, absentSides: 0 },
+  ]);
+  assert.equal(result.candidate, receipt);
+  assert.equal(result.candidates[0].excluded, 'unsupported-competing-boundary');
+});
+test('still evidence preserves separate sheets, weak shared edges and unknown frame margins', () => {
+  for (const [left, right, absentSides] of [
+    [sheet(0.02, 0.32), sheet(0.6, 0.9), 4],
+    [sheet(0.02, 0.32), sheet(0.32, 0.62), 0],
+    [sheet(0.004, 0.32), sheet(0.32, 0.62), 0],
+  ] as const) {
+    const result = selectDocumentCandidate([left, right], size, undefined, [
+      { supported: false, absentSides },
+      { supported: true, absentSides: 0 },
+    ]);
+    assert.equal(result.candidate, left);
+    assert.equal(result.candidates[0].excluded, '');
+  }
+});
+test('an implausible contour or an internal panel cannot erase an existing outer sheet', () => {
+  const left = sheet(0.02, 0.32),
+    invalid = { ...sheet(0.32, 0.62), isValid: false, confidence: 0.1 },
+    outer = sheet(0.1, 0.9, 0.05, 0.95),
+    inner = sheet(0.3, 0.7, 0.25, 0.75);
+  for (const [first, second] of [
+    [left, invalid],
+    [outer, inner],
+  ]) {
+    const result = selectDocumentCandidate([first, second], size, undefined, [
+      { supported: false, absentSides: 4 },
+      { supported: true, absentSides: 0 },
+    ]);
+    assert.equal(result.candidate, first);
+    assert.notEqual(result.candidates[0].excluded, 'unsupported-competing-boundary');
+  }
+});
+test('a source-supported duplicate can replace a scored fragment while retaining the document slot', () => {
+  const fragment = sheet(0.18, 0.77, 0.1, 0.9, 0.99),
+    paper = sheet(0.22, 0.78, 0.1, 0.9, 0.7),
+    right = sheet(0.83, 0.98);
+  assert.equal(selectDocumentCandidate([fragment, paper, right], size).candidate, fragment);
+  const result = selectDocumentCandidate([fragment, paper, right], size, undefined, [
+    { supported: false, absentSides: 1 },
+    { supported: true, absentSides: 0 },
+    { supported: true, absentSides: 0 },
+  ]);
+  assert.equal(result.candidate, paper);
+  assert.equal(result.candidates[0].excluded, 'duplicate');
+  assert.equal(result.candidates[2].excluded, '');
+});
 test('a full side sheet wins over a clipped central sheet', () => {
   const left = sheet(0.03, 0.27),
     middle = sheet(0.38, 0.63, 0, 0.9);
