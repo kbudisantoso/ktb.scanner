@@ -52,7 +52,7 @@
   "dependencies": {
     "jspdf": "4.2.1",
     "pdf-lib": "1.17.1",
-    "scanic": "1.7.1"
+    "scanic": "1.8.0"
   },
   "devDependencies": {
     "@paddleocr/paddleocr-js": "0.4.2",
